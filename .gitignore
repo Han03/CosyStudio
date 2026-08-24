@@ -1,3 +1,9 @@
+#python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # Runtime data directories
 *.db
 *.db-shm
@@ -20,3 +26,4 @@ data/cache/
 
 #test
 test/
+
