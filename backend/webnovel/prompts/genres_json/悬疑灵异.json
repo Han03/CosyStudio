@@ -1,0 +1,241 @@
+{
+  "title": "悬疑灵异题材模板",
+  "canonical_genre": "悬疑",
+  "core_selling_points": "氛围压迫 + 诡异规则 + 逻辑自洽。在恐惧与理性的边缘，探索未知的真相。",
+  "creative_constraints": [
+    "推荐约束包：Pack M06 / Pack M07",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "灵异探险流",
+      "features": "探索灵异地点，揭开诡异真相",
+      "core_payoffs": "恐怖氛围、真相揭露、绝境逃生",
+      "protagonist_traits": "勇敢、好奇心强、善于发现"
+    },
+    {
+      "name": "都市传说流",
+      "features": "现代都市中的灵异事件",
+      "core_payoffs": "身边恐怖、规则发现、智斗诡异",
+      "protagonist_traits": "理性、善于观察、冷静"
+    },
+    {
+      "name": "驱魔除灵流",
+      "features": "主角有特殊能力，专门处理灵异事件",
+      "core_payoffs": "能力成长、除灵战斗、拯救他人",
+      "protagonist_traits": "有使命感、勇敢、有天赋"
+    },
+    {
+      "name": "规则怪谈流",
+      "features": "遵守规则才能生存",
+      "core_payoffs": "规则发现、规则利用、规则反杀",
+      "protagonist_traits": "善于推理、细心、谨慎"
+    }
+  ],
+  "worldview": {
+    "description": "充满灵异与规则的恐怖世界",
+    "spirit_levels": [
+      {
+        "level": "普通灵异",
+        "features": "无害/轻微骚扰",
+        "danger": "低"
+      },
+      {
+        "level": "恶灵",
+        "features": "有攻击性",
+        "danger": "中"
+      },
+      {
+        "level": "厉鬼",
+        "features": "极度危险",
+        "danger": "高"
+      },
+      {
+        "level": "诡异",
+        "features": "规则级存在",
+        "danger": "极高"
+      },
+      {
+        "level": "禁忌",
+        "features": "不可名状",
+        "danger": "致命"
+      }
+    ],
+    "spirit_sources": [
+      "怨念",
+      "诅咒",
+      "禁忌",
+      "异界",
+      "自然"
+    ],
+    "faction_structure": [
+      "官方机构",
+      "民间组织",
+      "灵异存在",
+      "普通人"
+    ]
+  },
+  "power_system": {
+    "description": "灵异能力与规则体系",
+    "ability_types": [
+      {
+        "type": "阴阳眼",
+        "features": "看见灵异",
+        "cost": "被灵异看见"
+      },
+      {
+        "type": "通灵",
+        "features": "与灵沟通",
+        "cost": "精神消耗"
+      },
+      {
+        "type": "驱邪",
+        "features": "驱逐灵异",
+        "cost": "体力消耗"
+      },
+      {
+        "type": "封印",
+        "features": "封印灵异",
+        "cost": "材料消耗"
+      },
+      {
+        "type": "预知",
+        "features": "预见危险",
+        "cost": "头痛/流血"
+      }
+    ],
+    "ability_limits": [
+      "使用次数",
+      "副作用",
+      "条件限制",
+      "等级限制"
+    ],
+    "rule_types": [
+      {
+        "type": "禁止型",
+        "features": "不能做某事",
+        "example": "不能回头"
+      },
+      {
+        "type": "强制型",
+        "features": "必须做某事",
+        "example": "必须微笑"
+      },
+      {
+        "type": "条件型",
+        "features": "满足条件触发",
+        "example": "看到就会死"
+      },
+      {
+        "type": "时间型",
+        "features": "特定时间生效",
+        "example": "凌晨三点"
+      }
+    ],
+    "rule_design_principles": [
+      "自洽",
+      "可验证",
+      "有漏洞",
+      "有来源"
+    ]
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "入门",
+        "chapters": "1-50",
+        "focus": "主角接触灵异世界，首次解决灵异事件"
+      },
+      {
+        "name": "成长",
+        "chapters": "51-150",
+        "focus": "能力提升，解决重大灵异事件"
+      },
+      {
+        "name": "深入",
+        "chapters": "151-250",
+        "focus": "探索灵异世界的真相，揭露部分真相"
+      },
+      {
+        "name": "对抗",
+        "chapters": "251-350",
+        "focus": "与高级灵异对抗，击败主要敌人"
+      },
+      {
+        "name": "终局",
+        "chapters": "351-400",
+        "focus": "最终真相，终极对决"
+      }
+    ]
+  },
+  "story_rules": [
+    "规则破解要自洽合理",
+    "真相揭露要有伏笔",
+    "绝境逃生要有代价",
+    "能力觉醒要有限制",
+    "恐怖有逻辑有铺垫",
+    "规则自洽可验证",
+    "主角有代价有限制",
+    "设定详细且一致"
+  ],
+  "atmosphere_design": {
+    "horror_types": [
+      {
+        "type": "心理恐怖",
+        "features": "暗示为主",
+        "technique": "留白、想象"
+      },
+      {
+        "type": "视觉恐怖",
+        "features": "直接描写",
+        "technique": "血腥、畸形"
+      },
+      {
+        "type": "氛围恐怖",
+        "features": "环境营造",
+        "technique": "压抑、诡异"
+      },
+      {
+        "type": "规则恐怖",
+        "features": "违反即死",
+        "technique": "紧张、焦虑"
+      }
+    ],
+    "horror_rhythm": {
+      "foreshadow": [
+        "日常中的异常",
+        "不祥的预兆",
+        "氛围逐渐压抑"
+      ],
+      "escalation": [
+        "灵异事件发生",
+        "恐怖逐渐升级",
+        "有人遭遇不测"
+      ],
+      "climax": [
+        "直面恐怖核心",
+        "生死一线",
+        "真相揭露"
+      ],
+      "resolution": [
+        "恐怖解除/延续",
+        "余韵/伏笔"
+      ]
+    }
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "阴阳眼",
+      "通灵能力",
+      "驱邪天赋",
+      "规则感知"
+    ],
+    "fit_requirements": [
+      "要符合悬疑灵异世界观",
+      "要有代价和限制",
+      "要能制造恐怖氛围",
+      "升级路径要与危险同步"
+    ]
+  }
+}

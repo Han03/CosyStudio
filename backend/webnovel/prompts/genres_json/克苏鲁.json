@@ -1,0 +1,201 @@
+{
+  "title": "克苏鲁题材模板",
+  "canonical_genre": "悬疑",
+  "core_selling_points": "不可名状 + 理性崩塌 + 真相代价。读者快感来自\"接近真相但无法承受真相\"。",
+  "creative_constraints": [
+    "推荐约束包：Pack M21",
+    "通用叠加：Pack U04"
+  ],
+  "subgenres": [
+    {
+      "name": "调查档案流",
+      "features": "案件/日志/手稿推进，拼图式叙事",
+      "core_payoffs": "线索闭环、真相揭露、反转证据",
+      "protagonist_traits": "理性、善于推理、观察力强"
+    },
+    {
+      "name": "仪式失控流",
+      "features": "禁忌仪式触发灾变，后果层层升级",
+      "core_payoffs": "阻止失控、代价交换、局部胜利",
+      "protagonist_traits": "勇敢、果断、愿意牺牲"
+    },
+    {
+      "name": "旧日入侵流",
+      "features": "现实秩序被古神规则污染",
+      "core_payoffs": "在崩坏秩序中建立新生存规则",
+      "protagonist_traits": "适应力强、善于发现规则、有远见"
+    },
+    {
+      "name": "理智边缘流",
+      "features": "主角在理智下降中维持行动能力",
+      "core_payoffs": "以微小理性换取关键胜利",
+      "protagonist_traits": "意志坚定、有执念、善于自我控制"
+    }
+  ],
+  "worldview": {
+    "description": "不可名状的恐怖世界，真相越接近越可怕",
+    "truth_levels": [
+      {
+        "level": "表层异常",
+        "information": "可解释偏差",
+        "cost": "恐惧与误判"
+      },
+      {
+        "level": "中层污染",
+        "information": "规则扭曲",
+        "cost": "理智下降、关系破裂"
+      },
+      {
+        "level": "深层真相",
+        "information": "宇宙敌意",
+        "cost": "身份崩塌、不可逆损失"
+      }
+    ],
+    "factions": [
+      {
+        "name": "调查者组织",
+        "nature": "试图控制异常扩散"
+      },
+      {
+        "name": "秘密教团",
+        "nature": "追求古神降临或献祭收益"
+      },
+      {
+        "name": "中立旁观者",
+        "nature": "掌握情报但拒绝承担后果"
+      },
+      {
+        "name": "污染个体",
+        "nature": "受影响的人或地点"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "理智与规则体系",
+    "sanity_system": [
+      {
+        "level": "正常",
+        "description": "理性思维完整"
+      },
+      {
+        "level": "焦虑",
+        "description": "开始出现幻觉"
+      },
+      {
+        "level": "恐惧",
+        "description": "理智开始崩塌"
+      },
+      {
+        "level": "疯狂",
+        "description": "完全失去理性"
+      }
+    ],
+    "rule_system": {
+      "description": "每次异常都有可验证规则",
+      "requirements": [
+        "规则必须前后自洽",
+        "规则可验证",
+        "规则有代价"
+      ]
+    },
+    "cost_system": {
+      "description": "无法无伤通关",
+      "costs": [
+        "理智下降",
+        "身体损伤",
+        "关系破裂",
+        "身份崩塌",
+        "不可逆损失"
+      ]
+    }
+  },
+  "outline_structure": {
+    "description": "180万字参考大纲",
+    "volumes": [
+      {
+        "name": "异响",
+        "chapters": "1-70",
+        "focus": "发现异常与第一条规则，首次活着离开污染区"
+      },
+      {
+        "name": "深潜",
+        "chapters": "71-180",
+        "focus": "调查网络展开，组织与教团对抗，关键人物污染失控"
+      },
+      {
+        "name": "裂隙",
+        "chapters": "181-320",
+        "focus": "世界局部规则改写，代价型胜利，保住核心城市"
+      },
+      {
+        "name": "归零",
+        "chapters": "321-500",
+        "focus": "主角直面深层真相，牺牲与封印，重构新秩序"
+      }
+    ]
+  },
+  "story_rules": [
+    "规则必须前后自洽，可验证",
+    "代价必须真实落地到后续剧情",
+    "反转不靠突然告知，靠线索回收",
+    "情绪锚点要提前埋设",
+    "每次异常都给出至少1条可验证规则",
+    "主角每次推进都付出具体成本",
+    "用局部胜利维持追更爽感",
+    "反转前确保有可回溯线索"
+  ],
+  "horror_elements": {
+    "types": [
+      {
+        "type": "不可名状",
+        "description": "超出人类认知的恐怖"
+      },
+      {
+        "type": "理性崩塌",
+        "description": "世界观被颠覆"
+      },
+      {
+        "type": "真相代价",
+        "description": "知道得越多越危险"
+      },
+      {
+        "type": "仪式恐惧",
+        "description": "禁忌仪式的恐怖"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "规则感知",
+      "理智抗性",
+      "知识传承",
+      "特殊体质"
+    ],
+    "fit_requirements": [
+      "要符合克苏鲁世界观",
+      "要有理智代价",
+      "要能制造恐惧与胜利的反差",
+      "升级路径要谨慎"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "调查员",
+      "学者",
+      "幸存者",
+      "知情者"
+    ],
+    "villain_types": [
+      "古神",
+      "教团",
+      "污染体",
+      "自身疯狂"
+    ],
+    "relationship_patterns": [
+      "信任与背叛",
+      "理智与疯狂",
+      "真相与谎言",
+      "牺牲与救赎"
+    ]
+  }
+}

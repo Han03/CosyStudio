@@ -1,0 +1,169 @@
+{
+  "title": "系统流题材模板",
+  "canonical_genre": "玄幻",
+  "core_selling_points": "数据可视化 + 任务驱动 + 确定性回报。系统是主角的最强外挂，但也可能是最大的枷锁。",
+  "creative_constraints": [
+    "推荐约束包：Pack M13 / Pack M05",
+    "通用叠加：Pack U03"
+  ],
+  "core_mechanics": {
+    "visual_panel": {
+      "principle": "简单直接，只列核心战斗属性",
+      "rules": [
+        "非战斗属性（魅力/幸运/精神）短期内要有反馈（5-10章内触发剧情）",
+        "面板展示要克制，只在升级/关键节点展示变化",
+        "每次锻炼/战斗后数据必须涨"
+      ]
+    },
+    "task_generation": {
+      "main_quest": {
+        "description": "强制性，失败有惩罚（抹杀/扣除寿命）",
+        "function": "推动剧情发展的引擎"
+      },
+      "side_quest": {
+        "description": "选择性，奖励丰厚",
+        "function": "丰富世界观"
+      },
+      "achievement": {
+        "description": "隐藏触发",
+        "function": "给读者惊喜"
+      }
+    }
+  },
+  "inflation_control": {
+    "causes": [
+      "指数增长导致数字太大读者麻木",
+      "货币贬值导致商城失去意义"
+    ],
+    "solutions": [
+      {
+        "method": "属性压缩",
+        "description": "换地图时进行数值压缩"
+      },
+      {
+        "method": "货币回收",
+        "description": "推出吞金兽功能消耗积分"
+      },
+      {
+        "method": "边际效应",
+        "description": "等级越高升级所需经验指数级上升"
+      }
+    ]
+  },
+  "system_host_relationship": {
+    "phases": [
+      {
+        "phase": "工具期",
+        "chapters": "1-200",
+        "description": "系统冷冰冰，机械发布任务，主角依赖系统生存"
+      },
+      {
+        "phase": "伙伴期",
+        "chapters": "201-500",
+        "description": "系统解锁智能语音/精灵形象，开始吐槽卖萌，主角开始思考系统来源"
+      },
+      {
+        "phase": "博弈期",
+        "chapters": "501+",
+        "description": "阴谋论（系统是谁造的？目的是什么？），主角试图摆脱系统控制"
+      }
+    ]
+  },
+  "system_types": [
+    {
+      "type": "签到流",
+      "core": "在特定地点/时间打卡",
+      "payoffs": "探索地图 = 获得奖励",
+      "pitfalls": "容易变成流水账，必须结合剧情",
+      "protagonist_traits": "善于探索、有耐心"
+    },
+    {
+      "type": "抽奖流",
+      "core": "随机性，单车变摩托",
+      "payoffs": "欧皇时刻，绝境翻盘",
+      "pitfalls": "运气太好会显得假，需要铺垫幸运值或献祭代价",
+      "protagonist_traits": "运气好、善于把握机会"
+    },
+    {
+      "type": "兑换流",
+      "core": "只要有钱/积分，什么都能买",
+      "payoffs": "只要肝就能强",
+      "pitfalls": "容易变成打工流",
+      "protagonist_traits": "勤劳、善于规划"
+    }
+  ],
+  "outline_structure": {
+    "description": "系统流标准大纲",
+    "volumes": [
+      {
+        "name": "觉醒",
+        "chapters": "1-80",
+        "focus": "获得系统，了解规则，首次完成任务"
+      },
+      {
+        "name": "成长",
+        "chapters": "81-200",
+        "focus": "系统工具期，依赖系统成长，完成各种任务"
+      },
+      {
+        "name": "伙伴",
+        "chapters": "201-500",
+        "focus": "系统解锁智能，主角与系统建立关系，思考系统来源"
+      },
+      {
+        "name": "博弈",
+        "chapters": "501-700",
+        "focus": "发现系统秘密，试图摆脱控制，寻找自身力量"
+      },
+      {
+        "name": "终局",
+        "chapters": "701-900",
+        "focus": "揭露系统真相，终极对决，获得真正的自由"
+      }
+    ]
+  },
+  "story_rules": [
+    "系统名称未知时用代号/称呼，不要用???",
+    "面板展示要克制，避免每章重复",
+    "非战斗属性必须有短期内的剧情反馈",
+    "任务目标必须具有挑战性但可完成",
+    "奖励必须包含主角急需的物品",
+    "失败惩罚必须让主角感到肉痛但不致死",
+    "系统与主角的关系要逐步演变"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "签到系统",
+      "抽奖系统",
+      "兑换系统",
+      "任务系统",
+      "全能系统"
+    ],
+    "fit_requirements": [
+      "要符合系统流世界观",
+      "要有明确的规则和限制",
+      "要有数值膨胀控制机制",
+      "系统与主角关系要逐步演变"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "平凡人",
+      "重生者",
+      "穿越者",
+      "废柴"
+    ],
+    "villain_types": [
+      "系统本身",
+      "系统制造者",
+      "其他系统宿主",
+      "被系统抛弃的人"
+    ],
+    "relationship_patterns": [
+      "人与工具",
+      "人与AI伙伴",
+      "囚徒与狱卒",
+      "觉醒与反抗"
+    ]
+  }
+}

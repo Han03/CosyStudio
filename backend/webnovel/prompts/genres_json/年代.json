@@ -1,0 +1,193 @@
+{
+  "title": "年代题材模板",
+  "canonical_genre": "年代",
+  "core_selling_points": "时代背景 + 生活奋斗 + 情感共鸣。在特定年代的洪流中，书写小人物的奋斗史诗。",
+  "creative_constraints": [
+    "推荐约束包：Pack F12",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "六七十年代流",
+      "features": "计划经济，上山下乡，物资匮乏",
+      "core_payoffs": "空间囤货、知识碾压、改善生活",
+      "protagonist_traits": "谨慎、善于隐藏、有远见"
+    },
+    {
+      "name": "八九十年代流",
+      "features": "改革开放，下海经商，时代变革",
+      "core_payoffs": "抓住机遇、创业致富、时代红利",
+      "protagonist_traits": "敏锐、敢闯敢拼、有商业头脑"
+    },
+    {
+      "name": "民国年代流",
+      "features": "乱世风云，家族兴衰，爱恨情仇",
+      "core_payoffs": "乱世生存、家族崛起、爱情坚守",
+      "protagonist_traits": "坚韧、有担当、重情义"
+    },
+    {
+      "name": "建国初期流",
+      "features": "百废待兴，建设热潮，理想主义",
+      "core_payoffs": "技术贡献、建设成就、时代荣光",
+      "protagonist_traits": "爱国、有理想、肯奉献"
+    }
+  ],
+  "worldview": {
+    "description": "特定年代背景下的奋斗世界",
+    "era_features": {
+      "sixties_seventies": {
+        "economy": "计划经济，凭票供应",
+        "politics": "运动频繁",
+        "society": "集体主义",
+        "marriage": "组织介绍",
+        "work": "分配制度"
+      },
+      "eighties_nineties": {
+        "economy": "改革开放",
+        "politics": "相对宽松",
+        "society": "观念转变",
+        "marriage": "自由恋爱",
+        "work": "下海潮"
+      }
+    },
+    "resource_system": [
+      "票证",
+      "关系",
+      "信息",
+      "技能"
+    ],
+    "era_elements": {
+      "sixties_seventies": [
+        "知青下乡",
+        "工农兵大学",
+        "供销社",
+        "生产队",
+        "大院生活"
+      ],
+      "eighties_nineties": [
+        "个体户",
+        "倒爷",
+        "股票",
+        "出国潮",
+        "下岗潮"
+      ]
+    }
+  },
+  "power_system": {
+    "description": "时代机遇与资源体系",
+    "opportunities": [
+      "恢复高考",
+      "改革开放",
+      "股市开放",
+      "房地产"
+    ],
+    "success_factors": [
+      "知识",
+      "关系",
+      "胆识",
+      "机遇"
+    ]
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "立足",
+        "chapters": "1-60",
+        "focus": "穿越/重生，适应环境，站稳脚跟"
+      },
+      {
+        "name": "发展",
+        "chapters": "61-150",
+        "focus": "抓住机遇，开始积累，获得第一桶金"
+      },
+      {
+        "name": "崛起",
+        "chapters": "151-250",
+        "focus": "事业发展，地位提升，成为当地富户"
+      },
+      {
+        "name": "巅峰",
+        "chapters": "251-350",
+        "focus": "事业巅峰，家庭圆满"
+      },
+      {
+        "name": "圆满",
+        "chapters": "351-400",
+        "focus": "子孙满堂，安享晚年"
+      }
+    ]
+  },
+  "story_rules": [
+    "空间囤货要隐藏好",
+    "知识碾压要符合时代",
+    "抓住机遇要有铺垫",
+    "打脸极品不能太刻意",
+    "注重年代细节",
+    "避开敏感话题",
+    "金手指要隐藏",
+    "节奏要紧凑"
+  ],
+  "atmosphere": {
+    "language_features": {
+      "sixties_seventies": [
+        "同志",
+        "革命",
+        "为人民服务"
+      ],
+      "eighties_nineties": [
+        "下海",
+        "万元户",
+        "铁饭碗"
+      ]
+    },
+    "life_details": {
+      "sixties_seventies": {
+        "clothing": "蓝灰绿",
+        "food": "粗粮为主",
+        "housing": "筒子楼",
+        "transport": "自行车"
+      },
+      "eighties_nineties": {
+        "clothing": "喇叭裤",
+        "food": "开始丰富",
+        "housing": "单元房",
+        "transport": "摩托车"
+      }
+    }
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "空间能力",
+      "预知能力",
+      "现代知识",
+      "经商天赋"
+    ],
+    "fit_requirements": [
+      "要符合年代世界观",
+      "要有时代限制",
+      "要能制造奋斗爽点",
+      "升级路径要与时代进程同步"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "重生者",
+      "穿越者",
+      "空间流",
+      "普通人"
+    ],
+    "villain_types": [
+      "极品亲戚",
+      "竞争对手",
+      "时代限制",
+      "政治迫害"
+    ],
+    "relationship_patterns": [
+      "夫妻同心",
+      "母子情深",
+      "朋友互助",
+      "师徒传承"
+    ]
+  }
+}

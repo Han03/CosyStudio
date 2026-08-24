@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电子书阅读器</title>
+    <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        :root {
+            /* 轻度新拟态：与主站 token 对齐 */
+            --neu-bg: #e8edf2;
+            --neu-light: #ffffff;
+            --neu-dark: #b8c5d6;
+            --neu-text: #2d3748;
+            --neu-text-muted: #64748b;
+            --neu-accent: #6c5ce7;
+            --neu-bg-secondary: #e2e8f0;
+            --neu-border: rgba(163, 177, 198, 0.28);
+            --neu-shadow-small: 2px 2px 5px rgba(163, 177, 198, 0.38), -1px -1px 4px rgba(255, 255, 255, 0.85);
+            --neu-shadow-inset: inset 2px 2px 4px rgba(163, 177, 198, 0.35), inset -1px -1px 3px rgba(255, 255, 255, 0.75);
+            --neu-shadow: var(--neu-shadow-small);
+            --reader-bg: #f5f0e8;
+            --reader-text: #3d3d3d;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: var(--neu-bg);
+            color: var(--neu-text);
+            font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        .reader-header {
+            background: var(--neu-bg);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .reader-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-btn {
+            background: var(--neu-bg);
+            border: none;
+            border-radius: 10px;
+            box-shadow: var(--neu-shadow-small);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--neu-text);
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            color: var(--neu-accent);
+        }
+
+        .book-info-bar {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .book-info-bar .title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--neu-text);
+        }
+
+        .book-info-bar .author {
+            font-size: 12px;
+            color: var(--neu-text-muted);
+        }
+
+        .reader-header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chapter-indicator {
+            font-size: 13px;
+            color: var(--neu-text-muted);
+        }
+
+        .font-size-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--neu-bg);
+            border-radius: 10px;
+            box-shadow: var(--neu-shadow-small);
+            padding: 4px 12px;
+        }
+
+        .font-size-control button {
+            background: none;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--neu-text);
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .font-size-control button:hover {
+            background: var(--neu-dark);
+            color: var(--neu-light);
+        }
+
+        .font-size-control .size-label {
+            font-size: 13px;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        /* 主体区域 */
+        .reader-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 章节目录侧栏 */
+        .chapter-sidebar {
+            width: 280px;
+            background: var(--neu-bg);
+            box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: margin-left 0.3s ease;
+        }
+
+        .chapter-sidebar.collapsed {
+            margin-left: -280px;
+        }
+
+        .chapter-sidebar-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chapter-sidebar-header h5 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .chapter-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .chapter-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chapter-list::-webkit-scrollbar-thumb {
+            background: var(--neu-dark);
+            border-radius: 3px;
+        }
+
+        .chapter-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--neu-text);
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chapter-item:hover {
+            background: rgba(108, 92, 231, 0.08);
+            color: var(--neu-accent);
+        }
+
+        .chapter-item.active {
+            background: rgba(108, 92, 231, 0.12);
+            border-left-color: var(--neu-accent);
+            color: var(--neu-accent);
+            font-weight: 600;
+        }
+
+        /* 阅读区域 */
+        .reader-content-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            padding: 32px 16px;
+        }
+
+        .reader-content-wrapper::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .reader-content-wrapper::-webkit-scrollbar-thumb {
+            background: var(--neu-dark);
+            border-radius: 4px;
+        }
+
+        .reader-content {
+            max-width: 720px;
+            width: 100%;
+            background: var(--reader-bg);
+            border-radius: 12px;
+            padding: 48px 56px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+            min-height: fit-content;
+        }
+
+        .chapter-title-display {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: var(--reader-text);
+            text-align: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .chapter-text {
+            font-size: var(--reader-font-size, 18px);
+            line-height: 1.9;
+            color: var(--reader-text);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* 底部导航 */
+        .reader-footer {
+            background: var(--neu-bg);
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .nav-btn {
+            background: var(--neu-bg);
+            border: none;
+            border-radius: 10px;
+            box-shadow: var(--neu-shadow-small);
+            padding: 8px 20px;
+            cursor: pointer;
+            color: var(--neu-text);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            color: var(--neu-accent);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .toggle-sidebar-btn {
+            background: var(--neu-bg);
+            border: none;
+            border-radius: 10px;
+            box-shadow: var(--neu-shadow-small);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--neu-text);
+        }
+
+        /* 加载/空状态 */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--neu-text-muted);
+        }
+
+        .loading-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: var(--neu-dark);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--neu-dark);
+            border-top-color: var(--neu-accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast */
+        .toast-msg {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 9999;
+            padding: 12px 24px;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.3s;
+        }
+
+        .toast-msg.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast-msg.success { background: #10b981; }
+        .toast-msg.error { background: #ef4444; }
+        .toast-msg.info { background: #3b82f6; }
+
+        /* 朗读控制栏 */
+        .read-aloud-bar {
+            background: var(--neu-bg);
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+            border-top: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .read-aloud-btn {
+            background: var(--neu-bg);
+            border: none;
+            border-radius: 10px;
+            box-shadow: var(--neu-shadow-small);
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--neu-text);
+            font-size: 14px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .read-aloud-btn:hover:not(:disabled) {
+            color: var(--neu-accent);
+        }
+
+        .read-aloud-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .read-aloud-btn.primary {
+            background: var(--neu-accent);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+        }
+
+        .read-aloud-btn.primary:hover {
+            filter: brightness(1.1);
+            color: #fff;
+        }
+
+        .read-aloud-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .read-aloud-status {
+            font-size: 12px;
+            color: var(--neu-text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .read-aloud-progress {
+            height: 4px;
+            background: rgba(0,0,0,0.08);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .read-aloud-progress-bar {
+            height: 100%;
+            background: var(--neu-accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .read-aloud-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .agent-selector {
+            position: relative;
+        }
+
+        .agent-select-btn {
+            background: var(--neu-bg);
+            border: none;
+            border-radius: 10px;
+            box-shadow: var(--neu-shadow-small);
+            padding: 6px 14px;
+            cursor: pointer;
+            color: var(--neu-text);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            max-width: 180px;
+        }
+
+        .agent-select-btn:hover {
+            color: var(--neu-accent);
+        }
+
+        .agent-select-btn span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .agent-dropdown {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 8px;
+            background: var(--neu-bg);
+            border-radius: 10px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+            padding: 8px 0;
+            min-width: 240px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .agent-dropdown.show {
+            display: block;
+        }
+
+        .agent-dropdown-item {
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--neu-text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .agent-dropdown-item:hover {
+            background: rgba(108, 92, 231, 0.08);
+            color: var(--neu-accent);
+        }
+
+        .agent-dropdown-item.active {
+            background: rgba(108, 92, 231, 0.12);
+            color: var(--neu-accent);
+            font-weight: 600;
+        }
+
+        .agent-meta {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .agent-meta-tag {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: rgba(108, 92, 231, 0.1);
+            color: var(--neu-accent);
+            white-space: nowrap;
+        }
+
+        .agent-preview-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(108, 92, 231, 0.1);
+            color: var(--neu-accent);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .agent-preview-btn:hover {
+            background: var(--neu-accent);
+            color: #fff;
+        }
+
+        .agent-preview-btn.playing {
+            background: var(--neu-accent);
+            color: #fff;
+        }
+
+        .agent-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--neu-accent), #a29bfe);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .agent-info-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .agent-info-text .name {
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .agent-info-text .desc {
+            font-size: 11px;
+            color: var(--neu-text-muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--neu-text-muted);
+        }
+
+        .speed-control button {
+            background: var(--neu-bg);
+            border: none;
+            border-radius: 6px;
+            box-shadow: var(--neu-shadow-small);
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            color: var(--neu-text);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .speed-control button:hover {
+            color: var(--neu-accent);
+        }
+
+        .speed-value {
+            min-width: 36px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--neu-text);
+        }
+
+        .sentence-highlight {
+            background: rgba(108, 92, 231, 0.2);
+            border-radius: 4px;
+            padding: 2px 0;
+            transition: background 0.2s;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="reader-header">
+        <div class="reader-header-left">
+            <button class="back-btn" onclick="goBack()" title="返回书库">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="切换目录">
+                <i class="fas fa-list"></i>
+            </button>
+            <div class="book-info-bar">
+                <span class="title" id="bookTitle">加载中...</span>
+                <span class="author" id="bookAuthor"></span>
+            </div>
+        </div>
+        <div class="reader-header-right">
+            <span class="chapter-indicator" id="chapterIndicator"></span>
+            <button class="read-aloud-toggle" onclick="toggleReadAloud()" title="智能朗读" style="background:transparent;border:none;cursor:pointer;color:var(--neu-text);padding:6px 10px;font-size:15px;">
+                <i class="fas fa-volume-up"></i>
+            </button>
+            <div class="font-size-control">
+                <button onclick="changeFontSize(-1)">A-</button>
+                <span class="size-label" id="fontSizeLabel">18</span>
+                <button onclick="changeFontSize(1)">A+</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主体区域 -->
+    <div class="reader-body">
+        <!-- 章节目录 -->
+        <div class="chapter-sidebar" id="chapterSidebar">
+            <div class="chapter-sidebar-header">
+                <h5><i class="fas fa-bookmark"></i> 目录</h5>
+                <span class="badge bg-secondary" id="chapterTotalBadge">0</span>
+            </div>
+            <div class="chapter-list" id="chapterList">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p class="mt-2">加载章节...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 阅读区域 -->
+        <div class="reader-content-wrapper" id="readerContentWrapper">
+            <div class="reader-content" id="readerContent">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p class="mt-2">加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 朗读控制栏 -->
+    <div class="read-aloud-bar" id="readAloudBar" style="display:none;">
+        <button class="read-aloud-btn primary" id="playPauseBtn" onclick="togglePlayPause()">
+            <i class="fas fa-play" id="playPauseIcon"></i>
+        </button>
+        <button class="read-aloud-btn" onclick="stopReading()" title="停止">
+            <i class="fas fa-stop"></i>
+        </button>
+        <button class="read-aloud-btn" onclick="prevSentence()" title="上一句">
+            <i class="fas fa-step-backward"></i>
+        </button>
+        <button class="read-aloud-btn" onclick="nextSentence()" title="下一句">
+            <i class="fas fa-step-forward"></i>
+        </button>
+
+        <div class="read-aloud-info">
+            <div class="read-aloud-status" id="readAloudStatus">
+                <span>准备朗读</span>
+            </div>
+            <div class="read-aloud-progress">
+                <div class="read-aloud-progress-bar" id="readProgressBar"></div>
+            </div>
+        </div>
+
+        <div class="speed-control">
+            <button onclick="changeSpeed(-0.1)" title="减速">−</button>
+            <span class="speed-value" id="speedValue">1.0x</span>
+            <button onclick="changeSpeed(0.1)" title="加速">+</button>
+        </div>
+
+        <div class="agent-selector">
+            <button class="agent-select-btn" onclick="toggleAgentDropdown(event)">
+                <i class="fas fa-user-robot"></i>
+                <span id="selectedAgentName">选择智能体</span>
+                <i class="fas fa-chevron-up" style="font-size:10px;"></i>
+            </button>
+            <div class="agent-dropdown" id="agentDropdown">
+                <div class="loading-state" style="padding:20px;">
+                    <p>加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast-container" id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;"></div>
+
+    <!-- 底部导航 -->
+    <div class="reader-footer">
+        <button class="nav-btn" id="prevBtn" onclick="goToChapter(currentChapterIndex - 1)" disabled>
+            <i class="fas fa-chevron-left"></i> 上一章
+        </button>
+        <span class="chapter-indicator" id="footerChapterIndicator"></span>
+        <button class="nav-btn" id="nextBtn" onclick="goToChapter(currentChapterIndex + 1)" disabled>
+            下一章 <i class="fas fa-chevron-right"></i>
+        </button>
+    </div>
+
+    <script>
+        let bookId = null;
+        let chapters = [];
+        let currentChapterIndex = 0;
+        let fontSize = 18;
+
+        function getBookIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('book_id');
+        }
+
+        async function init() {
+            bookId = getBookIdFromUrl();
+            if (!bookId) {
+                showError('缺少 book_id 参数');
+                return;
+            }
+
+            await loadBookInfo();
+            await loadChapters();
+            if (chapters.length > 0) {
+                await goToChapter(0);
+            }
+        }
+
+        async function loadBookInfo() {
+            try {
+                const response = await fetch(`/api/books/library?book_id=${bookId}`);
+                if (!response.ok) {
+                    showError('电子书不存在');
+                    return;
+                }
+                const data = await response.json();
+                if (data.success) {
+                    const book = data.book;
+                    document.getElementById('bookTitle').textContent = book.title;
+                    document.getElementById('bookAuthor').textContent =
+                        `${book.author || '佚名'} · ${book.word_count}字 · ${book.chapter_count || 0}章`;
+                    document.title = `${book.title} - 电子书阅读器`;
+                }
+            } catch (e) {
+                console.error('加载电子书信息失败:', e);
+                showError('加载电子书信息失败');
+            }
+        }
+
+        async function loadChapters() {
+            try {
+                const response = await fetch(`/api/books/library/chapters?book_id=${bookId}`);
+                if (!response.ok) {
+                    showError('加载章节列表失败');
+                    return;
+                }
+                const data = await response.json();
+                if (data.success) {
+                    chapters = data.chapters;
+                    renderChapterList();
+                    document.getElementById('chapterTotalBadge').textContent = chapters.length;
+                }
+            } catch (e) {
+                console.error('加载章节列表失败:', e);
+                showError('加载章节列表失败');
+            }
+        }
+
+        function renderChapterList() {
+            const list = document.getElementById('chapterList');
+            list.innerHTML = '';
+
+            if (chapters.length === 0) {
+                list.innerHTML = '<div class="loading-state"><p>暂无章节</p></div>';
+                return;
+            }
+
+            chapters.forEach(ch => {
+                const item = document.createElement('div');
+                item.className = 'chapter-item';
+                item.dataset.index = ch.chapter_index;
+                item.textContent = ch.title;
+                item.onclick = () => goToChapter(ch.chapter_index);
+                list.appendChild(item);
+            });
+        }
+
+        async function goToChapter(index) {
+            if (index < 0 || index >= chapters.length) return;
+
+            currentChapterIndex = index;
+            const chapter = chapters[index];
+
+            // 更新目录高亮
+            document.querySelectorAll('.chapter-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.index) === index);
+            });
+
+            // 更新指示器
+            const indicator = `${index + 1} / ${chapters.length}`;
+            document.getElementById('chapterIndicator').textContent = indicator;
+            document.getElementById('footerChapterIndicator').textContent = indicator;
+
+            // 更新上下章按钮
+            document.getElementById('prevBtn').disabled = index <= 0;
+            document.getElementById('nextBtn').disabled = index >= chapters.length - 1;
+
+            // 显示加载状态
+            const contentEl = document.getElementById('readerContent');
+            contentEl.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p class="mt-2">加载章节内容...</p></div>';
+
+            // 加载章节内容
+            try {
+                const response = await fetch(`/api/books/library/chapters/content?book_id=${bookId}&chapter_index=${index}`);
+                if (!response.ok) {
+                    contentEl.innerHTML = `<div class="loading-state"><i class="fas fa-exclamation-circle"></i><p>加载章节内容失败</p></div>`;
+                    return;
+                }
+                const data = await response.json();
+                if (data.success) {
+                    contentEl.innerHTML = `
+                        <div class="chapter-title-display">${escapeHtml(data.chapter_title)}</div>
+                        <div class="chapter-text">${escapeHtml(data.content)}</div>
+                    `;
+                    // 滚动到顶部
+                    document.getElementById('readerContentWrapper').scrollTop = 0;
+                    // 滚动目录到当前章节
+                    const activeItem = document.querySelector('.chapter-item.active');
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }
+            } catch (e) {
+                console.error('加载章节内容失败:', e);
+                contentEl.innerHTML = `<div class="loading-state"><i class="fas fa-exclamation-circle"></i><p>加载章节内容失败</p></div>`;
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('chapterSidebar').classList.toggle('collapsed');
+        }
+
+        function changeFontSize(delta) {
+            fontSize = Math.max(14, Math.min(28, fontSize + delta));
+            document.getElementById('fontSizeLabel').textContent = fontSize;
+            document.documentElement.style.setProperty('--reader-font-size', fontSize + 'px');
+        }
+
+        function goBack() {
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+
+        function showError(message) {
+            const contentEl = document.getElementById('readerContent');
+            contentEl.innerHTML = `
+                <div class="loading-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>${escapeHtml(message)}</p>
+                    <button class="nav-btn mt-3" onclick="goBack()">
+                        <i class="fas fa-arrow-left"></i> 返回书库
+                    </button>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                goToChapter(currentChapterIndex - 1);
+            } else if (e.key === 'ArrowRight') {
+                goToChapter(currentChapterIndex + 1);
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                const wrapper = document.getElementById('readerContentWrapper');
+                wrapper.scrollBy({ top: wrapper.clientHeight * 0.8, behavior: 'smooth' });
+            }
+        });
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `toast-msg ${type} show`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // 朗读功能状态
+        let readAloudEnabled = false;
+        let isReading = false;
+        let isPaused = false;
+        let sentences = [];
+        let currentSentenceIdx = 0;
+        let selectedAgentId = null;
+        let selectedAgentName = '';
+        let readSpeed = 1.0;
+        let audioQueue = [];
+        let currentAudio = null;
+        let prefetchPromises = {};
+
+        function toggleReadAloud() {
+            readAloudEnabled = !readAloudEnabled;
+            const bar = document.getElementById('readAloudBar');
+            if (readAloudEnabled) {
+                bar.style.display = 'flex';
+                loadAgents();
+                loadChapterSentences();
+            } else {
+                bar.style.display = 'none';
+                stopReading();
+            }
+        }
+
+        let previewAudio = null;
+
+        async function loadAgents() {
+            try {
+                const resp = await fetch('/api/agents?page=1&page_size=200');
+                if (!resp.ok) {
+                    showToast('加载智能体列表失败', 'error');
+                    return;
+                }
+                const data = await resp.json();
+                const agents = data.items || data.agents || [];
+                if (agents.length > 0) {
+                    const dropdown = document.getElementById('agentDropdown');
+                    dropdown.innerHTML = '';
+                    agents.forEach(agent => {
+                        const item = document.createElement('div');
+                        item.className = 'agent-dropdown-item' + (agent.id === selectedAgentId ? ' active' : '');
+                        item.dataset.agentId = agent.id;
+
+                        const hasVoice = (agent.voice_tones && agent.voice_tones.length > 0);
+
+                        const genderText = agent.gender || '';
+                        const ageText = agent.age || '';
+                        const metaTags = [genderText, ageText].filter(Boolean).map(t =>
+                            `<span class="agent-meta-tag">${escapeHtml(t)}</span>`
+                        ).join('');
+
+                        item.innerHTML = `
+                            <div class="agent-avatar">${(agent.name || 'A').charAt(0)}</div>
+                            <div class="agent-info-text">
+                                <div class="name">${escapeHtml(agent.name || '未命名')}</div>
+                            </div>
+                            ${metaTags ? `<div class="agent-meta">${metaTags}</div>` : ''}
+                            ${hasVoice ? `<button class="agent-preview-btn" title="试听音色" onclick="event.stopPropagation(); previewAgentVoice('${agent.id}', this)"><i class="fas fa-play"></i></button>` : ''}
+                        `;
+                        item.onclick = () => selectAgent(agent);
+                        dropdown.appendChild(item);
+                    });
+
+                    if (!selectedAgentId) {
+                        selectAgent(agents[0]);
+                    }
+                } else {
+                    document.getElementById('agentDropdown').innerHTML = '<div style="padding:16px;text-align:center;color:var(--neu-text-muted);font-size:13px;">暂无智能体</div>';
+                }
+            } catch (e) {
+                console.error('加载智能体列表失败:', e);
+            }
+        }
+
+        function previewAgentVoice(agentId, btn) {
+            if (previewAudio) {
+                previewAudio.pause();
+                previewAudio = null;
+                document.querySelectorAll('.agent-preview-btn.playing').forEach(el => {
+                    el.classList.remove('playing');
+                    el.innerHTML = '<i class="fas fa-play"></i>';
+                });
+            }
+
+            if (btn.classList.contains('playing')) {
+                return;
+            }
+
+            btn.classList.add('playing');
+            btn.innerHTML = '<i class="fas fa-pause"></i>';
+
+            const url = `/api/agents/voice-preview?agent_id=${agentId}&tone_index=0`;
+            previewAudio = new Audio(url);
+
+            previewAudio.onended = () => {
+                btn.classList.remove('playing');
+                btn.innerHTML = '<i class="fas fa-play"></i>';
+                previewAudio = null;
+            };
+
+            previewAudio.onerror = () => {
+                btn.classList.remove('playing');
+                btn.innerHTML = '<i class="fas fa-play"></i>';
+                previewAudio = null;
+                showToast('试听失败', 'error');
+            };
+
+            previewAudio.play().catch(() => {
+                btn.classList.remove('playing');
+                btn.innerHTML = '<i class="fas fa-play"></i>';
+                previewAudio = null;
+                showToast('试听失败', 'error');
+            });
+        }
+
+        function toggleAgentDropdown(e) {
+            e.stopPropagation();
+            document.getElementById('agentDropdown').classList.toggle('show');
+        }
+
+        document.addEventListener('click', () => {
+            document.getElementById('agentDropdown')?.classList.remove('show');
+        });
+
+        function selectAgent(agent) {
+            selectedAgentId = agent.id;
+            selectedAgentName = agent.name;
+            document.getElementById('selectedAgentName').textContent = agent.name;
+            document.getElementById('agentDropdown').classList.remove('show');
+
+            document.querySelectorAll('.agent-dropdown-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.agentId === agent.id);
+            });
+
+            if (isReading) {
+                stopReading();
+                audioQueue = [];
+            }
+        }
+
+        function changeSpeed(delta) {
+            readSpeed = Math.max(0.5, Math.min(2.0, readSpeed + delta));
+            readSpeed = Math.round(readSpeed * 10) / 10;
+            document.getElementById('speedValue').textContent = readSpeed.toFixed(1) + 'x';
+        }
+
+        async function loadChapterSentences() {
+            try {
+                const resp = await fetch(
+                    `/api/books/library/chapters/sentences?book_id=${bookId}&chapter_index=${currentChapterIndex}`
+                );
+                if (!resp.ok) {
+                    updateReadStatus('加载句子失败');
+                    return;
+                }
+                const data = await resp.json();
+                if (data.success) {
+                    sentences = data.sentences || [];
+                    updateReadStatus(`共 ${sentences.length} 句`);
+                }
+            } catch (e) {
+                console.error('加载句子列表失败:', e);
+                updateReadStatus('加载句子失败');
+            }
+        }
+
+        function updateReadStatus(text) {
+            document.getElementById('readAloudStatus').innerHTML = `<span>${escapeHtml(text)}</span>`;
+        }
+
+        function updateProgress() {
+            const total = sentences.length;
+            const progress = total > 0 ? (currentSentenceIdx / total) * 100 : 0;
+            document.getElementById('readProgressBar').style.width = progress + '%';
+        }
+
+        function togglePlayPause() {
+            if (!selectedAgentId) {
+                showToast('请先选择智能体', 'error');
+                return;
+            }
+            if (sentences.length === 0) {
+                showToast('没有可朗读的句子', 'error');
+                return;
+            }
+
+            if (!isReading || isPaused) {
+                startReading();
+            } else {
+                pauseReading();
+            }
+        }
+
+        function startReading() {
+            if (!isReading) {
+                currentSentenceIdx = 0;
+                audioQueue = [];
+                prefetchPromises = {};
+            }
+            isReading = true;
+            isPaused = false;
+            document.getElementById('playPauseIcon').className = 'fas fa-pause';
+
+            playNextSentence();
+        }
+
+        function pauseReading() {
+            isPaused = true;
+            document.getElementById('playPauseIcon').className = 'fas fa-play';
+            if (currentAudio) {
+                currentAudio.pause();
+            }
+        }
+
+        function stopReading() {
+            isReading = false;
+            isPaused = false;
+            currentSentenceIdx = 0;
+            document.getElementById('playPauseIcon').className = 'fas fa-play';
+            updateReadStatus('已停止');
+            updateProgress();
+
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            audioQueue = [];
+            prefetchPromises = {};
+
+            document.querySelectorAll('.sentence-highlight').forEach(el => {
+                el.classList.remove('sentence-highlight');
+            });
+        }
+
+        function prevSentence() {
+            if (currentSentenceIdx > 0) {
+                currentSentenceIdx = Math.max(0, currentSentenceIdx - 2);
+                if (currentAudio) {
+                    currentAudio.pause();
+                }
+                playNextSentence();
+            }
+        }
+
+        function nextSentence() {
+            if (currentAudio) {
+                currentAudio.pause();
+            }
+            currentSentenceIdx++;
+            playNextSentence();
+        }
+
+        async function playNextSentence() {
+            if (!isReading || isPaused) return;
+
+            if (currentSentenceIdx >= sentences.length) {
+                stopReading();
+                updateReadStatus('朗读完毕');
+                return;
+            }
+
+            updateProgress();
+            highlightSentence(currentSentenceIdx);
+
+            // 检查是否已在缓冲队列中
+            const queuedIdx = audioQueue.findIndex(item => item.index === currentSentenceIdx);
+            if (queuedIdx >= 0) {
+                const item = audioQueue.splice(queuedIdx, 1)[0];
+                playAudio(item.url, item.index);
+                prefetchSentence(currentSentenceIdx + 1);
+                return;
+            }
+
+            // 检查是否已有正在进行的预生成
+            if (prefetchPromises[currentSentenceIdx]) {
+                updateReadStatus(`等待语音生成 第 ${currentSentenceIdx + 1}/${sentences.length} 句`);
+                try {
+                    const result = await prefetchPromises[currentSentenceIdx];
+                    if (result && result.url && currentSentenceIdx === result.index) {
+                        playAudio(result.url, result.index);
+                        prefetchSentence(currentSentenceIdx + 1);
+                        return;
+                    }
+                } catch (e) {
+                    // 预生成失败，继续走直接生成
+                }
+            }
+
+            // 直接生成并播放
+            synthesizeAndPlay(sentences[currentSentenceIdx], currentSentenceIdx);
+        }
+
+        async function synthesizeAndPlay(sentence, index) {
+            try {
+                updateReadStatus(`正在生成语音 第 ${index + 1}/${sentences.length} 句`);
+                const result = await requestSentenceAudio(index);
+
+                if (index !== currentSentenceIdx) return;
+
+                playAudio(result.url, index);
+                // 生成完成后，立刻预生成下一句
+                prefetchSentence(index + 1);
+            } catch (e) {
+                console.error('语音合成失败:', e);
+                updateReadStatus(`生成失败: ${e.message}`);
+                currentSentenceIdx++;
+                setTimeout(() => playNextSentence(), 300);
+            }
+        }
+
+        function playAudio(url, index) {
+            if (index !== currentSentenceIdx) return;
+
+            if (currentAudio) {
+                currentAudio.pause();
+            }
+
+            const audio = new Audio(url);
+            currentAudio = audio;
+
+            updateReadStatus(`正在朗读 第 ${index + 1}/${sentences.length} 句`);
+
+            audio.onended = () => {
+                if (index === currentSentenceIdx && isReading && !isPaused) {
+                    currentSentenceIdx++;
+                    playNextSentence();
+                }
+            };
+
+            audio.onerror = () => {
+                console.error('音频播放失败');
+                if (index === currentSentenceIdx && isReading && !isPaused) {
+                    currentSentenceIdx++;
+                    playNextSentence();
+                }
+            };
+
+            audio.play().catch(err => {
+                console.error('播放失败:', err);
+                if (index === currentSentenceIdx && isReading && !isPaused) {
+                    currentSentenceIdx++;
+                    playNextSentence();
+                }
+            });
+        }
+
+        async function requestSentenceAudio(index) {
+            if (index >= sentences.length) return null;
+
+            // 如果已在队列中，直接返回
+            const queued = audioQueue.find(item => item.index === index);
+            if (queued) return queued;
+
+            // 如果已有正在进行的请求，等待它
+            if (prefetchPromises[index]) {
+                return await prefetchPromises[index];
+            }
+
+            const promise = (async () => {
+                // 遇到"系统繁忙"时自动重试
+                for (let attempt = 0; attempt < 30; attempt++) {
+                    if (!isReading) return null;
+                    try {
+                        const resp = await fetch(
+                            `/api/books/library/chapters/sentences/audio?book_id=${bookId}&chapter_index=${currentChapterIndex}&sentence_index=${index}`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    agent_id: selectedAgentId,
+                                    speed: readSpeed,
+                                }),
+                            }
+                        );
+
+                        if (resp.status === 400) {
+                            // 模型繁忙，等待后重试
+                            await new Promise(r => setTimeout(r, 500));
+                            continue;
+                        }
+
+                        if (!resp.ok) {
+                            throw new Error(`HTTP ${resp.status}`);
+                        }
+
+                        const data = await resp.json();
+                        if (data.success && data.audio_url) {
+                            const result = { index, url: data.audio_url };
+                            // 同时加入队列
+                            if (!audioQueue.some(item => item.index === index)) {
+                                audioQueue.push(result);
+                            }
+                            return result;
+                        } else {
+                            throw new Error(data.detail || '生成失败');
+                        }
+                    } catch (e) {
+                        if (e.name === 'AbortError') return null;
+                        throw e;
+                    }
+                }
+                throw new Error('重试次数过多');
+            })();
+
+            prefetchPromises[index] = promise;
+
+            try {
+                return await promise;
+            } finally {
+                delete prefetchPromises[index];
+            }
+        }
+
+        function prefetchSentence(index) {
+            if (index >= sentences.length) return;
+            if (audioQueue.some(item => item.index === index)) return;
+            if (prefetchPromises[index]) return;
+
+            // 后台触发预生成，不阻塞当前播放
+            requestSentenceAudio(index).catch(e => {
+                if (e.name !== 'AbortError') {
+                    console.error(`预生成第${index + 1}句失败:`, e);
+                }
+            });
+        }
+
+        function highlightSentence(index) {
+            document.querySelectorAll('.sentence-highlight').forEach(el => {
+                el.classList.remove('sentence-highlight');
+            });
+
+            const contentEl = document.getElementById('readerContent');
+            const allText = contentEl.innerText || '';
+            if (!allText || index >= sentences.length) return;
+
+            const sentence = sentences[index];
+            if (!sentence || !sentence.content) return;
+
+            const content = sentence.content.trim();
+            if (!content) return;
+
+            const paragraphs = contentEl.querySelectorAll('p, .chapter-title');
+            let found = false;
+            paragraphs.forEach(p => {
+                if (found) return;
+                const pText = p.innerText || '';
+                if (pText.includes(content)) {
+                    p.classList.add('sentence-highlight');
+                    p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    found = true;
+                }
+            });
+        }
+
+        const origGoToChapter = goToChapter;
+        goToChapter = async function(index) {
+            if (isReading) {
+                stopReading();
+            }
+            await origGoToChapter(index);
+            if (readAloudEnabled) {
+                loadChapterSentences();
+            }
+        };
+
+        init();
+    </script>
+</body>
+
+</html>

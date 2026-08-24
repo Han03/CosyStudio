@@ -1,0 +1,259 @@
+{
+  "title": "职场婚恋题材模板",
+  "canonical_genre": "现言",
+  "core_selling_points": "职场博弈 + 成长晋升 + 情感平衡。在事业与爱情的天平上，找到属于自己的平衡点。",
+  "creative_constraints": [
+    "推荐约束包：Pack F09",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "办公室恋情流",
+      "features": "上下级/同事之间的感情",
+      "core_payoffs": "暗恋成真、身份反转、甜蜜日常"
+    },
+    {
+      "name": "职场逆袭流",
+      "features": "职场小白成长为精英",
+      "core_payoffs": "能力打脸、晋升逆袭、事业爱情双丰收"
+    },
+    {
+      "name": "商战博弈流",
+      "features": "商业竞争中的爱恨情仇",
+      "core_payoffs": "商战胜利、对手臣服、强强联合"
+    },
+    {
+      "name": "行业精英流",
+      "features": "特定行业的专业故事",
+      "core_payoffs": "专业碾压、行业认可、业界传奇"
+    }
+  ],
+  "worldview": {
+    "description": "职场社会学：职场等级与行业特色",
+    "workplace_levels": [
+      {
+        "name": "高管层",
+        "features": "决策权",
+        "power": "战略方向"
+      },
+      {
+        "name": "中层",
+        "features": "执行权",
+        "power": "部门管理"
+      },
+      {
+        "name": "基层主管",
+        "features": "监督权",
+        "power": "团队管理"
+      },
+      {
+        "name": "普通员工",
+        "features": "执行者",
+        "power": "具体工作"
+      },
+      {
+        "name": "实习生",
+        "features": "学习者",
+        "power": "打杂"
+      }
+    ],
+    "industry_features": [
+      {
+        "name": "金融",
+        "features": "高压高薪",
+        "conflict": "业绩vs道德"
+      },
+      {
+        "name": "互联网",
+        "features": "快节奏",
+        "conflict": "创新vs稳定"
+      },
+      {
+        "name": "律师",
+        "features": "逻辑严密",
+        "conflict": "正义vs利益"
+      },
+      {
+        "name": "医疗",
+        "features": "生死攸关",
+        "conflict": "救人vs规则"
+      },
+      {
+        "name": "传媒",
+        "features": "舆论影响",
+        "conflict": "真相vs流量"
+      }
+    ],
+    "resources": [
+      "人脉",
+      "业绩",
+      "能力",
+      "口碑",
+      "靠山"
+    ]
+  },
+  "power_system": {
+    "description": "职场晋升体系",
+    "paths": [
+      {
+        "name": "专业路线",
+        "path": "实习生 → 初级 → 中级 → 高级 → 专家 → 首席"
+      },
+      {
+        "name": "管理路线",
+        "path": "员工 → 组长 → 主管 → 经理 → 总监 → VP → CEO"
+      },
+      {
+        "name": "创业路线",
+        "path": "打工人 → 合伙人 → 创始人 → 上市公司老板"
+      }
+    ],
+    "games": [
+      {
+        "name": "业绩竞争",
+        "means": "拼能力",
+        "risk": "低"
+      },
+      {
+        "name": "资源争夺",
+        "means": "抢项目",
+        "risk": "中"
+      },
+      {
+        "name": "站队选择",
+        "means": "选靠山",
+        "risk": "高"
+      },
+      {
+        "name": "办公室政治",
+        "means": "拉帮结派",
+        "risk": "极高"
+      }
+    ],
+    "rules": {
+      "explicit": [
+        "绩效考核",
+        "晋升制度",
+        "奖惩机制"
+      ],
+      "hidden": [
+        "派系站队",
+        "人情世故",
+        "信息差"
+      ]
+    }
+  },
+  "outline_structure": {
+    "description": "80万字标准大纲",
+    "volumes": [
+      {
+        "name": "入职",
+        "chapters": "1-50章",
+        "focus": "进入职场，适应环境，第一个项目成功"
+      },
+      {
+        "name": "成长",
+        "chapters": "51-120章",
+        "focus": "能力提升，感情萌芽，获得晋升机会"
+      },
+      {
+        "name": "考验",
+        "chapters": "121-200章",
+        "focus": "事业感情双重考验，度过危机"
+      },
+      {
+        "name": "突破",
+        "chapters": "201-280章",
+        "focus": "事业突破，感情确定，事业巅峰"
+      },
+      {
+        "name": "圆满",
+        "chapters": "281-350章",
+        "focus": "事业爱情双丰收，圆满结局"
+      }
+    ]
+  },
+  "story_rules": [
+    "能力打脸：被质疑后用实力证明自己，要有专业细节支撑",
+    "晋升逆袭：从底层一路升到高位，要有成长过程",
+    "商战胜利：关键项目/谈判获胜，击败对手获得认可",
+    "身份反转：隐藏身份被揭露，要有伏笔不能太突兀"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "专业能力",
+      "商业头脑",
+      "人脉资源",
+      "预知未来"
+    ],
+    "fit_requirements": [
+      "要符合职场背景",
+      "晋升要有过程",
+      "事业感情要平衡"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_types": [
+      {
+        "name": "职场小白",
+        "description": "初入职场",
+        "growth": "从零开始"
+      },
+      {
+        "name": "隐藏大佬",
+        "description": "有背景",
+        "growth": "身份揭露"
+      },
+      {
+        "name": "重生者",
+        "description": "知道未来",
+        "growth": "避坑抓机"
+      },
+      {
+        "name": "行业精英",
+        "description": "能力强",
+        "growth": "感情线为主"
+      }
+    ],
+    "male_protagonist_types": [
+      {
+        "name": "霸道上司",
+        "description": "外冷内热",
+        "interaction": "工作中相处"
+      },
+      {
+        "name": "温柔同事",
+        "description": "默默守护",
+        "interaction": "日常帮助"
+      },
+      {
+        "name": "竞争对手",
+        "description": "欢喜冤家",
+        "interaction": "从对手到恋人"
+      },
+      {
+        "name": "行业大佬",
+        "description": "高高在上",
+        "interaction": "被女主吸引"
+      }
+    ],
+    "supporting_types": [
+      {
+        "name": "好闺蜜",
+        "function": "助攻"
+      },
+      {
+        "name": "绿茶同事",
+        "function": "制造冲突"
+      },
+      {
+        "name": "严厉上司",
+        "function": "考验"
+      },
+      {
+        "name": "职场导师",
+        "function": "指引"
+      }
+    ]
+  }
+}

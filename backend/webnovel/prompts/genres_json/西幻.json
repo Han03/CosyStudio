@@ -1,0 +1,352 @@
+{
+  "title": "西幻题材模板",
+  "canonical_genre": "奇幻",
+  "core_selling_points": "神魔体系 + 骑士冒险 + 契约代价。在神与魔的夹缝中，书写凡人的史诗。",
+  "creative_constraints": [
+    "推荐约束包：Pack M22",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "骑士冒险流",
+      "features": "经典DND式冒险，组队打怪升级",
+      "core_payoffs": "团队配合、装备收集、BOSS战",
+      "protagonist_traits": "勇敢、有担当、善于团队协作"
+    },
+    {
+      "name": "魔法学院流",
+      "features": "进入魔法学校学习，校园+冒险",
+      "core_payoffs": "天赋觉醒、学院竞争、导师传承",
+      "protagonist_traits": "天才、勤奋、好学"
+    },
+    {
+      "name": "神权教廷流",
+      "features": "神明真实存在，教会掌控世界",
+      "core_payoffs": "信仰博弈、神权对抗、真相揭露",
+      "protagonist_traits": "质疑权威、追求真相、有信仰"
+    },
+    {
+      "name": "领主经营流",
+      "features": "获得领地，发展势力，争霸大陆",
+      "core_payoffs": "领地建设、人才招募、战争指挥",
+      "protagonist_traits": "有领导力、善于管理、有远见"
+    },
+    {
+      "name": "黑暗史诗流",
+      "features": "残酷世界观，灰色道德，命运抗争",
+      "core_payoffs": "绝境求生、道德抉择、史诗战役",
+      "protagonist_traits": "坚韧、智慧、不屈"
+    }
+  ],
+  "worldview": {
+    "description": "神魔共存的西方奇幻世界，信仰与魔法交织",
+    "races": [
+      {
+        "race": "人类",
+        "features": "适应性强，繁殖快",
+        "position": "主流种族"
+      },
+      {
+        "race": "精灵",
+        "features": "长寿，魔法亲和",
+        "position": "高贵但傲慢"
+      },
+      {
+        "race": "矮人",
+        "features": "工匠天赋，坚韧",
+        "position": "锻造大师"
+      },
+      {
+        "race": "兽人",
+        "features": "力量强大，部落制",
+        "position": "蛮族/敌人"
+      },
+      {
+        "race": "龙族",
+        "features": "顶级战力，稀有",
+        "position": "BOSS/盟友"
+      },
+      {
+        "race": "恶魔",
+        "features": "契约交易，腐化",
+        "position": "诱惑者"
+      }
+    ],
+    "class_structure": [
+      "神明/神使",
+      "教皇/大主教",
+      "国王/大公",
+      "贵族/骑士",
+      "商人/工匠",
+      "农民/奴隶"
+    ],
+    "factions": [
+      {
+        "name": "教廷",
+        "nature": "神权代言人",
+        "role": "掌控信仰和部分世俗权力"
+      },
+      {
+        "name": "王国",
+        "nature": "世俗统治者",
+        "role": "与教廷既合作又对抗"
+      },
+      {
+        "name": "法师塔",
+        "nature": "魔法研究机构",
+        "role": "相对独立"
+      },
+      {
+        "name": "冒险者公会",
+        "nature": "雇佣兵组织",
+        "role": "任务中介"
+      },
+      {
+        "name": "黑暗势力",
+        "nature": "邪教/魔族/亡灵",
+        "role": "主要敌人"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "魔法体系",
+    "magic_levels": [
+      {
+        "level": "1环",
+        "title": "学徒",
+        "ability": "基础法术",
+        "social_status": "普通人"
+      },
+      {
+        "level": "3环",
+        "title": "正式法师",
+        "ability": "战斗法术",
+        "social_status": "受尊重"
+      },
+      {
+        "level": "5环",
+        "title": "高阶法师",
+        "ability": "领域法术",
+        "social_status": "贵族待遇"
+      },
+      {
+        "level": "7环",
+        "title": "大法师",
+        "ability": "禁咒",
+        "social_status": "国师级"
+      },
+      {
+        "level": "9环",
+        "title": "传奇法师",
+        "ability": "改变规则",
+        "social_status": "一国之力"
+      }
+    ],
+    "magic_schools": [
+      {
+        "school": "元素系",
+        "features": "火/冰/雷/风",
+        "cost": "精神力消耗"
+      },
+      {
+        "school": "死灵系",
+        "features": "操控亡灵",
+        "cost": "生命力/理智"
+      },
+      {
+        "school": "召唤系",
+        "features": "召唤生物",
+        "cost": "契约代价"
+      },
+      {
+        "school": "附魔系",
+        "features": "强化物品",
+        "cost": "材料消耗"
+      },
+      {
+        "school": "神术系",
+        "features": "神明赐予",
+        "cost": "信仰虔诚度"
+      },
+      {
+        "school": "血魔法",
+        "features": "以血为媒",
+        "cost": "生命/血液"
+      }
+    ],
+    "magic_costs": [
+      "精神力",
+      "生命力",
+      "理智值",
+      "契约束缚"
+    ]
+  },
+  "outline_structure": {
+    "description": "200万字标准大纲",
+    "volumes": [
+      {
+        "name": "起源",
+        "chapters": "1-80",
+        "focus": "主角觉醒/入学，建立基础能力，首次展现天赋"
+      },
+      {
+        "name": "历练",
+        "chapters": "81-180",
+        "focus": "外出冒险，组建队伍，完成重大任务"
+      },
+      {
+        "name": "崛起",
+        "chapters": "181-350",
+        "focus": "卷入大势力博弈，成为一方势力核心"
+      },
+      {
+        "name": "争霸",
+        "chapters": "351-550",
+        "focus": "参与大陆级冲突，击败主要敌人，揭露真相"
+      },
+      {
+        "name": "神战",
+        "chapters": "551-700",
+        "focus": "与神明/至高存在对抗，成神/改变世界规则"
+      }
+    ]
+  },
+  "story_rules": [
+    "血脉觉醒要有代价或限制",
+    "传承要逐步解锁，不能一步登天",
+    "契约必须有代价，不能白嫖",
+    "身份反转要有铺垫",
+    "世界观逐步展开，边走边介绍",
+    "种族设定有独特之处",
+    "魔法有明确代价和限制",
+    "配角有自己的故事线"
+  ],
+  "party_configuration": {
+    "classic_team": [
+      {
+        "role": "主角",
+        "class": "法师/骑士",
+        "function": "核心输出",
+        "personality": "成长型"
+      },
+      {
+        "role": "战士",
+        "class": "骑士/战士",
+        "function": "前排坦克",
+        "personality": "忠诚可靠"
+      },
+      {
+        "role": "牧师",
+        "class": "神官",
+        "function": "治疗辅助",
+        "personality": "温柔/严肃"
+      },
+      {
+        "role": "盗贼",
+        "class": "刺客/游侠",
+        "function": "侦察陷阱",
+        "personality": "机灵狡猾"
+      },
+      {
+        "role": "法师",
+        "class": "元素/召唤",
+        "function": "后排输出",
+        "personality": "学者型"
+      }
+    ],
+    "development_stages": [
+      {
+        "stage": "初期",
+        "feature": "临时组队，磨合期"
+      },
+      {
+        "stage": "中期",
+        "feature": "固定队伍，默契配合"
+      },
+      {
+        "stage": "后期",
+        "feature": "各自成长，分分合合"
+      }
+    ]
+  },
+  "gods_and_faith": {
+    "pantheon": [
+      {
+        "god": "光明神",
+        "domain": "秩序/正义",
+        "followers": "教廷",
+        "attitude": "秩序至上"
+      },
+      {
+        "god": "战争神",
+        "domain": "战斗/荣耀",
+        "followers": "骑士",
+        "attitude": "崇尚强者"
+      },
+      {
+        "god": "知识神",
+        "domain": "魔法/智慧",
+        "followers": "法师",
+        "attitude": "中立"
+      },
+      {
+        "god": "自然神",
+        "domain": "生命/森林",
+        "followers": "精灵/德鲁伊",
+        "attitude": "守护自然"
+      },
+      {
+        "god": "死亡神",
+        "domain": "亡灵/轮回",
+        "followers": "死灵法师",
+        "attitude": "公正"
+      },
+      {
+        "god": "混沌神",
+        "domain": "毁灭/变化",
+        "followers": "邪教",
+        "attitude": "敌对"
+      }
+    ],
+    "divine_power_methods": [
+      "虔诚祈祷",
+      "神契",
+      "神选"
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "特殊血脉",
+      "魔法传承",
+      "契约召唤",
+      "神器",
+      "系统"
+    ],
+    "fit_requirements": [
+      "要符合西幻世界观",
+      "要有代价和限制",
+      "要能制造冒险爽点",
+      "升级路径要清晰"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "流浪骑士",
+      "魔法学徒",
+      "失落贵族",
+      "先知"
+    ],
+    "villain_types": [
+      "黑暗神明",
+      "堕落骑士",
+      "邪教教主",
+      "远古恶魔"
+    ],
+    "relationship_patterns": [
+      "冒险伙伴",
+      "主仆契约",
+      "信仰与质疑",
+      "宿命对决"
+    ]
+  }
+}

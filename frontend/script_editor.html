@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剧本编辑器</title>
+    <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/font-awesome.min.css" rel="stylesheet">
+    <link href="assets/css/script-editor.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="editor-header">
+        <div class="header-left">
+            <button class="neu-btn" onclick="toggleChapterSidebar()" title="目录">
+                <i class="fas fa-list"></i>
+            </button>
+            <div class="script-info">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="title" id="scriptTitle">加载中...</span>
+                    <button class="title-edit-btn" id="editTitleBtn" onclick="showTitleEditor()" title="修改书名">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <input type="text" id="scriptTitleInput" class="title-input" style="display:none;" 
+                        placeholder="输入书名" onkeydown="if(event.key==='Enter')saveTitle()" onblur="saveTitle()">
+                </div>
+                <span class="meta" id="scriptMeta"></span>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="status-badge status-pending" id="statusBadge">
+                <span class="ws-status-dot disconnected" id="wsStatusDot"></span>
+                <span id="statusBadgeText">加载中</span>
+            </span>
+            <button class="neu-btn-lg" onclick="showInitModal()" title="深度初始化">
+                <i class="fas fa-rocket"></i> 初始化
+            </button>
+            <button class="neu-btn-lg" onclick="showOutlineModal()" title="卷纲规划">
+                <i class="fas fa-sitemap"></i> 卷纲
+            </button>
+            <button class="neu-btn-lg" onclick="showWorldModal()" title="项目">
+                <i class="fas fa-globe"></i> 项目
+            </button>
+            <button class="neu-btn-lg" onclick="showQueryModal()" title="状态查询">
+                <i class="fas fa-question-circle"></i> 查询
+            </button>
+            <button class="neu-btn-lg" onclick="showDoctorModal()" title="项目体检">
+                <i class="fas fa-heartbeat"></i> 体检
+            </button>
+            <button class="neu-btn-lg" onclick="showLearnModal()" title="项目学习">
+                <i class="fas fa-book-reader"></i> 学习
+            </button>
+            <button class="neu-btn-lg" onclick="showDashboardModal()" title="可视化面板">
+                <i class="fas fa-chart-pie"></i> 面板
+            </button>
+            <button class="neu-btn-lg" onclick="showReviewModal()" title="质量审查">
+                <i class="fas fa-check-circle"></i> 审查
+            </button>
+            <button class="neu-btn-lg" onclick="showTasksModal()" title="任务管理">
+                <i class="fas fa-tasks"></i> 任务
+            </button>
+            <button class="neu-btn-lg primary" onclick="showContinueModal()" title="章节创作">
+                <i class="fas fa-pen-fancy"></i> 创作
+            </button>
+        </div>
+    </div>
+
+    <!-- 创作流程进度条 -->
+    <div class="workflow-progress-bar" id="workflowProgressBar" style="display:none;">
+        <div class="workflow-progress-header">
+            <i class="fas fa-tasks"></i> 创作流程
+            <span class="workflow-progress-status" id="workflowProgressStatus">准备中...</span>
+        </div>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-step="1" title="准备">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">准备</span>
+            </div>
+            <div class="workflow-step-line"></div>
+            <div class="workflow-step" data-step="2" title="剧情生成与审查">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">剧情</span>
+            </div>
+            <div class="workflow-step-line"></div>
+            <div class="workflow-step" data-step="3" title="草稿生成">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">草稿</span>
+            </div>
+            <div class="workflow-step-line"></div>
+            <div class="workflow-step" data-step="4" title="质量审查">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">审查</span>
+            </div>
+            <div class="workflow-step-line"></div>
+            <div class="workflow-step" data-step="5" title="润色优化">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">润色</span>
+            </div>
+            <div class="workflow-step-line"></div>
+            <div class="workflow-step" data-step="6" title="事实记录">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">事实</span>
+            </div>
+            <div class="workflow-step-line"></div>
+            <div class="workflow-step" data-step="7" title="伏笔提取">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">伏笔</span>
+            </div>
+            <div class="workflow-step-line"></div>
+            <div class="workflow-step" data-step="8" title="任务归档">
+                <div class="workflow-step-dot"></div>
+                <span class="workflow-step-label">归档</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 生成进度条 -->
+    <div class="progress-container" id="progressContainer" style="display: none;">
+        <div class="progress-bar-wrapper">
+            <div class="progress-bar">
+                <div class="progress-bar-fill" id="progressBarFill"></div>
+            </div>
+            <button class="stop-btn" id="stopGenBtn" onclick="stopGeneration()">
+                <i class="fas fa-stop-circle"></i> 停止
+            </button>
+        </div>
+        <div class="progress-message" id="progressMessage">正在准备生成...</div>
+    </div>
+
+    <!-- 主体区域 -->
+    <div class="editor-body">
+        <!-- 左侧章节目录 -->
+        <div class="chapter-sidebar" id="chapterSidebar">
+            <div class="sidebar-header">
+                <h6><i class="fas fa-bookmark"></i> 章节目录</h6>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="badge bg-secondary" id="chapterCountBadge">0</span>
+                    <button class="chapter-add-btn" onclick="showAddChapterModal()" title="新增章节">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chapter-list" id="chapterList">
+                <div class="loading-state"><div class="loading-spinner"></div></div>
+            </div>
+        </div>
+
+        <!-- 中间台词区域 -->
+        <div class="lines-area">
+            <div class="lines-toolbar">
+                <span class="chapter-title-display">
+                    <span id="currentChapterTitle">请选择章节</span>
+                </span>
+                <div class="toolbar-actions">
+                    <button class="toolbar-clear-btn hidden" id="clearChapterBtn" onclick="clearCurrentChapter()" title="清空当前章节台词">
+                        <i class="fas fa-eraser"></i> 清空台词
+                    </button>
+                    <button class="export-btn" id="synthesizeBtn" onclick="synthesizeChapterAudio()" disabled title="整章配音：合成音频并保存到历史">
+                        <i class="fas fa-microphone"></i> 整章配音
+                    </button>
+                    <button class="export-btn chapter-history-btn" id="chapterHistoryBtn" onclick="showChapterAudioHistory()" disabled title="查看本章配音历史">
+                        <i class="fas fa-history"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="lines-content-wrapper">
+                <div class="original-text-panel" id="originalTextPanel">
+                    <div class="original-text-header">
+                        <span>章节原文</span>
+                        <div class="original-text-actions">
+                            <button class="original-text-history-btn" id="originalHistoryBtn" onclick="showChapterVersionHistory()" title="查看版本历史">
+                                <i class="fas fa-history"></i> 历史
+                            </button>
+                            <button class="original-text-save-btn" id="saveOriginalBtn" onclick="saveChapterContent()" title="保存修改">
+                                <i class="fas fa-save"></i> 保存
+                            </button>
+                        </div>
+                    </div>
+                    <textarea class="original-text-body" id="originalTextBody" placeholder="选择章节后显示原文..." spellcheck="false"></textarea>
+                </div>
+                <div class="lines-list" id="linesList">
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p class="mt-2">加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧角色设置面板 -->
+        <div class="audio-sidebar" id="audioSidebar" style="margin-right: 0;">
+            <!-- 角色选择区域 -->
+            <div class="audio-section" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="audio-section-title">
+                    <span><i class="fas fa-users"></i> 角色</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="badge bg-secondary" id="characterCountBadge">0</span>
+                        <button class="character-add-btn" onclick="addNewCharacter()" title="新增配音角色">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="character-grid" id="characterGrid">
+                    <div class="loading-state" style="padding: 20px;"><div class="loading-spinner"></div></div>
+                </div>
+                <div class="character-settings" id="characterSettings">
+                    <div class="settings-empty">
+                        <i class="fas fa-hand-pointer"></i>
+                        <p>点击配音角色头像设置音色</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 项目信息模态框 -->
+        <div id="worldModal" class="modal-overlay world-modal" style="display:none;">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3><i class="fas fa-globe"></i> 项目信息</h3>
+                    <button class="modal-close" onclick="closeWorldModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="world-sidebar-tabs">
+                        <button class="world-tab-btn active" onclick="switchWorldTab('webnovel')">
+                            <i class="fas fa-globe"></i> 基础信息
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('worldstate')">
+                            <i class="fas fa-mountain"></i> 世界状态
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('characters')">
+                            <i class="fas fa-users"></i> 角色卡
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('goldenfinger')">
+                            <i class="fas fa-hand-sparkles"></i> 金手指
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('villain')">
+                            <i class="fas fa-skull-crossbones"></i> 反派
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('powersystem')">
+                            <i class="fas fa-bolt"></i> 战力系统
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('timeline')">
+                            <i class="fas fa-clock"></i> 时间线
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('coolpoints')">
+                            <i class="fas fa-fire"></i> 爽点记录
+                        </button>
+                        <button class="world-tab-btn" onclick="switchWorldTab('openloops')">
+                            <i class="fas fa-puzzle-piece"></i> 开放悬念
+                        </button>
+                    </div>
+                    <div class="world-content" id="worldContent">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 卷纲规划模态框 -->
+        <div id="outlineModal" class="modal-overlay outline-modal" style="display:none;">
+            <div class="modal-dialog outline-modal-dialog">
+                <div class="modal-header">
+                    <h3><i class="fas fa-sitemap"></i> 卷纲规划</h3>
+                    <button class="modal-close" onclick="closeOutlineModal()">×</button>
+                </div>
+                <div class="modal-body outline-modal-body">
+                    <div class="outline-split-layout">
+                        <div class="outline-left-panel">
+                            <div class="outline-panel-header">
+                                <span><i class="fas fa-layer-group"></i> 卷纲列表</span>
+                            </div>
+                            <div class="outline-panel-content" id="volumeListPanel">
+                                <!-- 卷纲列表由 JS 动态渲染 -->
+                            </div>
+                            <div class="outline-panel-footer">
+                                <div class="outline-footer-btns">
+                                    <button class="btn btn-sm outline-footer-btn" onclick="showVolumeOutlineModal()">
+                                        <i class="fas fa-plus"></i> 添加卷纲
+                                    </button>
+                                    <button class="btn btn-sm outline-footer-btn accent" onclick="showInlinePlanForm()">
+                                        <i class="fas fa-magic"></i> 智能规划
+                                    </button>
+                                </div>
+                                <div id="inlinePlanForm" class="inline-plan-form" style="display:none;">
+                                    <div class="inline-plan-row">
+                                        <input type="number" id="inlinePlanVolumeNumber" class="inline-plan-input" placeholder="卷号" min="1" value="1">
+                                        <button class="btn btn-sm outline-footer-btn accent" onclick="startVolumePlanInline()">开始</button>
+                                        <button class="btn btn-sm outline-footer-btn" onclick="hideInlinePlanForm()">取消</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="outline-right-panel">
+                            <div class="outline-panel-content" id="outlineDetailPanel">
+                                <!-- 详情和章节列表由 JS 动态渲染 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="planProgressContainer" class="plan-progress-container" style="display:none;">
+                    <div class="continue-progress-bar">
+                        <div class="continue-progress-fill" id="planProgressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="continue-progress-info">
+                        <span id="planProgressText">0%</span>
+                        <span id="planProgressMessage">准备中...</span>
+                    </div>
+                    <div class="continue-task-status" id="planTaskStatus"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部播放控制 -->
+    <div class="player-bar">
+        <div class="player-bar-left">
+            <button class="export-btn regenerate-btn" id="regenerateBtn" onclick="regenerateAllLines()" title="生成全部台词">
+                <i class="fas fa-sync-alt"></i> 生成全部台词
+            </button>
+        </div>
+        <div class="player-bar-center">
+            <button class="player-btn" id="prevLineBtn" onclick="playPrevLine()" disabled title="上一句">
+                <i class="fas fa-step-backward"></i>
+            </button>
+            <button class="player-btn play-btn" id="playBtn" onclick="togglePlay()" disabled title="播放/暂停">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="player-btn" id="nextLineBtn" onclick="playNextLine()" disabled title="下一句">
+                <i class="fas fa-step-forward"></i>
+            </button>
+        </div>
+        <div class="player-bar-right">
+            <div class="player-info">
+                <div class="current-line" id="currentLineDisplay">未播放</div>
+                <div id="playProgress">-- / --</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/core/api.js"></script>
+    <script src="assets/js/modules/audio_editor.js"></script>
+    <script src="assets/js/script-editor/state.js"></script>
+    <script src="assets/js/script-editor/lines.js"></script>
+    <script src="assets/js/script-editor/audio.js"></script>
+    <script src="assets/js/script-editor/characters.js"></script>
+    <script src="assets/js/script-editor/worldbuilding.js"></script>
+    <script src="assets/js/script-editor/writing.js"></script>
+    <script src="assets/js/script-editor/review.js"></script>
+    <script src="assets/js/script-editor/tasks.js"></script>
+    <script src="assets/js/script-editor/init.js"></script>
+    <script src="assets/js/script-editor/plan.js"></script>
+    <script src="assets/js/script-editor/query.js"></script>
+    <script src="assets/js/script-editor/doctor.js"></script>
+    <script src="assets/js/script-editor/learn.js"></script>
+    <script src="assets/js/script-editor/dashboard.js"></script>
+    <script src="assets/js/script-editor/websocket.js"></script>
+    <script src="assets/js/script-editor/picker.js"></script>
+    <script src="assets/js/script-editor/history.js"></script>
+    <script src="assets/js/script-editor/ui.js"></script>
+    <script>
+        init();
+    </script>
+
+    <div id="audioHistoryModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-history"></i> 语音生成历史</h3>
+                <button class="modal-close" onclick="hideAudioHistoryModal()">×</button>
+            </div>
+            <div class="modal-body" id="audioHistoryBody">
+                <div class="loading-state"><div class="loading-spinner"></div><p class="mt-2">加载历史...</p></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideAudioHistoryModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 章节配音历史模态框 -->
+    <div id="chapterAudioHistoryModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-history"></i> 章节配音历史</h3>
+                <button class="modal-close" onclick="hideChapterAudioHistory()">×</button>
+            </div>
+            <div class="modal-body" id="chapterAudioHistoryBody">
+                <div class="loading-state"><div class="loading-spinner"></div><p class="mt-2">加载历史...</p></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideChapterAudioHistory()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增章节模态框 -->
+    <div id="addChapterModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle"></i> 新增章节</h3>
+                <button class="modal-close-btn" onclick="hideAddChapterModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div style="margin-bottom: 16px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--neu-text-muted);">章节标题</label>
+                    <input type="text" id="addChapterTitle" class="form-input" placeholder="请输入章节标题（如：第一章 开端）" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid rgba(0,0,0,0.1); font-size:14px;" />
+                </div>
+                <div>
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--neu-text-muted);">章节正文</label>
+                    <textarea id="addChapterContent" placeholder="请输入或粘贴章节正文内容..." style="width:100%; min-height:300px; padding:12px; border-radius:8px; border:1px solid rgba(0,0,0,0.1); font-size:14px; line-height:1.8; resize:vertical; font-family:inherit;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display:flex; justify-content:flex-end; gap:8px;">
+                <button class="btn btn-secondary" onclick="hideAddChapterModal()">取消</button>
+                <button class="btn btn-primary" id="addChapterSubmitBtn" onclick="submitAddChapter()"><i class="fas fa-check"></i> 确认添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 智能体选择模态框 -->
+    <div id="agentPickerModal" class="modal-overlay picker-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-circle"></i> 选择配音智能体</h3>
+                <button class="modal-close" onclick="closeAgentPickerModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="picker-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="agentPickerSearch" placeholder="搜索智能体名称、描述、标签..." oninput="searchAgentPicker(this.value)">
+                </div>
+                <div class="picker-filters">
+                    <div class="picker-filter-group">
+                        <span class="picker-filter-label">性别：</span>
+                        <div class="picker-filter-chips">
+                            <span class="picker-filter-chip active" data-filter="gender" data-value="" onclick="setAgentPickerFilter('gender', '')">全部</span>
+                            <span class="picker-filter-chip" data-filter="gender" data-value="男" onclick="setAgentPickerFilter('gender', '男')">男</span>
+                            <span class="picker-filter-chip" data-filter="gender" data-value="女" onclick="setAgentPickerFilter('gender', '女')">女</span>
+                        </div>
+                    </div>
+                    <div class="picker-filter-group">
+                        <span class="picker-filter-label">年龄：</span>
+                        <div class="picker-filter-chips">
+                            <span class="picker-filter-chip active" data-filter="age" data-value="" onclick="setAgentPickerFilter('age', '')">全部</span>
+                            <span class="picker-filter-chip" data-filter="age" data-value="幼儿" onclick="setAgentPickerFilter('age', '幼儿')">幼儿</span>
+                            <span class="picker-filter-chip" data-filter="age" data-value="儿童" onclick="setAgentPickerFilter('age', '儿童')">儿童</span>
+                            <span class="picker-filter-chip" data-filter="age" data-value="少年" onclick="setAgentPickerFilter('age', '少年')">少年</span>
+                            <span class="picker-filter-chip" data-filter="age" data-value="青年" onclick="setAgentPickerFilter('age', '青年')">青年</span>
+                            <span class="picker-filter-chip" data-filter="age" data-value="中年" onclick="setAgentPickerFilter('age', '中年')">中年</span>
+                            <span class="picker-filter-chip" data-filter="age" data-value="老年" onclick="setAgentPickerFilter('age', '老年')">老年</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="picker-count" id="agentPickerCount">共 0 个智能体</div>
+                <div class="picker-list" id="agentPickerList">
+                    <div class="loading-state"><div class="loading-spinner"></div><p class="mt-2">加载中...</p></div>
+                </div>
+                <div class="picker-pagination" id="agentPickerPagination" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="clearAgentPickerSelection()">清除选择</button>
+                <button class="btn btn-secondary" onclick="closeAgentPickerModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 角色选择模态框 -->
+    <div id="rolePickerModal" class="modal-overlay picker-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-users"></i> 选择角色</h3>
+                <button class="modal-close" onclick="closeRolePickerModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="picker-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="rolePickerSearch" placeholder="搜索角色名称..." oninput="searchRolePicker(this.value)" onkeydown="if(event.key==='Enter')createNewRoleFromPicker()">
+                </div>
+                <div class="picker-count" id="rolePickerCount">共 0 个角色</div>
+                <div class="picker-list" id="rolePickerList">
+                    <div class="picker-empty">
+                        <i class="fas fa-users"></i>
+                        <p>暂无角色</p>
+                    </div>
+                </div>
+                <div class="picker-create-new" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--neu-border);">
+                    <div style="font-size: 12px; color: var(--neu-text-muted); margin-bottom: 8px;">找不到角色？创建新角色：</div>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="rolePickerNewRoleInput" class="form-control" placeholder="输入新角色名称" style="flex: 1;" onkeydown="if(event.key==='Enter')createNewRoleFromPicker()">
+                        <button class="btn btn-primary" onclick="createNewRoleFromPicker()"><i class="fas fa-plus"></i> 创建</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRolePickerModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 世界观设定编辑模态框 -->
+    <div id="worldSettingModal" class="modal-overlay world-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-globe"></i> <span id="worldSettingModalTitle">添加世界观设定</span></h3>
+                <button class="modal-close" onclick="closeWorldSettingModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="worldSettingId">
+                <div class="world-form-group">
+                    <label>设定名称</label>
+                    <input type="text" id="worldSettingName" placeholder="输入设定名称">
+                </div>
+                <div class="world-form-group">
+                    <label>分类</label>
+                    <input type="text" id="worldSettingCategory" placeholder="输入分类（如：地理、历史、宗教）">
+                </div>
+                <div class="world-form-group">
+                    <label>设定内容</label>
+                    <textarea id="worldSettingContent" placeholder="详细描述这个世界观设定..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeWorldSettingModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveWorldSetting()">保存</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- 章节规划编辑模态框 -->
+    <div id="chapterPlanModal" class="modal-overlay outline-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-alt"></i> <span id="chapterPlanModalTitle">添加章节规划</span></h3>
+                <button class="modal-close" onclick="closeChapterPlanModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="chapterPlanId">
+                <input type="hidden" id="chapterPlanOutlineId">
+                <div class="outline-form-group">
+                    <label>章节序号</label>
+                    <input type="number" id="chapterPlanIndex" placeholder="1" min="1">
+                </div>
+                <div class="outline-form-group">
+                    <label>章节标题</label>
+                    <input type="text" id="chapterPlanTitle" placeholder="输入章节标题">
+                </div>
+                <div class="outline-form-group">
+                    <label>章节概述</label>
+                    <textarea id="chapterPlanSummary" placeholder="概述本章的主要内容..."></textarea>
+                </div>
+                <div class="outline-form-group">
+                    <label>关键事件</label>
+                    <textarea id="chapterPlanKeyEvents" placeholder="列出本章的关键事件..."></textarea>
+                </div>
+                <div class="outline-form-group">
+                    <label>伏笔与铺垫</label>
+                    <textarea id="chapterPlanForeshadowing" placeholder="本章需要埋下的伏笔..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeChapterPlanModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveChapterPlan()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 智能拆章范围输入模态框 -->
+    <div id="aiSplitChapterModal" class="modal-overlay outline-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-magic"></i> 智能拆章</h3>
+                <button class="modal-close" onclick="closeAiSplitChapterModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="aiSplitOutlineId">
+                <div class="outline-form-group">
+                    <label>卷纲章节范围：<span id="aiSplitRangeHint"></span></label>
+                </div>
+                <div style="display:flex; gap:12px;">
+                    <div class="outline-form-group" style="flex:1;">
+                        <label>起始章节</label>
+                        <select id="aiSplitStartChapter" onchange="onAiSplitStartChange()"></select>
+                    </div>
+                    <div class="outline-form-group" style="flex:1;">
+                        <label>结束章节</label>
+                        <select id="aiSplitEndChapter"></select>
+                    </div>
+                </div>
+                <div style="font-size:11px; color:var(--neu-text-muted); margin-top:4px;">
+                    起始章节须为卷首、已规划章节或已规划章节+1，保证剧情连续。生成过程在后台异步执行，完成后自动刷新。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeAiSplitChapterModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmAiSplitChapter()"><i class="fas fa-magic"></i> 开始生成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 卷纲添加编辑模态框 -->
+    <div id="volumeOutlineModal" class="modal-overlay outline-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-layer-group"></i> <span id="volumeOutlineModalTitle">添加卷纲</span></h3>
+                <button class="modal-close" onclick="closeVolumeOutlineModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="volumeOutlineId">
+                <div class="outline-form-group">
+                    <label>卷号</label>
+                    <input type="number" id="volumeOutlineNumber" placeholder="1" min="1">
+                </div>
+                <div class="outline-form-group">
+                    <label>卷名</label>
+                    <input type="text" id="volumeOutlineName" placeholder="输入卷名">
+                </div>
+                <div class="outline-form-group">
+                    <label>起始章节</label>
+                    <input type="number" id="volumeOutlineStart" placeholder="1" min="1">
+                </div>
+                <div class="outline-form-group">
+                    <label>结束章节</label>
+                    <input type="number" id="volumeOutlineEnd" placeholder="100" min="1">
+                </div>
+                <div class="outline-form-group">
+                    <label>核心冲突</label>
+                    <textarea id="volumeOutlineConflict" placeholder="描述本卷的核心冲突..."></textarea>
+                </div>
+                <div class="outline-form-group">
+                    <label>卷末高潮</label>
+                    <textarea id="volumeOutlineClimax" placeholder="描述本卷的高潮情节..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeVolumeOutlineModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveVolumeOutline()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创作模态框 -->
+    <div id="continueModal" class="modal-overlay continue-modal" style="display:none;">
+        <div class="modal-dialog" style="max-width: 750px; max-height: 90vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-pen-fancy"></i> 智能创作</h3>
+                <button class="modal-close" onclick="closeContinueModal()">×</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto;">
+                <div class="continue-section">
+                    <div class="continue-chapter-area">
+                        <label>选择章节</label>
+                        <div id="continueChapterSelector" class="continue-chapter-selector">
+                            <div class="chapter-selector-auto" onclick="selectContinueChapter(null)">
+                                <i class="fas fa-magic"></i> 自动追加章节
+                            </div>
+                            <div class="chapter-selector-search">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="chapterSelectorSearch" placeholder="搜索章节..." oninput="filterChapterSelector()">
+                            </div>
+                            <div class="chapter-selector-list" id="chapterSelectorList">
+                                <div class="chapter-selector-loading"><i class="fas fa-spinner fa-spin"></i> 加载章节规划...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="continue-section" id="continueInstructions">
+                    <div class="continue-prompt-area">
+                        <label>输入创作要求（可选）</label>
+                        <textarea id="continuePrompt" placeholder="例如：增加主角故事的紧张感..."></textarea>
+                        <div style="margin-top: 12px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--neu-text-primary);">
+                                <input type="checkbox" id="continueEnablePolish" checked style="width: 16px; height: 16px; accent-color: var(--neu-primary);">
+                                <span>润色优化</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--neu-text-primary);">
+                                <input type="checkbox" id="continueAutoApply" style="width: 16px; height: 16px; accent-color: var(--neu-primary);">
+                                <span>完成后自动应用结果</span>
+                            </label>
+                        </div>
+                        <div style="margin-top: 6px; display: flex; gap: 16px;">
+                            <span style="font-size: 12px; color: var(--neu-text-muted);">润色优化：勾选后将对草稿进行润色提升文笔质量，不勾选则跳过润色步骤</span>
+                            <span style="font-size: 12px; color: var(--neu-text-muted);">自动应用：勾选后创作完成将自动应用到章节</span>
+                        </div>
+                    </div>
+                    <div class="continue-section-title">
+                        <i class="fas fa-info-circle"></i> 创作说明
+                    </div>
+                    <div class="continue-context-preview" id="continueContextPreview">
+                        <div style="font-size: 13px; line-height: 1.8;">
+                            <p><strong>创作流程：</strong></p>
+                            <ol style="margin: 8px 0 0 20px; padding: 0;">
+                                <li>检查大纲完整性，必要时进行章节规划</li>
+                                <li>构建写作上下文（角色、世界观、前文、章纲等）</li>
+                                <li>生成章节草稿</li>
+                                <li>质量审查（爽点、一致性、节奏、OOC等维度）</li>
+                                <li>润色优化，提升文笔质量</li>
+                                <li>记录本章事实，更新项目状态</li>
+                                <li>保存创作结果并归档任务</li>
+                            </ol>
+                            <p style="margin-top: 8px; color: var(--neu-text-muted); font-size: 12px;">
+                                未指定章节时将自动根据项目状态确定创作章节。每步结果都会保存，意外中断后可直接再次点击创作按钮继续。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="continue-progress-container" id="continueProgressContainer" style="display:none;">
+                    
+                    <div class="continue-task-status" id="continueTaskStatus"></div>
+                    
+                    <div class="continue-result-preview" id="continueResultPreview"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeContinueModal()">关闭</button>
+                <button class="btn btn-danger" id="continueCancelBtn" onclick="cancelContinue()" style="display:none;">取消任务</button>
+                <button class="btn btn-warning" id="continueRecreateBtn" onclick="startContinue()" style="display:none;"><i class="fas fa-redo"></i> 重新创作</button>
+                <button class="btn btn-primary" id="continueApplyBtn" onclick="applyContinueResult()" style="display:none;">应用结果</button>
+                <button class="btn btn-primary" id="continueStartBtn" onclick="startContinue()">开始创作</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RAG检索模态框 -->
+    <div id="ragModal" class="modal-overlay rag-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-search"></i> RAG语义检索</h3>
+                <button class="modal-close" onclick="closeRagModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="rag-search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="ragSearchInput" placeholder="搜索相关内容..." onkeydown="if(event.key==='Enter')searchRag()">
+                </div>
+                <div class="rag-results-list" id="ragResultsList">
+                    <div class="rag-empty">
+                        <i class="fas fa-search"></i>
+                        <p>输入关键词进行检索</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRagModal()">关闭</button>
+                <button class="btn btn-primary" onclick="searchRag()">检索</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 审查结果模态框 -->
+    <div id="reviewModal" class="modal-overlay review-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-circle"></i> 质量审查报告</h3>
+                <button class="modal-close" onclick="closeReviewModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="review-scores-grid" id="reviewScoresGrid">
+                </div>
+                <div class="review-detail-section">
+                    <div class="review-detail-title">审查总结</div>
+                    <div class="review-detail-content" id="reviewSummary">
+                    </div>
+                </div>
+                <div class="review-detail-section">
+                    <div class="review-detail-title">问题列表</div>
+                    <div class="review-issue-list" id="reviewIssues">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeReviewModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 写作任务列表模态框 -->
+    <div id="tasksModal" class="modal-overlay tasks-modal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fas fa-tasks"></i> 写作任务管理</h3>
+                <button class="modal-close" onclick="closeTasksModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="tasks-filter-bar">
+                    <div class="tasks-filter-chip active" onclick="filterTasks('all')">全部</div>
+                    <div class="tasks-filter-chip" onclick="filterTasks('running')">运行中</div>
+                    <div class="tasks-filter-chip" onclick="filterTasks('pending')">等待中</div>
+                    <div class="tasks-filter-chip" onclick="filterTasks('completed')">已完成</div>
+                    <div class="tasks-filter-chip" onclick="filterTasks('failed')">失败</div>
+                    <div class="tasks-filter-chip" onclick="filterTasks('cancelled')">已取消</div>
+                </div>
+                <div class="tasks-list" id="tasksList">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTasksModal()">关闭</button>
+                <button class="btn btn-primary" onclick="refreshTasks()">刷新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 章节版本历史模态框 -->
+    <div id="chapterVersionModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-history"></i> 章节版本历史</h3>
+                <button class="modal-close" onclick="closeChapterVersionModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="version-history-container">
+                    <div class="version-list" id="versionList">
+                        <div class="loading-state"><div class="loading-spinner"></div><p class="mt-2">加载历史...</p></div>
+                    </div>
+                    <div class="version-compare" id="versionCompare">
+                        <div class="compare-empty">
+                            <i class="fas fa-search"></i>
+                            <p>点击左侧历史版本查看与当前内容的差异</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeChapterVersionModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 深度初始化模态框 -->
+    <div id="initModal" class="modal-overlay continue-modal" style="display:none;">
+        <div class="modal-dialog" style="max-width: 850px; max-height: 90vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-rocket"></i> 深度初始化 <span id="initStepTitle"></span></h3>
+                <button class="modal-close" id="initModalCloseBtn" onclick="closeInitModal()">×</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto;">
+                <div class="init-progress-steps">
+                    <div class="init-step" id="step-1" onclick="goToStep(1)">
+                        <div class="init-step-num">1</div>
+                        <div class="init-step-label">创建剧本</div>
+                    </div>
+                    <div class="init-step-line"></div>
+                    <div class="init-step" id="step-2" onclick="goToStep(2)">
+                        <div class="init-step-num">2</div>
+                        <div class="init-step-label">故事核</div>
+                    </div>
+                    <div class="init-step-line"></div>
+                    <div class="init-step" id="step-3" onclick="goToStep(3)">
+                        <div class="init-step-num">3</div>
+                        <div class="init-step-label">角色骨架</div>
+                    </div>
+                    <div class="init-step-line"></div>
+                    <div class="init-step" id="step-4" onclick="goToStep(4)">
+                        <div class="init-step-num">4</div>
+                        <div class="init-step-label">金手指</div>
+                    </div>
+                    <div class="init-step-line"></div>
+                    <div class="init-step" id="step-5" onclick="goToStep(5)">
+                        <div class="init-step-num">5</div>
+                        <div class="init-step-label">世界观</div>
+                    </div>
+                    <div class="init-step-line"></div>
+                    <div class="init-step" id="step-6" onclick="goToStep(6)">
+                        <div class="init-step-num">6</div>
+                        <div class="init-step-label">创意约束</div>
+                    </div>
+                    <div class="init-step-line"></div>
+                    <div class="init-step" id="step-7" onclick="goToStep(7)">
+                        <div class="init-step-num">7</div>
+                        <div class="init-step-label">确认</div>
+                    </div>
+                </div>
+
+                <div id="initStepContent">
+                    <div id="step1Content" class="init-step-content">
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-book"></i> 创建剧本
+                            </div>
+                            <div class="continue-prompt-area">
+                                <div class="init-form-group">
+                                    <label>书名 <span class="init-required">*</span></label>
+                                    <input type="text" id="initCreateBookName" class="init-input" placeholder="输入书名，如：冬瓜农场">
+                                </div>
+                                <div class="init-form-group">
+                                    <label>作者</label>
+                                    <input type="text" id="initCreateBookAuthor" class="init-input" placeholder="输入作者名（可选）">
+                                </div>
+                                <div class="init-form-group">
+                                    <label>简介</label>
+                                    <textarea id="initCreateBookDesc" class="init-textarea" rows="3" placeholder="一句话简介（可选）"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="continue-section">
+                            <div class="continue-context-preview" style="font-size: 12px; line-height: 1.6;">
+                                <p><strong>说明：</strong></p>
+                                <ul style="margin: 8px 0 0 20px; padding: 0;">
+                                    <li>输入书名后将创建一本新书和对应的剧本</li>
+                                    <li>创建完成后自动进入下一步进行深度初始化</li>
+                                    <li>如需从已有书籍创建，请在书籍库中选择后进入剧本编辑器</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step2Content" class="init-step-content" style="display:none;">
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-info-circle"></i> 故事核与商业定位
+                            </div>
+                            <div class="continue-prompt-area">
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>书名 <span class="init-required">*</span></label>
+                                        <input type="text" id="initTitle" class="init-input" placeholder="输入书名" readonly title="书名请在剧本编辑器顶部修改">
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>题材 <span class="init-required">*</span></label>
+                                        <select id="initGenre" class="init-select">
+                                            <option value="">请选择题材...</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>目标字数</label>
+                                        <input type="number" id="initTargetWords" class="init-input" placeholder="如：1000000" min="0">
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>目标章节</label>
+                                        <input type="number" id="initTargetChapters" class="init-input" placeholder="如：200" min="0">
+                                    </div>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>一句话故事 <span class="init-required">*</span></label>
+                                    <textarea id="initOneLiner" class="init-textarea" rows="2" placeholder="一句话讲清故事核心..."></textarea>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>核心冲突 <span class="init-required">*</span></label>
+                                    <textarea id="initCoreConflict" class="init-textarea" rows="2" placeholder="主角要解决的核心矛盾..."></textarea>
+                                </div>
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>目标读者</label>
+                                        <input type="text" id="initTargetReader" class="init-input" placeholder="如：18-30岁男性">
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>目标平台</label>
+                                        <input type="text" id="initPlatform" class="init-input" placeholder="如：起点中文网">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-lightbulb"></i> 创作提示
+                            </div>
+                            <div class="continue-context-preview" style="font-size: 12px; line-height: 1.6;">
+                                <p><strong>一句话故事写作技巧：</strong></p>
+                                <ul style="margin: 8px 0 0 20px; padding: 0;">
+                                    <li>必须包含主角、冲突、结果三要素</li>
+                                    <li>避免笼统表述，要有具体细节</li>
+                                    <li>突出题材特色和差异化</li>
+                                </ul>
+                                <p style="margin-top: 8px;"><strong>核心冲突要点：</strong></p>
+                                <ul style="margin: 8px 0 0 20px; padding: 0;">
+                                    <li>主角想要什么？</li>
+                                    <li>什么阻止他得到？</li>
+                                    <li>失败的后果是什么？</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step3Content" class="init-step-content" style="display:none;">
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-user"></i> 角色骨架与关系冲突
+                            </div>
+                            <div class="continue-prompt-area">
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>主角姓名 <span class="init-required">*</span></label>
+                                        <input type="text" id="initProtagonistName" class="init-input" placeholder="输入主角姓名">
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>主角原型</label>
+                                        <input type="text" id="initProtagonistArchetype" class="init-input" placeholder="如：废柴逆袭、重生归来">
+                                    </div>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>主角欲望 <span class="init-required">*</span></label>
+                                    <textarea id="initProtagonistDesire" class="init-textarea" rows="2" placeholder="主角最想要的是什么..."></textarea>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>主角缺陷 <span class="init-required">*</span></label>
+                                    <textarea id="initProtagonistFlaw" class="init-textarea" rows="2" placeholder="会导致主角付出代价的缺陷..."></textarea>
+                                </div>
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>主角结构</label>
+                                        <select id="initProtagonistStructure" class="init-select">
+                                            <option value="单主角">单主角</option>
+                                            <option value="多主角">多主角</option>
+                                        </select>
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>感情线配置</label>
+                                        <select id="initHeroineConfig" class="init-select">
+                                            <option value="无女主">无女主</option>
+                                            <option value="单女主">单女主</option>
+                                            <option value="多女主">多女主</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>反派分层</label>
+                                        <select id="initAntagonistLevel" class="init-select">
+                                            <option value="BOSS级">BOSS级</option>
+                                            <option value="多级反派">多级反派</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>反派镜像</label>
+                                    <textarea id="initVillainMirror" class="init-textarea" rows="2" placeholder="反派与主角的镜像关系，如何对抗..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-lightbulb"></i> 创作提示
+                            </div>
+                            <div class="continue-context-preview" style="font-size: 12px; line-height: 1.6;">
+                                <p><strong>欲望 vs 缺陷：</strong>主角的缺陷必须导致他无法轻易实现欲望</p>
+                                <p><strong>反派镜像：</strong>反派应该是主角可能成为的人，或是主角价值观的对立面</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step4Content" class="init-step-content" style="display:none;">
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-star"></i> 金手指与兑现机制 <span class="init-optional">(特定题材必填)</span>
+                            </div>
+                            <div class="continue-prompt-area">
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>金手指类型</label>
+                                        <select id="initGoldenFingerType" class="init-select">
+                                            <option value="无金手指">无金手指</option>
+                                            <option value="系统">系统</option>
+                                            <option value="传承">传承</option>
+                                            <option value="法宝">法宝</option>
+                                            <option value="血脉">血脉</option>
+                                            <option value="功法">功法</option>
+                                            <option value="重生">重生</option>
+                                            <option value="商业头脑">商业头脑</option>
+                                            <option value="其他">其他</option>
+                                        </select>
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>金手指名称</label>
+                                        <input type="text" id="initGoldenFingerName" class="init-input" placeholder="如：神级修炼系统">
+                                    </div>
+                                </div>
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>风格</label>
+                                        <select id="initGoldenFingerStyle" class="init-select">
+                                            <option value="辅助型">辅助型</option>
+                                            <option value="战斗型">战斗型</option>
+                                            <option value="经营型">经营型</option>
+                                            <option value="信息型">信息型</option>
+                                        </select>
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>可见度</label>
+                                        <select id="initGoldenFingerVisibility" class="init-select">
+                                            <option value="隐藏">隐藏</option>
+                                            <option value="半公开">半公开</option>
+                                            <option value="公开">公开</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>不可逆代价 <span class="init-required">*</span></label>
+                                    <textarea id="initGoldenFingerCost" class="init-textarea" rows="2" placeholder="使用金手指必须付出的不可逆代价；若无金手指，请说明理由..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-lightbulb"></i> 创作提示
+                            </div>
+                            <div class="continue-context-preview" style="font-size: 12px; line-height: 1.6;">
+                                <p><strong>不可逆代价：</strong>任何获得都必须有代价，这是故事张力的核心</p>
+                                <p><strong>隐藏金手指：</strong>秘密使用金手指能制造悬念和紧张感</p>
+                                <p><strong>无金手指：</strong>现实题材可选择，需靠主角自身能力推动剧情</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step5Content" class="init-step-content" style="display:none;">
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-globe"></i> 世界观与力量规则 <span class="init-optional">(特定题材必填)</span>
+                            </div>
+                            <div class="continue-prompt-area">
+                                <div class="init-form-row">
+                                    <div class="init-form-group">
+                                        <label>世界规模 <span class="init-required">*</span></label>
+                                        <select id="initWorldScale" class="init-select">
+                                            <option value="单城">单城</option>
+                                            <option value="多城">多城</option>
+                                            <option value="大陆">大陆</option>
+                                            <option value="多界">多界</option>
+                                        </select>
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>力量体系类型 <span class="init-required">*</span></label>
+                                        <select id="initPowerSystemType" class="init-select">
+                                            <option value="修仙">修仙</option>
+                                            <option value="武道">武道</option>
+                                            <option value="魔法">魔法</option>
+                                            <option value="科技">科技</option>
+                                            <option value="异能">异能</option>
+                                            <option value="职场">职场</option>
+                                            <option value="无">无</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>势力格局</label>
+                                    <textarea id="initFactions" class="init-textarea" rows="2" placeholder="主要势力及其关系..."></textarea>
+                                </div>
+                                <div class="init-form-group">
+                                    <label>社会阶层与资源分配</label>
+                                    <textarea id="initSocialClass" class="init-textarea" rows="2" placeholder="社会结构和资源分布..."></textarea>
+                                </div>
+                                <div id="genreSpecificFields">
+                                    <div class="init-form-group">
+                                        <label>货币体系</label>
+                                        <input type="text" id="initCurrencySystem" class="init-input" placeholder="如：灵石、金币、信用点">
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>境界链（如适用）</label>
+                                        <input type="text" id="initCultivationChain" class="init-input" placeholder="如：练气-筑基-金丹-元婴">
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>宗门/组织层级（如适用）</label>
+                                        <input type="text" id="initSectHierarchy" class="init-input" placeholder="如：外门-内门-核心-长老">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-lightbulb"></i> 创作提示
+                            </div>
+                            <div class="continue-context-preview" style="font-size: 12px; line-height: 1.6;">
+                                <p><strong>力量体系一致性：</strong>规则必须始终一致，不能随意改变</p>
+                                <p><strong>资源稀缺性：</strong>资源有限才能制造冲突和取舍</p>
+                                <p><strong>势力平衡：</strong>势力之间的平衡被打破是故事的驱动力</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step6Content" class="init-step-content" style="display:none;">
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-lock"></i> 创意约束包（差异化核心）
+                            </div>
+                            <div id="constraintPackagesContainer" style="display:none;">
+                                <div id="constraintPackagesList"></div>
+                            </div>
+                            <div id="constraintManualInput" style="display:block;">
+                                <div class="continue-prompt-area">
+                                    <div class="init-form-group">
+                                        <label>反套路规则</label>
+                                        <textarea id="initAntiTrope" class="init-textarea" rows="2" placeholder="避免使用的套路和陈词滥调..."></textarea>
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>硬性约束</label>
+                                        <textarea id="initConstraints" class="init-textarea" rows="2" placeholder="必须遵守的硬性规则，增加故事张力..."></textarea>
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>核心卖点</label>
+                                        <textarea id="initCoreSellingPoints" class="init-textarea" rows="2" placeholder="一句话讲清本书的独特卖点..."></textarea>
+                                    </div>
+                                    <div class="init-form-group">
+                                        <label>开篇钩子</label>
+                                        <textarea id="initOpeningHook" class="init-textarea" rows="2" placeholder="吸引读者继续阅读的开篇设计..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-lightbulb"></i> 三问筛选
+                            </div>
+                            <div class="continue-context-preview" style="font-size: 12px; line-height: 1.6;">
+                                <p><strong>1. 为什么这题材必须这么写？</strong></p>
+                                <p><strong>2. 换常规主角会不会塌？</strong></p>
+                                <p><strong>3. 卖点能否一句话讲清且不撞模板？</strong></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="step7Content" class="init-step-content" style="display:none;">
+                        <div class="continue-section">
+                            <div class="continue-section-title">
+                                <i class="fas fa-check-circle"></i> 确认信息
+                            </div>
+                            <div class="continue-context-preview" style="font-size: 13px; line-height: 1.8;">
+                                <div id="initSummaryContent"></div>
+                            </div>
+                        </div>
+                        <div class="continue-progress-container" id="initProgressContainer" style="display:none;">
+                            <div class="continue-progress-bar">
+                                <div class="continue-progress-fill" id="initProgressFill" style="width: 0%"></div>
+                            </div>
+                            <div class="continue-progress-info">
+                                <span id="initProgressText">0%</span>
+                                <span id="initProgressMessage">准备中...</span>
+                            </div>
+                            <div class="continue-task-status" id="initTaskStatus"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="initModalFooterCloseBtn" onclick="closeInitModal()">关闭</button>
+                <button class="btn btn-warning" id="initAiBtn" onclick="generateAiData()" style="display:none;">AI生成</button>
+                <button class="btn btn-primary" id="initPrevBtn" onclick="prevStep()" style="display:none;">上一步</button>
+                <button class="btn btn-danger" id="initCancelBtn" onclick="cancelInit()" style="display:none;">取消任务</button>
+                <button class="btn btn-primary" id="initNextBtn" onclick="nextStep()">下一步</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态查询模态框 -->
+    <div id="queryModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-question-circle"></i> 状态查询</h3>
+                <button class="modal-close" onclick="closeQueryModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="continue-section">
+                    <div class="continue-section-title">
+                        <i class="fas fa-search"></i> 查询类型
+                    </div>
+                    <div class="continue-options" style="margin-bottom: 12px;">
+                        <button class="continue-option-btn active" onclick="setQueryType(this, 'character')">角色状态</button>
+                        <button class="continue-option-btn" onclick="setQueryType(this, 'power')">能力体系</button>
+                        <button class="continue-option-btn" onclick="setQueryType(this, 'timeline')">时间线</button>
+                        <button class="continue-option-btn" onclick="setQueryType(this, 'plot')">剧情进展</button>
+                        <button class="continue-option-btn" onclick="setQueryType(this, 'custom')">自定义查询</button>
+                    </div>
+                    <textarea id="queryQuestion" class="form-control" rows="3" placeholder="输入查询问题，例如：主角当前的修为境界是多少？"></textarea>
+                </div>
+
+                <div class="continue-progress-container" id="queryProgressContainer" style="display:none;">
+                    <div class="continue-progress-bar">
+                        <div class="continue-progress-fill" id="queryProgressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="continue-progress-info">
+                        <span id="queryProgressText">0%</span>
+                        <span id="queryProgressMessage">查询中...</span>
+                    </div>
+                </div>
+
+                <div id="queryResult" style="display:none; margin-top: 12px; padding: 12px; background: var(--neu-bg-secondary); border-radius: 8px;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">查询结果</div>
+                    <div id="queryResultContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeQueryModal()">关闭</button>
+                <button class="btn btn-primary" id="querySubmitBtn" onclick="submitQuery()">查询</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目体检模态框 -->
+    <div id="doctorModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-heartbeat"></i> 项目体检</h3>
+                <button class="modal-close" onclick="closeDoctorModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="continue-section">
+                    <div class="continue-section-title">
+                        <i class="fas fa-stethoscope"></i> 体检选项
+                    </div>
+                    <div class="continue-prompt-area">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="doctorDeep" checked>
+                            深度体检（检查设定一致性、逻辑漏洞等）
+                        </label>
+                        <p style="font-size: 12px; color: var(--neu-text-muted); margin-top: 8px;">
+                            深度体检会检查角色行为一致性、能力体系平衡性、时间线逻辑等多个维度。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="continue-progress-container" id="doctorProgressContainer" style="display:none;">
+                    <div class="continue-progress-bar">
+                        <div class="continue-progress-fill" id="doctorProgressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="continue-progress-info">
+                        <span id="doctorProgressText">0%</span>
+                        <span id="doctorProgressMessage">体检中...</span>
+                    </div>
+                </div>
+
+                <div id="doctorResult" style="display:none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="font-weight: 600;">体检报告</div>
+                        <span id="doctorScoreBadge" class="badge" style="font-size: 14px;"></span>
+                    </div>
+                    <div id="doctorIssues" style="margin-bottom: 12px;"></div>
+                    <div id="doctorSuggestions"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDoctorModal()">关闭</button>
+                <button class="btn btn-primary" id="doctorStartBtn" onclick="startDoctor()">开始体检</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目学习模态框 -->
+    <div id="learnModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-book-reader"></i> 项目学习</h3>
+                <button class="modal-close" onclick="closeLearnModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="continue-section">
+                    <div class="continue-section-title">
+                        <i class="fas fa-graduation-cap"></i> 学习内容
+                    </div>
+                    <div class="continue-prompt-area">
+                        <div style="margin-bottom: 12px;">
+                            <label>当前章节</label>
+                            <select id="learnChapterSelect" class="form-control">
+                                <option value="">请选择章节</option>
+                            </select>
+                        </div>
+                        <label>学习内容或写作心得</label>
+                        <textarea id="learnContent" class="form-control" rows="4" placeholder="输入要学习的内容，例如：
+1. 战斗描写的节奏控制技巧
+2. 对话中的潜台词设计
+3. 如何制造悬念和钩子..."></textarea>
+                    </div>
+                </div>
+
+                <div class="continue-progress-container" id="learnProgressContainer" style="display:none;">
+                    <div class="continue-progress-bar">
+                        <div class="continue-progress-fill" id="learnProgressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="continue-progress-info">
+                        <span id="learnProgressText">0%</span>
+                        <span id="learnProgressMessage">学习中...</span>
+                    </div>
+                </div>
+
+                <div id="learnResult" style="display:none; margin-top: 12px;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">学习成果</div>
+                    <div id="learnResultContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeLearnModal()">关闭</button>
+                <button class="btn btn-primary" id="learnStartBtn" onclick="startLearn()">开始学习</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 可视化面板模态框 -->
+    <div id="dashboardModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog" style="max-width: 900px; max-height: 85vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-chart-pie"></i> 可视化面板</h3>
+                <button class="modal-close" onclick="closeDashboardModal()">×</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto;">
+                <div class="dashboard-loading" id="dashboardLoading">
+                    <div class="loading-spinner"></div>
+                    <p>加载中...</p>
+                </div>
+
+                <div id="dashboardContent" style="display:none;">
+                    <div class="dashboard-stats-grid">
+                        <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            <div class="dashboard-stat-info">
+                                <div class="dashboard-stat-value" id="statTotalChapters">0</div>
+                                <div class="dashboard-stat-label">总章节数</div>
+                            </div>
+                        </div>
+                        <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="dashboard-stat-info">
+                                <div class="dashboard-stat-value" id="statTotalWords">0</div>
+                                <div class="dashboard-stat-label">总字数</div>
+                            </div>
+                        </div>
+                        <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                                <i class="fas fa-layer-group"></i>
+                            </div>
+                            <div class="dashboard-stat-info">
+                                <div class="dashboard-stat-value" id="statTotalVolumes">0</div>
+                                <div class="dashboard-stat-label">总卷数</div>
+                            </div>
+                        </div>
+                        <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="dashboard-stat-info">
+                                <div class="dashboard-stat-value" id="statTotalCharacters">0</div>
+                                <div class="dashboard-stat-label">角色数</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <div class="dashboard-section-title">
+                            <i class="fas fa-info-circle"></i> 项目信息
+                        </div>
+                        <div class="dashboard-info-grid" id="dashboardProjectInfo"></div>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <div class="dashboard-section-title">
+                            <i class="fas fa-layer-group"></i> 卷纲概览
+                        </div>
+                        <div class="dashboard-list" id="dashboardVolumeList"></div>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <div class="dashboard-section-title">
+                            <i class="fas fa-users"></i> 主要角色
+                        </div>
+                        <div class="dashboard-list" id="dashboardCharacterList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDashboardModal()">关闭</button>
+                <button class="btn btn-primary" onclick="refreshDashboard()">刷新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 深度初始化全局任务遮罩 -->
+    <div id="initTaskMask" class="modal-overlay" style="display:none; background:rgba(0,0,0,0.85); z-index:9999;">
+        <div class="modal-dialog" style="max-width:520px; max-height:80vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-cog fa-spin"></i> 深度初始化进行中</h3>
+            </div>
+            <div class="modal-body" style="overflow-y:auto;">
+                <div id="initTaskCurrent" style="text-align:center; font-size:16px; margin-bottom:16px; color:var(--neu-accent, #2563eb); font-weight:600;">
+                    准备中...
+                </div>
+                <div style="background:var(--neu-bg, #f5f5f5); border-radius:8px; padding:12px; max-height:300px; overflow-y:auto;" id="initTaskLog">
+                    <div style="color:var(--neu-text-muted, #888); text-align:center; font-size:13px;">等待任务启动...</div>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button class="btn btn-danger" id="initInterruptBtn" onclick="interruptInitTask()">
+                    <i class="fas fa-stop"></i> 中断初始化
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

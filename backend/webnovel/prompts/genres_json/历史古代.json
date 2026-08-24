@@ -1,0 +1,331 @@
+{
+  "title": "历史古代题材模板",
+  "canonical_genre": "历史",
+  "core_selling_points": "大时代背景 + 权谋博弈 + 格局升级。在历史的洪流中，书写个人的传奇与时代的变迁。",
+  "creative_constraints": [
+    "推荐约束包：Pack M08",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "争霸权谋流",
+      "features": "乱世争霸，逐鹿天下",
+      "core_payoffs": "战略碾压、收服人才、统一天下",
+      "protagonist_traits": "有远见、善于谋略、有领导力"
+    },
+    {
+      "name": "仕途升迁流",
+      "features": "官场沉浮，步步高升",
+      "core_payoffs": "政治博弈、晋升打脸、权倾朝野",
+      "protagonist_traits": "善于钻营、有才华、善于交际"
+    },
+    {
+      "name": "科技种田流",
+      "features": "用现代知识改变历史",
+      "core_payoffs": "科技碾压、内政建设、富国强兵",
+      "protagonist_traits": "有现代知识、善于创新、注重民生"
+    },
+    {
+      "name": "军事征战流",
+      "features": "沙场征战，名将之路",
+      "core_payoffs": "战术碾压、以少胜多、封狼居胥",
+      "protagonist_traits": "军事天才、勇敢、善于激励"
+    }
+  ],
+  "worldview": {
+    "description": "古代中国历史世界，权力与机遇并存",
+    "dynasty_features": [
+      {
+        "dynasty": "秦汉",
+        "features": "大一统初建",
+        "core_conflict": "中央vs地方"
+      },
+      {
+        "dynasty": "三国",
+        "features": "群雄割据",
+        "core_conflict": "争霸统一"
+      },
+      {
+        "dynasty": "隋唐",
+        "features": "盛世开放",
+        "core_conflict": "门阀vs科举"
+      },
+      {
+        "dynasty": "宋朝",
+        "features": "文治武弱",
+        "core_conflict": "内忧外患"
+      },
+      {
+        "dynasty": "明朝",
+        "features": "皇权集中",
+        "core_conflict": "党争内耗"
+      },
+      {
+        "dynasty": "清朝",
+        "features": "闭关锁国",
+        "core_conflict": "变革图存"
+      }
+    ],
+    "social_class": [
+      {
+        "class": "皇族",
+        "features": "最高权力",
+        "upward_path": "继承/篡位"
+      },
+      {
+        "class": "世家",
+        "features": "门阀势力",
+        "upward_path": "联姻/功勋"
+      },
+      {
+        "class": "士人",
+        "features": "读书人",
+        "upward_path": "科举/举荐"
+      },
+      {
+        "class": "商人",
+        "features": "有财无权",
+        "upward_path": "捐官/依附"
+      },
+      {
+        "class": "农民",
+        "features": "社会基础",
+        "upward_path": "军功/读书"
+      }
+    ],
+    "power_system": [
+      {
+        "institution": "中书省",
+        "function": "决策",
+        "power": "核心"
+      },
+      {
+        "institution": "门下省",
+        "function": "审议",
+        "power": "制衡"
+      },
+      {
+        "institution": "尚书省",
+        "function": "执行",
+        "power": "实权"
+      },
+      {
+        "institution": "御史台",
+        "function": "监察",
+        "power": "弹劾"
+      },
+      {
+        "institution": "军机处",
+        "function": "军政",
+        "power": "机密"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "官职体系与政治资源",
+    "promotion_paths": {
+      "imperial_examination": [
+        "童生",
+        "秀才",
+        "举人",
+        "进士",
+        "翰林",
+        "六部",
+        "内阁"
+      ],
+      "military_merit": [
+        "士卒",
+        "伍长",
+        "百户",
+        "千户",
+        "将军",
+        "大将军"
+      ],
+      "family_connection": [
+        "荫补",
+        "散官",
+        "实职",
+        "要职"
+      ]
+    },
+    "political_resources": [
+      {
+        "resource": "人脉",
+        "description": "同年/同乡/师生",
+        "acquisition": "科举/交际"
+      },
+      {
+        "resource": "名望",
+        "description": "清名/政绩",
+        "acquisition": "做事/宣传"
+      },
+      {
+        "resource": "派系",
+        "description": "党派归属",
+        "acquisition": "站队/经营"
+      },
+      {
+        "resource": "财力",
+        "description": "经济基础",
+        "acquisition": "俸禄/经营"
+      },
+      {
+        "resource": "军权",
+        "description": "武力保障",
+        "acquisition": "军功/任命"
+      }
+    ],
+    "court_game": {
+      "information_war": [
+        "情报收集",
+        "舆论引导",
+        "消息封锁"
+      ],
+      "personnel_war": [
+        "拉拢盟友",
+        "打击对手",
+        "安插亲信"
+      ],
+      "policy_war": [
+        "提出政策",
+        "阻挠对手",
+        "争夺功劳"
+      ]
+    }
+  },
+  "outline_structure": {
+    "description": "200万字标准大纲",
+    "volumes": [
+      {
+        "name": "入局",
+        "chapters": "1-80",
+        "focus": "主角进入历史舞台，初露锋芒，站稳脚跟"
+      },
+      {
+        "name": "崛起",
+        "chapters": "81-200",
+        "focus": "积累实力，扩大影响，获得重要职位/地盘"
+      },
+      {
+        "name": "争锋",
+        "chapters": "201-400",
+        "focus": "与主要对手正面交锋，击败主要对手"
+      },
+      {
+        "name": "争霸",
+        "chapters": "401-600",
+        "focus": "逐鹿天下，决定性战役/政变"
+      },
+      {
+        "name": "定鼎",
+        "chapters": "601-700",
+        "focus": "统一/改革，建立新秩序"
+      }
+    ]
+  },
+  "story_rules": [
+    "科举逆袭要有铺垫，展示努力",
+    "战场封神要有战术描写",
+    "朝堂翻盘要有布局，不能太巧合",
+    "收服人才要有合理的吸引点",
+    "基本史实准确",
+    "思维符合时代",
+    "有挫折有代价",
+    "配角有血有肉"
+  ],
+  "historical_atmosphere": {
+    "language_style": [
+      "使用文言词汇但不晦涩",
+      "官职称谓要准确",
+      "避免现代网络用语"
+    ],
+    "detail_research": [
+      {
+        "aspect": "服饰",
+        "points": "符合朝代",
+        "pitfall": "张冠李戴"
+      },
+      {
+        "aspect": "饮食",
+        "points": "食材合理",
+        "pitfall": "穿越食物"
+      },
+      {
+        "aspect": "礼仪",
+        "points": "尊卑有序",
+        "pitfall": "礼崩乐坏"
+      },
+      {
+        "aspect": "称谓",
+        "points": "官职准确",
+        "pitfall": "乱用称呼"
+      }
+    ],
+    "historical_events": [
+      "利用历史事件推动剧情",
+      "主角参与但不喧宾夺主",
+      "保持历史大势不变"
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "现代知识",
+      "先知先觉",
+      "军事天才",
+      "政治手腕"
+    ],
+    "fit_requirements": [
+      "要符合历史世界观",
+      "要有时代限制",
+      "要能制造权谋爽点",
+      "升级路径要符合官场规则"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "穿越者",
+      "重生者",
+      "原生者",
+      "皇族"
+    ],
+    "villain_types": [
+      "权臣",
+      "诸侯",
+      "外族",
+      "奸臣"
+    ],
+    "supporting_roles": [
+      {
+        "role": "谋士",
+        "function": "出谋划策",
+        "relationship": "智囊"
+      },
+      {
+        "role": "武将",
+        "function": "征战沙场",
+        "relationship": "臂膀"
+      },
+      {
+        "role": "红颜",
+        "function": "情感线",
+        "relationship": "知己"
+      },
+      {
+        "role": "对手",
+        "function": "制造冲突",
+        "relationship": "棋逢对手"
+      },
+      {
+        "role": "君主",
+        "function": "权力来源",
+        "relationship": "效忠/取代"
+      }
+    ],
+    "relationship_patterns": [
+      "君臣相得",
+      "兄弟同心",
+      "红颜知己",
+      "亦敌亦友"
+    ]
+  }
+}

@@ -1,0 +1,301 @@
+{
+  "title": "抗战谍战题材模板",
+  "canonical_genre": "历史",
+  "core_selling_points": "身份博弈 + 信息战 + 高压生存。在敌后的刀锋上行走，用智慧与勇气守护信仰。",
+  "creative_constraints": [
+    "推荐约束包：Pack M10",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "地下潜伏流",
+      "features": "长期潜伏敌营，获取情报",
+      "core_payoffs": "身份周旋、险中求胜、关键情报",
+      "protagonist_traits": "冷静、隐忍、善于伪装"
+    },
+    {
+      "name": "敌后抗战流",
+      "features": "敌后游击，打击敌人",
+      "core_payoffs": "战术碾压、以少胜多、民族大义",
+      "protagonist_traits": "勇敢、机智、有军事才能"
+    },
+    {
+      "name": "情报战流",
+      "features": "情报机构之间的博弈",
+      "core_payoffs": "智力对决、破译密码、反间计",
+      "protagonist_traits": "聪明、记忆力强、善于分析"
+    },
+    {
+      "name": "特工行动流",
+      "features": "执行特殊任务",
+      "core_payoffs": "惊险刺激、完成不可能任务",
+      "protagonist_traits": "身手好、冷静、善于应变"
+    }
+  ],
+  "worldview": {
+    "description": "抗战时期的谍战世界",
+    "faction_structure": [
+      {
+        "faction": "我方",
+        "features": "地下党/军统",
+        "goal": "抗日救国"
+      },
+      {
+        "faction": "日方",
+        "features": "特务机关",
+        "goal": "镇压抗日"
+      },
+      {
+        "faction": "汪伪",
+        "features": "伪政权",
+        "goal": "维护统治"
+      },
+      {
+        "faction": "中间派",
+        "features": "观望势力",
+        "goal": "自保"
+      }
+    ],
+    "intelligence_agencies": [
+      {
+        "agency": "中共地下党",
+        "nature": "我方",
+        "features": "信仰坚定"
+      },
+      {
+        "agency": "军统",
+        "nature": "国民党",
+        "features": "手段强硬"
+      },
+      {
+        "agency": "日本特高课",
+        "nature": "敌方",
+        "features": "残忍狡猾"
+      },
+      {
+        "agency": "76号",
+        "nature": "汪伪",
+        "features": "叛徒走狗"
+      }
+    ],
+    "identity_levels": [
+      {
+        "identity": "高层潜伏",
+        "features": "情报价值高",
+        "risk": "极高"
+      },
+      {
+        "identity": "中层潜伏",
+        "features": "执行任务",
+        "risk": "高"
+      },
+      {
+        "identity": "外围人员",
+        "features": "传递情报",
+        "risk": "中"
+      },
+      {
+        "identity": "交通员",
+        "features": "联络",
+        "risk": "中高"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "情报工作与身份管理体系",
+    "intelligence_work": {
+      "collection": [
+        "人际渗透",
+        "技术窃取",
+        "策反叛变"
+      ],
+      "transmission": [
+        "密码电报",
+        "死信箱",
+        "交通员"
+      ],
+      "analysis": [
+        "破译密码",
+        "情报甄别",
+        "战略判断"
+      ]
+    },
+    "identity_management": [
+      {
+        "element": "公开身份",
+        "description": "掩护身份",
+        "risk": "被调查"
+      },
+      {
+        "element": "社会关系",
+        "description": "人际网络",
+        "risk": "被牵连"
+      },
+      {
+        "element": "行为习惯",
+        "description": "日常表现",
+        "risk": "露出破绽"
+      },
+      {
+        "element": "情感关系",
+        "description": "爱情/亲情",
+        "risk": "被利用"
+      }
+    ],
+    "counter_intelligence": {
+      "daily_prevention": [
+        "检查跟踪",
+        "清理痕迹",
+        "建立暗号"
+      ],
+      "emergency_response": [
+        "紧急撤离",
+        "销毁证据",
+        "启用备用身份"
+      ]
+    }
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "潜入",
+        "chapters": "1-60",
+        "focus": "建立身份，站稳脚跟，第一次重要任务"
+      },
+      {
+        "name": "扎根",
+        "chapters": "61-150",
+        "focus": "深入敌营，获取信任，获取重要情报"
+      },
+      {
+        "name": "危机",
+        "chapters": "151-250",
+        "focus": "身份受到怀疑，化解危机"
+      },
+      {
+        "name": "反击",
+        "chapters": "251-350",
+        "focus": "主动出击，打击敌人，重大行动成功"
+      },
+      {
+        "name": "胜利",
+        "chapters": "351-400",
+        "focus": "迎来胜利，身份揭晓"
+      }
+    ]
+  },
+  "story_rules": [
+    "险中求胜要有合理的脱身方式",
+    "智斗敌特双方都要有智商",
+    "关键情报要有巨大价值",
+    "策反过程要合理",
+    "情感克制有力",
+    "反派有智商",
+    "主角有危机有代价",
+    "历史细节准确"
+  ],
+  "atmosphere_design": {
+    "historical_periods": [
+      {
+        "period": "抗战初期",
+        "features": "全面抗战",
+        "conflict": "民族存亡"
+      },
+      {
+        "period": "抗战中期",
+        "features": "相持阶段",
+        "conflict": "敌后斗争"
+      },
+      {
+        "period": "抗战后期",
+        "features": "胜利在望",
+        "conflict": "争夺胜利果实"
+      }
+    ],
+    "scene_design": {
+      "daily": [
+        "舞厅/咖啡馆",
+        "机关办公室",
+        "街头巷尾"
+      ],
+      "tense": [
+        "审讯室",
+        "秘密接头",
+        "追捕逃亡"
+      ],
+      "climax": [
+        "情报交接",
+        "身份揭露",
+        "生死抉择"
+      ]
+    },
+    "detail_elements": [
+      "时代服饰（旗袍、中山装）",
+      "通讯方式（电报、暗号）",
+      "交通工具（黄包车、汽车）",
+      "社会风貌（租界、沦陷区）"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "冷静隐忍型",
+      "机智灵活型",
+      "信仰坚定型",
+      "双面人生型"
+    ],
+    "core_supporting": [
+      {
+        "role": "上线",
+        "function": "指挥",
+        "relation": "信任/考验"
+      },
+      {
+        "role": "战友",
+        "function": "配合",
+        "relation": "生死与共"
+      },
+      {
+        "role": "敌特",
+        "function": "对手",
+        "relation": "斗智斗勇"
+      },
+      {
+        "role": "爱人",
+        "function": "情感",
+        "relation": "牵挂/掩护"
+      }
+    ],
+    "villain_types": [
+      {
+        "type": "狡猾特务",
+        "features": "经验丰富",
+        "threat": "难以欺骗"
+      },
+      {
+        "type": "叛徒",
+        "features": "了解内情",
+        "threat": "致命威胁"
+      },
+      {
+        "type": "疯狂军官",
+        "features": "手段残忍",
+        "threat": "生命威胁"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "身份掩护",
+      "情报分析能力",
+      "伪装能力",
+      "特殊技能"
+    ],
+    "fit_requirements": [
+      "要符合抗战谍战世界观",
+      "要有风险和代价",
+      "要能制造智斗爽点",
+      "升级路径要与危险同步"
+    ]
+  }
+}

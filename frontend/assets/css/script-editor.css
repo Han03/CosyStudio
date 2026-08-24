@@ -1,0 +1,39 @@
+@import url("script-editor/se-base.css");
+@import url("script-editor/se-audio.css");
+@import url("script-editor/se-progress.css");
+@import url("script-editor/se-modals.css");
+@import url("script-editor/se-outline.css");
+@import url("script-editor/se-webnovel.css");
+@import url("script-editor/se-workflow.css");
+
+:root {
+    /* 轻度新拟态：与主站 token 对齐 */
+    --neu-bg: #e8edf2;
+    --neu-light: #ffffff;
+    --neu-dark: #b8c5d6;
+    --neu-text: #2d3748;
+    --neu-text-muted: #64748b;
+    --neu-accent: #6c5ce7;
+    --neu-accent-light: rgba(108, 92, 231, 0.12);
+    --neu-bg-secondary: #e2e8f0;
+    --neu-border: rgba(163, 177, 198, 0.28);
+    --neu-shadow-raised: 3px 3px 8px rgba(163, 177, 198, 0.42), -2px -2px 6px rgba(255, 255, 255, 0.9);
+    --neu-shadow-small: 2px 2px 5px rgba(163, 177, 198, 0.38), -1px -1px 4px rgba(255, 255, 255, 0.85);
+    --neu-shadow-inset: inset 2px 2px 4px rgba(163, 177, 198, 0.35), inset -1px -1px 3px rgba(255, 255, 255, 0.75);
+    --neu-shadow-hover: 4px 4px 10px rgba(163, 177, 198, 0.48), -2px -2px 6px rgba(255, 255, 255, 0.95);
+    --neu-shadow: var(--neu-shadow-small);
+    --reader-bg: #f5f0e8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--neu-bg);
+    color: var(--neu-text);
+    font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}

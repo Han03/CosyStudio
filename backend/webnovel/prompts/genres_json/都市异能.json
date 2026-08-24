@@ -1,0 +1,84 @@
+{
+  "title": "都市异能题材模板",
+  "canonical_genre":"都市",
+  "core_selling_points": "熟悉的现代生活 + 超凡力量的入侵。在平凡中寻找非凡。",
+  "creative_constraints": ["推荐约束包：Pack M12 / Pack M05", "通用叠加：Pack U03"],
+  "subgenres": [],
+  "worldview": {
+    "description": "灵气复苏三阶段：隐秘期、爆发期、新秩序期",
+    "eras": [
+      {
+        "name": "隐秘期",
+        "status": "异能者极少，被官方严格管控，普通人不知道异能存在",
+        "conflict": "主角觉醒，试图隐藏身份，躲避官方调查和反派追杀",
+        "atmosphere": "悬疑、压抑、都市传说",
+        "rules": ["只要出现普通人可能注意到的大动静，必须给出现实余波+遮蔽机制的解释"]
+      },
+      {
+        "name": "爆发期",
+        "status": "灵气浓度上升，动植物变异，觉醒者井喷，纸包不住火",
+        "conflict": "社会秩序动荡，新旧势力洗牌，官方公开异能存在",
+        "atmosphere": "混乱、机遇、热血"
+      },
+      {
+        "name": "新秩序期",
+        "status": "异能成为常态，科技与修真结合，人类建立基地市对抗妖兽",
+        "conflict": "种族战争（人族vs妖族/异界入侵者）",
+        "atmosphere": "史诗、末世、救亡"
+      }
+    ],
+    "factions": [
+      {
+        "name": "官方机构",
+        "features": "秩序维护者，资源最强，规矩最多",
+        "examples": ["龙组", "特管局", "第749局", "守夜人"]
+      },
+      {
+        "name": "民间组织",
+        "sub_types": [
+          {"name": "财团", "description": "试图用金钱掌控异能者，研究长生技术"},
+          {"name": "教派", "description": "崇拜异界邪神，制造混乱"},
+          {"name": "公会", "description": "异能者自发组成的互助/雇佣兵组织"}
+        ]
+      }
+    ]
+  },
+  "power_system": {
+    "description": "觉醒等级与能力分类",
+    "levels": [
+      {"name": "E级", "description": "身体强化，比普通人强一点"},
+      {"name": "C级", "description": "掌握元素/特殊能力，能对抗热武器"},
+      {"name": "A级", "description": "镇国级战力，一人敌一师"},
+      {"name": "S级", "description": "核威慑级，行走的核弹"}
+    ],
+    "categories": [
+      {"name": "元素系", "description": "火、雷、冰（输出高）"},
+      {"name": "强化系", "description": "力量、速度、自愈（生存强）"},
+      {"name": "精神系", "description": "念力、催眠、预知（诡异）"},
+      {"name": "特殊系", "description": "空间、时间、因果（BUG级）"}
+    ]
+  },
+  "outline_structure": {
+    "description": "都市异能标准大纲",
+    "volumes": [
+      {"name": "觉醒", "focus": "主角觉醒异能，隐藏身份，初次战斗"},
+      {"name": "崛起", "focus": "加入组织/建立势力，能力提升，崭露头角"},
+      {"name": "争霸", "focus": "势力博弈，对抗强敌，揭露阴谋"},
+      {"name": "新秩序", "focus": "解决末世根源，建立新秩序"}
+    ]
+  },
+  "story_rules": [
+    "扮猪吃虎套路：普通人身份+恐怖实力反差",
+    "现实余波规则：大动静后必须有遮蔽机制",
+    "势力博弈：官方、财团、教派、公会多方角力"
+  ],
+  "golden_finger_guidelines": {
+    "types": ["觉醒异能", "祖传宝物", "系统加持", "重生预知"],
+    "fit_requirements": ["要符合都市背景", "要有代价和限制", "升级路径要清晰", "要能制造爽点"]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": ["隐藏大佬", "重生者", "天才少年", "平凡觉醒"],
+    "villain_types": ["反派组织", "变异妖兽", "邪恶异能者", "官方内鬼"],
+    "relationship_patterns": ["师徒传承", "并肩作战", "相爱相杀"]
+  }
+}

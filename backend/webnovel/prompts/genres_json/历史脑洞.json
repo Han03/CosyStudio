@@ -1,0 +1,240 @@
+{
+  "title": "历史脑洞题材模板",
+  "canonical_genre": "历史",
+  "core_selling_points": "历史框架 + 设定反转 + 规则博弈。当超自然规则与历史交织，改变历史的代价是什么？",
+  "creative_constraints": [
+    "推荐约束包：Pack M08",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "历史规则化流",
+      "features": "历史规律被具象化为可操作的规则",
+      "core_payoffs": "规则利用、历史改写、因果博弈",
+      "protagonist_traits": "善于发现规则、理性、善于博弈"
+    },
+    {
+      "name": "历史异闻流",
+      "features": "历史背后隐藏的超自然真相",
+      "core_payoffs": "真相揭露、阴谋破解、历史重构",
+      "protagonist_traits": "善于调查、有好奇心、理性"
+    },
+    {
+      "name": "穿越改命流",
+      "features": "穿越者试图改变历史走向",
+      "core_payoffs": "蝴蝶效应、历史转折、命运抗争",
+      "protagonist_traits": "有远见、勇敢、善于把握机遇"
+    },
+    {
+      "name": "历史游戏流",
+      "features": "历史世界被游戏化/系统化",
+      "core_payoffs": "系统利用、任务完成、历史干预",
+      "protagonist_traits": "善于规划、精打细算、适应力强"
+    }
+  ],
+  "worldview": {
+    "description": "历史与超自然规则交织的世界",
+    "history_rules": [
+      {
+        "type": "因果律",
+        "features": "改变历史有代价",
+        "example": "救一人死一人"
+      },
+      {
+        "type": "时间锁",
+        "features": "某些事件不可改变",
+        "example": "关键节点锁定"
+      },
+      {
+        "type": "蝴蝶效应",
+        "features": "小改变大影响",
+        "example": "连锁反应"
+      },
+      {
+        "type": "历史惯性",
+        "features": "历史趋势难改",
+        "example": "大势不可逆"
+      }
+    ],
+    "knowledge_levels": [
+      {
+        "level": "规则制定者",
+        "knowledge": "完全了解",
+        "people": "神秘存在"
+      },
+      {
+        "level": "规则利用者",
+        "knowledge": "部分了解",
+        "people": "穿越者/觉醒者"
+      },
+      {
+        "level": "历史参与者",
+        "knowledge": "不知规则",
+        "people": "历史人物"
+      },
+      {
+        "level": "普通人",
+        "knowledge": "完全不知",
+        "people": "百姓"
+      }
+    ],
+    "factions": [
+      {
+        "name": "历史守护者",
+        "nature": "维护原有历史",
+        "goal": "阻止改变"
+      },
+      {
+        "name": "历史改变者",
+        "nature": "试图改变历史",
+        "goal": "各有目的"
+      },
+      {
+        "name": "历史势力",
+        "nature": "原有历史势力",
+        "goal": "争权夺利"
+      },
+      {
+        "name": "超然存在",
+        "nature": "规则本身",
+        "goal": "不可知"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "历史干预规则与代价系统",
+    "intervention_rules": {
+      "changeable": [
+        "个人命运",
+        "局部事件",
+        "技术发展"
+      ],
+      "difficult": [
+        "历史大势",
+        "关键节点",
+        "核心人物命运"
+      ],
+      "unchangeable": [
+        "时间锁定事件",
+        "因果律保护事件"
+      ]
+    },
+    "cost_system": [
+      {
+        "cost": "等价交换",
+        "features": "得到什么失去什么",
+        "example": "救人需牺牲"
+      },
+      {
+        "cost": "因果反噬",
+        "features": "改变越大反噬越大",
+        "example": "身体/精神损伤"
+      },
+      {
+        "cost": "时间债务",
+        "features": "借用未来偿还",
+        "example": "寿命减少"
+      },
+      {
+        "cost": "存在稀释",
+        "features": "存在感降低",
+        "example": "被历史遗忘"
+      }
+    ],
+    "history_knowledge_usage": [
+      {
+        "knowledge": "历史事件",
+        "usage": "提前布局",
+        "risk": "蝴蝶效应"
+      },
+      {
+        "knowledge": "技术知识",
+        "usage": "科技碾压",
+        "risk": "时代不适应"
+      },
+      {
+        "knowledge": "人物信息",
+        "usage": "人才招揽",
+        "risk": "改变命运"
+      },
+      {
+        "knowledge": "经济规律",
+        "usage": "财富积累",
+        "risk": "引起注意"
+      }
+    ]
+  },
+  "outline_structure": {
+    "description": "150万字标准大纲",
+    "volumes": [
+      {
+        "name": "入局",
+        "chapters": "1-60",
+        "focus": "进入历史，发现规则，首次利用规则"
+      },
+      {
+        "name": "立足",
+        "chapters": "61-150",
+        "focus": "站稳脚跟，积累资源，改变局部历史"
+      },
+      {
+        "name": "博弈",
+        "chapters": "151-280",
+        "focus": "与规则/势力博弈，重大历史事件干预"
+      },
+      {
+        "name": "抉择",
+        "chapters": "281-400",
+        "focus": "面临重大抉择，关键历史节点"
+      },
+      {
+        "name": "终局",
+        "chapters": "401-500",
+        "focus": "最终结局"
+      }
+    ]
+  },
+  "story_rules": [
+    "历史预知要有合理的信息来源",
+    "规则利用要自洽",
+    "历史反转要有代价",
+    "因果博弈双方都要有智商",
+    "设定与历史融合",
+    "因果逻辑清晰",
+    "历史基础准确",
+    "代价明确兑现"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "历史知识",
+      "规则感知",
+      "时间能力",
+      "系统"
+    ],
+    "fit_requirements": [
+      "要符合历史脑洞世界观",
+      "要有因果代价",
+      "要能制造智斗爽点",
+      "升级路径要与历史进程同步"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "历史学者",
+      "规则利用者",
+      "理想主义者",
+      "务实主义者"
+    ],
+    "villain_types": [
+      "历史守护者",
+      "历史惯性",
+      "因果律",
+      "其他穿越者"
+    ],
+    "relationship_patterns": [
+      "与历史人物合作",
+      "与规则守护者博弈",
+      "与同类穿越者竞争"
+    ]
+  }
+}

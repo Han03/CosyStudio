@@ -1,0 +1,160 @@
+{
+  "title": "黑暗题材模板",
+  "canonical_genre": "悬疑",
+  "core_selling_points": "秩序崩塌 + 新秩序建立 + 极致权力 + 道德灰色。权力幻想的极致满足。",
+  "creative_constraints": [
+    "推荐约束包：Pack M16",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [],
+  "worldview": {
+    "description": "黑暗世界观：世界类型与生存法则",
+    "world_types": [
+      {
+        "name": "末日废土",
+        "features": "文明崩塌、资源匮乏",
+        "style": "生存竞争"
+      },
+      {
+        "name": "崩坏修真",
+        "features": "修真世界黑暗面",
+        "style": "弱肉强食"
+      },
+      {
+        "name": "黑暗都市",
+        "features": "现代社会阴暗面",
+        "style": "隐秘渗透"
+      },
+      {
+        "name": "星际黑暗",
+        "features": "宇宙尺度征服",
+        "style": "种族战争"
+      }
+    ],
+    "survival_rules": [
+      "弱肉强食",
+      "适者生存",
+      "强者为王",
+      "胜者通吃"
+    ],
+    "faction_structure": [
+      {
+        "name": "主角势力",
+        "description": "崛起中的黑暗帝国",
+        "function": "核心发展线"
+      },
+      {
+        "name": "抵抗势力",
+        "description": "人类最后希望",
+        "function": "制造冲突"
+      },
+      {
+        "name": "第三方势力",
+        "description": "中立/投机",
+        "function": "增加变数"
+      },
+      {
+        "name": "敌对势力",
+        "description": "竞争者/旧秩序",
+        "function": "主要对手"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "黑暗系统设计：基因霸权系统",
+    "mechanics": [
+      {
+        "name": "吞噬",
+        "description": "获取基因/能量",
+        "payoff": "掠夺快感"
+      },
+      {
+        "name": "消化",
+        "description": "转化为力量",
+        "payoff": "成长满足"
+      },
+      {
+        "name": "进化",
+        "description": "能力升级",
+        "payoff": "变强爽感"
+      },
+      {
+        "name": "反馈",
+        "description": "战斗验证",
+        "payoff": "碾压快感"
+      }
+    ],
+    "evolution_path": "初级阶段 → 中级阶段 → 高级阶段 → 究极阶段"
+  },
+  "outline_structure": {
+    "description": "黑暗题材标准大纲",
+    "volumes": [
+      {
+        "name": "觉醒",
+        "focus": "黑暗力量觉醒，第一次吞噬/征服，建立基础势力"
+      },
+      {
+        "name": "扩张",
+        "focus": "势力扩张，能力进化，征服更强对手"
+      },
+      {
+        "name": "争霸",
+        "focus": "成为顶级掠食者，征服大片领域"
+      },
+      {
+        "name": "终局",
+        "focus": "面对终极敌人，建立黑暗帝国"
+      }
+    ]
+  },
+  "story_rules": [
+    "爽点结构：展示实力差距 → 敌人恐惧/绝望 → 碾压/征服 → 收获战利品",
+    "仪式感场景：登基/加冕、敌人臣服、势力扩张、进化突破",
+    "恐怖递进：不安 → 紧张 → 恐惧 → 绝望 → 崩溃"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "黑暗力量",
+      "基因霸权",
+      "系统加持",
+      "寄生能力"
+    ],
+    "fit_requirements": [
+      "要有代价和限制",
+      "升级路径要清晰",
+      "要能制造支配爽感"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_types": [
+      {
+        "name": "暴君型",
+        "description": "绝对统治、铁血手腕",
+        "drive": "秩序与控制"
+      },
+      {
+        "name": "征服型",
+        "description": "扩张野心、永不满足",
+        "drive": "占有与征服"
+      },
+      {
+        "name": "毁灭型",
+        "description": "破坏一切、重建世界",
+        "drive": "毁灭与重生"
+      },
+      {
+        "name": "寄生型",
+        "description": "隐秘渗透、暗中操控",
+        "drive": "生存与进化"
+      }
+    ],
+    "trait_template": "理性冷酷 + 绝对掌控 + 野心勃勃 + 孤独患者",
+    "origin_template": "被世界抛弃 → 觉醒黑暗力量 → 复仇/征服 → 建立新秩序",
+    "complexity_rules": [
+      "有自己的行为逻辑",
+      "不是纯粹的恶",
+      "有可理解的动机",
+      "偶尔展现人性"
+    ]
+  }
+}

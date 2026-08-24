@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/font-awesome.min.css" rel="stylesheet">
+    <link href="assets/css/styles/main.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- 左侧面板：系统日志和资源监控 -->
+        <aside class="sidebar-left" id="sidebarLeft">
+            <button class="sidebar-collapse-toggle" id="sidebarCollapseBtn" onclick="toggleSidebarCollapse()" title="收起侧栏">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="sidebar-header">
+                <div class="header-logo">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <div class="header-title">
+                    <h1>CosyChat</h1>
+                    <small>智能对话系统</small>
+                </div>
+            </div>
+            <div class="sidebar-title">
+                <i class="fas fa-terminal"></i> 系统日志
+            </div>
+            <div class="log-panel-container">
+                <div id="logPanel">
+                    <div class="text-center text-muted"><small>暂无日志</small></div>
+                </div>
+            </div>
+            <div class="sidebar-title">
+                <i class="fas fa-chart-line"></i> 资源监控
+            </div>
+            <div class="resource-monitor">
+                <div class="resource-item">
+                    <span class="resource-label">CPU</span>
+                    <div class="resource-bar-container">
+                        <div id="cpuBar" class="resource-bar" style="width: 0%"></div>
+                    </div>
+                    <span id="cpuPercent" class="resource-value">--%</span>
+                </div>
+                <div class="resource-item">
+                    <span class="resource-label">内存</span>
+                    <div class="resource-bar-container">
+                        <div id="memoryBar" class="resource-bar" style="width: 0%"></div>
+                    </div>
+                    <span id="memoryPercent" class="resource-value">--%</span>
+                </div>
+                <div class="resource-item">
+                    <span class="resource-label">磁盘</span>
+                    <div class="resource-bar-container">
+                        <div id="diskBar" class="resource-bar resource-bar-warning" style="width: 0%"></div>
+                    </div>
+                    <span id="diskPercent" class="resource-value">--%</span>
+                </div>
+                <div id="gpuSection" class="resource-item" style="display: none;">
+                    <span class="resource-label">GPU显存</span>
+                    <div class="resource-bar-container">
+                        <div id="gpuBar" class="resource-bar" style="width: 0%"></div>
+                    </div>
+                    <span id="gpuPercent" class="resource-value">--%</span>
+                </div>
+            </div>
+            <div class="resource-actions">
+                <button class="resource-action-btn" onclick="unloadModels()" title="卸载模型">
+                    <i class="fas fa-eject"></i>
+                </button>
+                <button class="resource-action-btn" onclick="clearGpuCache()" title="清理GPU缓存">
+                    <i class="fas fa-broom"></i>
+                </button>
+                <button class="resource-action-btn" onclick="refreshResources()" title="刷新资源">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="resource-action-btn resource-action-btn-danger" onclick="shutdownService()" title="关闭服务">
+                    <i class="fas fa-power-off"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- 右侧：主内容区域 -->
+        <div class="main-area">
+            <!-- 页头 -->
+            <header class="app-header">
+                <div class="header-center">
+                    <div class="header-status-item">
+                        <span class="status-dot" id="headerGpuDot"></span>
+                        <span class="header-status-label">GPU:</span>
+                        <span id="gpuName" class="resource-name" style="font-size: 12px; color: var(--neu-text-muted);"></span>
+                        <span class="header-status-value" id="headerGpuStatus">未检测</span>
+                    </div>
+                    <div class="header-status-item">
+                        <span class="status-dot" id="headerQwenDot"></span>
+                        <span class="header-status-label">Qwen:</span>
+                        <span class="header-status-value" id="headerQwenStatus">未加载</span>
+                    </div>
+                    <div class="header-status-item">
+                        <span class="status-dot" id="headerCosyvoiceDot"></span>
+                        <span class="header-status-label">CosyVoice:</span>
+                        <span class="header-status-value" id="headerCosyvoiceStatus">未加载</span>
+                    </div>
+                    <div class="header-status-item">
+                        <span class="status-dot" id="headerDreamliteDot"></span>
+                        <span class="header-status-label">DreamLite:</span>
+                        <span class="header-status-value" id="headerDreamliteStatus">未加载</span>
+                    </div>
+                    <div class="header-status-item">
+                        <span class="status-dot" id="headerEmbeddingDot"></span>
+                        <span class="header-status-label">Embedding:</span>
+                        <span class="header-status-value" id="headerEmbeddingStatus">未加载</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <span class="badge bg-white\/20" id="versionBadge">v1.0.0</span>
+                </div>
+            </header>
+
+            <!-- 页面主体内容 -->
+            <div class="page-layout">
+                <!-- 中间：主内容区 -->
+                <main class="main-content">
+                <div class="tab-content" id="mainTabsContent">
+                    <!-- 工具页面 -->
+                    <!-- 设置页面 -->
+                    <div class="tab-pane fade" id="settings" role="tabpanel">
+                        <h3>设置</h3>
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle"></i>
+                            模型配置已整合到 <a href="#models" onclick="switchTab('models')">模型管理</a> 页面，在那里可以选择模型并配置参数。
+                        </div>
+
+                        <div class="mt-4">
+                            <nav class="nav nav-tabs mb-4" id="settingsNav">
+                            </nav>
+                            <div id="settingsContent"></div>
+                        </div>
+                    </div>
+
+                    <!-- 模型管理页面 -->
+                    <div class="tab-pane fade" id="models" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h3>模型管理</h3>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-primary" onclick="showDownloadModal()">
+                                    <i class="fas fa-download"></i> 下载模型
+                                </button>
+                                <button class="btn btn-success" onclick="showImportModal()">
+                                    <i class="fas fa-upload"></i> 导入模型
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="refreshModelList()" title="刷新模型列表">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="d-flex flex-wrap gap-2" id="modelCategoryFilters">
+                                <button class="btn btn-outline-primary active" data-category="qwen" onclick="filterModels('qwen')">
+                                    <i class="fas fa-comment"></i> Qwen
+                                </button>
+                                <button class="btn btn-outline-secondary" data-category="cosyvoice" onclick="filterModels('cosyvoice')">
+                                    <i class="fas fa-volume-up"></i> CosyVoice
+                                </button>
+                                <button class="btn btn-outline-secondary" data-category="dreamlite" onclick="filterModels('dreamlite')">
+                                    <i class="fas fa-image"></i> DreamLite
+                                </button>
+                                <button class="btn btn-outline-secondary" data-category="qwen_embedding" onclick="filterModels('qwen_embedding')">
+                                    <i class="fas fa-puzzle-piece"></i> Qwen3-Embedding
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="modelListContainer" class="space-y-6"></div>
+
+                        <!-- 模型参数配置模板 -->
+                        <template id="modelParamsTemplate">
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <i class="fas fa-sliders-h"></i> 参数配置
+                                </div>
+                                <div class="card-body">
+                                    <div class="params-content"></div>
+                                    <div class="mt-3 text-right">
+                                        <button class="btn btn-primary btn-sm" onclick="saveCategoryParams(this)">
+                                            <i class="fas fa-save"></i> 保存参数
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- 智能体管理页面 -->
+                    <div class="tab-pane fade show active" id="agents" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h3>智能体列表</h3>
+                            <div class="d-flex gap-2">
+                                <div class="input-group agent-search-input">
+                                    <input type="text" class="form-control" id="agentSearchInput" placeholder="搜索智能体..." onkeyup="handleAgentSearch(event)">
+                                    <button class="btn btn-outline-primary" onclick="searchAgents()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                <button class="btn btn-primary" onclick="showAddAgentModal()">
+                                    <i class="fas fa-plus"></i> 新增智能体
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 标签快捷筛选 -->
+                        <div class="mb-3" id="agentTagsFilter">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="text-muted" style="font-size: 13px; font-weight: 600;"><i class="fas fa-tags"></i> 标签筛选：</span>
+                                <button class="btn btn-sm btn-outline-secondary active" onclick="filterByTag('')" data-tag="">全部</button>
+                                <span id="agentTagsList"></span>
+                            </div>
+                        </div>
+
+                        <!-- 智能体数量统计 -->
+                        <div class="mb-3">
+                            <small class="text-muted" id="agentCountText">共 0 个智能体</small>
+                        </div>
+
+                        <div id="agentList">
+                            <div class="text-center py-5">
+                                <div class="text-muted">
+                                    <i class="fas fa-users text-4xl mb-3" style="color: #ccc;"></i>
+                                    <p>暂无智能体，点击上方按钮新增</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 分页 -->
+                        <div class="d-flex justify-content-center mt-4" id="agentPagination" style="display: none;">
+                            <nav>
+                                <ul class="pagination mb-0" id="agentPaginationUl"></ul>
+                            </nav>
+                        </div>
+                    </div>
+
+                    <!-- 媒体管理页面 -->
+                    <div class="tab-pane fade" id="media" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h3>媒体管理</h3>
+                            <div class="d-flex gap-2">
+                                <div class="input-group" style="width: 260px;">
+                                    <input type="text" class="form-control" id="mediaSearchInput" placeholder="搜索文件..." onkeyup="handleMediaSearch(event)">
+                                    <button class="btn btn-outline-primary" onclick="searchMediaFiles()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                <button class="btn btn-outline-secondary" onclick="refreshMediaFiles()">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 分类卡片 -->
+                        <div class="row mb-4" id="mediaCategoriesRow"></div>
+
+                        <!-- 排序控制 -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <span class="text-muted" id="mediaFileCount">共 0 个文件</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <select class="form-select form-select-sm" id="mediaSortBy" onchange="refreshMediaFiles()" style="width: auto;">
+                                    <option value="name">按名称</option>
+                                    <option value="size">按大小</option>
+                                    <option value="modified_time">按修改时间</option>
+                                </select>
+                                <select class="form-select form-select-sm" id="mediaSortOrder" onchange="refreshMediaFiles()" style="width: auto;">
+                                    <option value="asc">升序</option>
+                                    <option value="desc">降序</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 文件网格 -->
+                        <div id="mediaFileGrid" class="row g-3"></div>
+
+                        <!-- 分页 -->
+                        <nav class="mt-4" id="mediaPagination" style="display: none;">
+                            <ul class="pagination justify-content-center" id="mediaPaginationList"></ul>
+                        </nav>
+
+                        <!-- 空状态 -->
+                        <div id="mediaEmptyState" class="text-center py-5" style="display: none;">
+                            <div class="text-muted">
+                                <i class="fas fa-folder-open text-4xl mb-3" style="color: #ccc;"></i>
+                                <p>暂无文件</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 任务管理页面 -->
+                    <!-- 书库页面 -->
+                    <div class="tab-pane fade" id="library" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h3> 书库</h3>
+                            <div class="d-flex gap-2">
+                                <div class="input-group" style="width: 260px;">
+                                    <input type="text" class="form-control" id="librarySearchInput" placeholder="搜索书名/作者..." onkeyup="handleLibrarySearch(event)">
+                                    <button class="btn btn-outline-primary" onclick="searchLibraryBooks()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                <button class="btn btn-outline-secondary" onclick="loadLibraryBooks()">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button class="btn btn-primary" onclick="showCreateEmptyBookModal()">
+                                    <i class="fas fa-plus"></i> 新增
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="document.getElementById('ebookUploadInput').click()">
+                                    <i class="fas fa-upload"></i> 上传电子书
+                                </button>
+                                <input type="file" id="ebookUploadInput" accept=".txt,.md,.pdf,.doc,.docx,.epub" style="display: none;" onchange="uploadEbookFile(this)">
+                            </div>
+                        </div>
+
+                        <!-- 电子书卡片网格 -->
+                        <div id="libraryBookGrid" class="row g-3"></div>
+
+                        <!-- 分页 -->
+                        <nav class="mt-4" id="libraryPagination" style="display: none;">
+                            <ul class="pagination justify-content-center" id="libraryPaginationList"></ul>
+                        </nav>
+
+                        <!-- 空状态 -->
+                        <div id="libraryEmptyState" class="text-center py-5" style="display: none;">
+                            <div class="text-muted">
+                                <i class="fas fa-book text-4xl mb-3" style="color: #ccc;"></i>
+                                <p>书库暂无电子书</p>
+                                <p class="small">点击右上角"上传电子书"添加</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- 右侧：导航菜单 -->
+            <aside class="sidebar-right">
+                <div class="sidebar-title">
+                    <i class="fas fa-bars"></i> 导航菜单
+                </div>
+                <nav class="sidebar-nav">
+                    <button class="sidebar-nav-btn" id="sidebar-settings-btn" onclick="switchTab('settings')">
+                        <i class="fas fa-cog"></i> 设置
+                    </button>
+                    
+                    <button class="sidebar-nav-btn" id="sidebar-models-btn" onclick="switchTab('models')">
+                        <i class="fas fa-box"></i> 模型
+                    </button>
+                    <button class="sidebar-nav-btn active" id="sidebar-agents-btn" onclick="switchTab('agents')">
+                        <i class="fas fa-users"></i> 智能体
+                    </button>
+                    <button class="sidebar-nav-btn" id="sidebar-media-btn" onclick="switchTab('media'); loadMediaCategories()">
+                        <i class="fas fa-folder-open"></i> 媒体
+                    </button>
+                    <button class="sidebar-nav-btn" id="sidebar-library-btn" onclick="switchTab('library'); loadLibraryBooks()">
+                        <i class="fas fa-book-open"></i> 书库
+                    </button>
+                </nav>
+            </aside>
+        </div>
+    </div>
+
+    <!-- 创建空书本模态框 -->
+    <div class="modal fade" id="createEmptyBookModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-book"></i> 新建空书</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">书名 *</label>
+                        <input type="text" class="form-control" id="emptyBookTitle" placeholder="请输入书名">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">作者</label>
+                        <input type="text" class="form-control" id="emptyBookAuthor" placeholder="请输入作者名（可选）">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">简介</label>
+                        <textarea class="form-control" id="emptyBookDescription" rows="2" placeholder="请输入书籍简介（可选）"></textarea>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 创建空书后可直接打开剧本编辑页面进行智能创作。
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="createEmptyBook()">
+                        <i class="fas fa-check"></i> 创建并打开
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增智能体模态框 -->
+    <div class="modal fade" id="addAgentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-plus"></i> 新增智能体</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">智能体名称 *</label>
+                        <input type="text" class="form-control" id="agentName" placeholder="例如：CosyGirl">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">性别</label>
+                            <select class="form-select" id="agentGender">
+                                <option value="">请选择</option>
+                                <option value="男">男</option>
+                                <option value="女">女</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">年龄范围</label>
+                            <select class="form-select" id="agentAge">
+                                <option value="">请选择</option>
+                                <option value="幼儿">幼儿</option>
+                                <option value="儿童">儿童</option>
+                                <option value="少年">少年</option>
+                                <option value="青年">青年</option>
+                                <option value="中年">中年</option>
+                                <option value="老年">老年</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" id="agentDescription" rows="2"
+                            placeholder="简单描述这个智能体"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">标签</label>
+                        <input type="text" class="form-control" id="agentTags"
+                            placeholder="多个标签用逗号分隔，例如：温柔,知性,少女">
+                        <small class="text-muted">多个标签用英文逗号分隔，用于快速筛选智能体</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="voice-tones-section">
+                            <div class="section-title">
+                                <i class="fas fa-music"></i> 语气音色配置
+                                <small class="text-muted d-block">为不同语气配置不同的参考音频，合成时传入语气名即可使用对应音色；未指定语气时默认使用第一个配置</small>
+                            </div>
+                            <div id="voiceTonesContainer"></div>
+                            <button type="button" class="add-tone-btn" onclick="addVoiceToneItem('voiceTonesContainer')">
+                                <i class="fas fa-plus"></i> 添加语气配置
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="createProgress" class="d-none mt-3">
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="createProgressBar"
+                                style="width: 0%"></div>
+                        </div>
+                        <p class="text-center text-muted" id="createProgressText">准备创建...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="createAgentBtn"
+                        onclick="createAgentWithTraining()">
+                        <i class="fas fa-check"></i> 创建智能体
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑智能体模态框 -->
+    <div class="modal fade" id="editAgentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-edit"></i> 编辑智能体</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">智能体名称 *</label>
+                        <input type="text" class="form-control" id="editAgentName" placeholder="例如：CosyGirl">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">性别</label>
+                            <select class="form-select" id="editAgentGender">
+                                <option value="">请选择</option>
+                                <option value="男">男</option>
+                                <option value="女">女</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">年龄范围</label>
+                            <select class="form-select" id="editAgentAge">
+                                <option value="">请选择</option>
+                                <option value="幼儿">幼儿</option>
+                                <option value="儿童">儿童</option>
+                                <option value="少年">少年</option>
+                                <option value="青年">青年</option>
+                                <option value="中年">中年</option>
+                                <option value="老年">老年</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" id="editAgentDescription" rows="2"
+                            placeholder="简单描述这个智能体"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">标签</label>
+                        <input type="text" class="form-control" id="editAgentTags"
+                            placeholder="多个标签用逗号分隔，例如：温柔,知性,少女">
+                        <small class="text-muted">多个标签用英文逗号分隔，用于快速筛选智能体</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="voice-tones-section">
+                            <div class="section-title">
+                                <i class="fas fa-music"></i> 语气音色配置
+                                <small class="text-muted d-block">为不同语气配置不同的参考音频，合成时传入语气名即可使用对应音色；未指定语气时默认使用第一个配置</small>
+                            </div>
+                            <div id="editVoiceTonesContainer"></div>
+                            <button type="button" class="add-tone-btn" onclick="addVoiceToneItem('editVoiceTonesContainer')">
+                                <i class="fas fa-plus"></i> 添加语气配置
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="editProgress" class="d-none mt-3">
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="editProgressBar"
+                                style="width: 0%"></div>
+                        </div>
+                        <p class="text-center text-muted" id="editProgressText">准备保存...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="editAgentBtn"
+                        onclick="saveAgentChanges()">
+                        <i class="fas fa-save"></i> 保存修改
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入模型模态框 -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-upload"></i> 导入模型</h5>
+                    <button type="button" class="btn-close" onclick="closeImportModal()"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">模型分类</label>
+                        <select id="importCategory" class="form-select">
+                            <option value="cosyvoice">CosyVoice</option>
+                            <option value="qwen">Qwen</option>
+                            <option value="dreamlite">DreamLite</option>
+                            <option value="qwen_embedding">Qwen3-Embedding</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">模型名称</label>
+                        <input type="text" class="form-control" id="importName" placeholder="自定义模型名称">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" id="importDescription" rows="2"
+                            placeholder="简单描述这个模型"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">导入方式</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="importMethod" id="importByPath"
+                                        checked>
+                                    <label class="form-check-label" for="importByPath">本地路径</label>
+                                </div>
+                                <div class="input-group mt-2">
+                                    <input type="text" class="form-control" id="importSourcePath"
+                                        placeholder="选择模型文件夹路径" readonly>
+                                    <button type="button" class="btn btn-outline-secondary"
+                                        onclick="selectImportFolder()">
+                                        <i class="fas fa-folder-open"></i> 浏览
+                                    </button>
+                                </div>
+                                <input type="file" id="importFolderInput" style="display: none;" webkitdirectory
+                                    directory onchange="handleFolderSelect(this)">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="importMethod" id="importByFile">
+                                    <label class="form-check-label" for="importByFile">上传文件</label>
+                                </div>
+                                <input type="file" class="form-control mt-2" id="importFile" style="display: none;">
+                                <div class="file-upload-area mt-2" id="importFileArea"
+                                    onclick="document.getElementById('importFile').click()">
+                                    <i class="fas fa-file-archive text-2xl mb-2" style="color: #667eea;"></i>
+                                    <p>点击选择文件</p>
+                                    <small class="text-muted">支持 zip, tar.gz 等压缩文件</small>
+                                    <div id="importFileName" class="mt-2"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeImportModal()">取消</button>
+                    <button type="button" class="btn btn-primary" id="startImportBtn"
+                        onclick="startModelImport()">开始导入</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/bootstrap.bundle.min.js"></script>    
+    <script src="assets/js/core/api.js"></script>
+    <script src="assets/js/core/base.js"></script>
+    <script src="assets/js/core/monitor.js"></script>
+    <script src="assets/js/modules/models.js"></script>
+    <script src="assets/js/modules/audio_editor.js"></script>
+    <script src="assets/js/modules/voice_tones.js"></script>
+    <script src="assets/js/modules/agents.js"></script>
+    <script src="assets/js/modules/media.js"></script>
+    <script src="assets/js/modules/library.js"></script>
+    <script src="assets/js/modules/tasks.js"></script>
+    <script src="assets/js/modules/settings.js"></script>
+    <script src="assets/js/modules/test.js"></script>
+    <script src="assets/js/core/navigation.js"></script>
+</div>
+</body>
+
+</html>

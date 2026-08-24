@@ -1,0 +1,293 @@
+{
+  "title": "豪门总裁题材模板",
+  "canonical_genre": "现言",
+  "core_selling_points": "权力差距 + 契约关系 + 情感拉扯。灰姑娘与王子的现代演绎，在金钱与真心之间抉择。",
+  "creative_constraints": [
+    "推荐约束包：Pack F07",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "契约婚姻流",
+      "features": "因某种原因签订契约，假戏真做",
+      "core_payoffs": "身份反转、真心流露、契约到期抉择",
+      "protagonist_traits": "理性、善于伪装、内心柔软"
+    },
+    {
+      "name": "先婚后爱流",
+      "features": "先结婚后培养感情",
+      "core_payoffs": "日久生情、冷面热心、独宠",
+      "protagonist_traits": "温柔、有耐心、懂得珍惜"
+    },
+    {
+      "name": "豪门争斗流",
+      "features": "卷入豪门内部争斗",
+      "core_payoffs": "智斗对手、站稳脚跟、逆袭上位",
+      "protagonist_traits": "聪明、有谋略、坚韧"
+    },
+    {
+      "name": "复仇虐恋流",
+      "features": "带着目的接近，却动了真心",
+      "core_payoffs": "身份揭露、虐心反转、破镜重圆",
+      "protagonist_traits": "隐忍、有谋略、情感复杂"
+    }
+  ],
+  "worldview": {
+    "description": "豪门世界，权力与财富是游戏规则",
+    "family_ranks": [
+      {
+        "rank": "顶级财阀",
+        "features": "控制行业命脉",
+        "asset_scale": "千亿级"
+      },
+      {
+        "rank": "一线豪门",
+        "features": "行业龙头",
+        "asset_scale": "百亿级"
+      },
+      {
+        "rank": "二线豪门",
+        "features": "区域巨头",
+        "asset_scale": "十亿级"
+      },
+      {
+        "rank": "新贵",
+        "features": "新兴富豪",
+        "asset_scale": "亿级"
+      },
+      {
+        "rank": "普通富人",
+        "features": "小有资产",
+        "asset_scale": "千万级"
+      }
+    ],
+    "family_rules": [
+      "门当户对：婚姻是利益联姻",
+      "嫡庶有别：私生子地位低",
+      "继承权争夺：家产是核心矛盾",
+      "面子工程：形象比真相重要"
+    ],
+    "power_structure": [
+      {
+        "role": "家族长辈",
+        "nature": "掌控大权，需要讨好"
+      },
+      {
+        "role": "嫡系子女",
+        "nature": "正统继承人"
+      },
+      {
+        "role": "庶出/私生",
+        "nature": "边缘人，可能黑化"
+      },
+      {
+        "role": "联姻对象",
+        "nature": "政治筹码"
+      },
+      {
+        "role": "家族企业",
+        "nature": "权力的载体"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "契约与权力体系",
+    "contract_types": [
+      {
+        "type": "假结婚",
+        "reason": "应付家族",
+        "duration": "1-3年"
+      },
+      {
+        "type": "代孕",
+        "reason": "需要继承人",
+        "duration": "怀孕期"
+      },
+      {
+        "type": "情人",
+        "reason": "商业需要",
+        "duration": "不定"
+      },
+      {
+        "type": "助理",
+        "reason": "工作关系",
+        "duration": "合同期"
+      }
+    ],
+    "contract_clauses": [
+      "不能爱上对方",
+      "不能干涉私生活",
+      "期满后净身出户",
+      "保密条款"
+    ]
+  },
+  "outline_structure": {
+    "description": "80万字标准大纲",
+    "volumes": [
+      {
+        "name": "相遇",
+        "chapters": "1-50",
+        "focus": "男女主相遇，建立契约关系，签订契约，开始同居"
+      },
+      {
+        "name": "暧昧",
+        "chapters": "51-120",
+        "focus": "日常相处，感情萌芽，第一次心动/吃醋"
+      },
+      {
+        "name": "考验",
+        "chapters": "121-200",
+        "focus": "感情遇到考验，误会/分离"
+      },
+      {
+        "name": "确认",
+        "chapters": "201-280",
+        "focus": "解除误会，确认感情，正式在一起"
+      },
+      {
+        "name": "圆满",
+        "chapters": "281-350",
+        "focus": "获得认可，修成正果，盛大婚礼"
+      }
+    ]
+  },
+  "story_rules": [
+    "身份反转要有伏笔",
+    "独宠打脸要有铺垫",
+    "契约反转要有感情铺垫",
+    "豪门认可要展示女主闪光点",
+    "虐有度，甜有糖",
+    "霸总有人性化的一面",
+    "女主有主见有底线",
+    "误会要合理"
+  ],
+  "conflict_design": {
+    "internal_conflicts": [
+      {
+        "conflict": "身份差距",
+        "source": "门不当户不对",
+        "solution": "证明自己"
+      },
+      {
+        "conflict": "契约束缚",
+        "source": "不能动真心",
+        "solution": "打破契约"
+      },
+      {
+        "conflict": "自尊",
+        "source": "不想被施舍",
+        "solution": "独立自强"
+      }
+    ],
+    "external_conflicts": [
+      {
+        "conflict": "家族反对",
+        "source": "长辈",
+        "solution": "获得认可"
+      },
+      {
+        "conflict": "情敌",
+        "source": "前任/追求者",
+        "solution": "坚定选择"
+      },
+      {
+        "conflict": "商业危机",
+        "source": "公司",
+        "solution": "共同面对"
+      },
+      {
+        "conflict": "身世秘密",
+        "source": "过去",
+        "solution": "真相大白"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "隐藏身份",
+      "契约关系",
+      "商业天赋",
+      "真心"
+    ],
+    "fit_requirements": [
+      "要符合豪门世界观",
+      "要有情感代价",
+      "要能制造身份反转爽点",
+      "升级路径要与感情发展同步"
+    ]
+  },
+  "character_guidelines": {
+    "male_protagonist_types": [
+      {
+        "type": "冷面总裁",
+        "features": "外冷内热",
+        "attitude_to_female": "只对女主温柔"
+      },
+      {
+        "type": "腹黑总裁",
+        "features": "城府深",
+        "attitude_to_female": "暗中保护"
+      },
+      {
+        "type": "霸道总裁",
+        "features": "强势占有",
+        "attitude_to_female": "独占欲强"
+      },
+      {
+        "type": "病娇总裁",
+        "features": "偏执",
+        "attitude_to_female": "极端宠爱"
+      }
+    ],
+    "female_protagonist_types": [
+      {
+        "type": "灰姑娘",
+        "features": "出身普通",
+        "interaction": "被动卷入"
+      },
+      {
+        "type": "落魄千金",
+        "features": "曾经富有",
+        "interaction": "势均力敌"
+      },
+      {
+        "type": "独立女性",
+        "features": "自尊自强",
+        "interaction": "不卑不亢"
+      },
+      {
+        "type": "隐藏身份",
+        "features": "有秘密",
+        "interaction": "反转惊喜"
+      }
+    ],
+    "supporting_roles": [
+      {
+        "role": "白莲花",
+        "function": "表面善良",
+        "ending": "被揭穿"
+      },
+      {
+        "role": "恶毒女配",
+        "function": "明面作恶",
+        "ending": "被打脸"
+      },
+      {
+        "role": "前任",
+        "function": "制造冲突",
+        "ending": "被拒绝"
+      },
+      {
+        "role": "婆婆",
+        "function": "刁难女主",
+        "ending": "被征服"
+      }
+    ],
+    "relationship_patterns": [
+      "契约开始",
+      "先婚后爱",
+      "复仇与真心",
+      "门当户对"
+    ]
+  }
+}

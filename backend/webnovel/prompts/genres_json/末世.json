@@ -1,0 +1,232 @@
+{
+  "title": "末世题材模板",
+  "canonical_genre": "科幻",
+  "core_selling_points": "资源崩塌 + 生存博弈 + 人性抉择。文明废墟上重建秩序，在绝望中寻找希望。",
+  "creative_constraints": [
+    "推荐约束包：Pack M20",
+    "通用叠加：Pack U03"
+  ],
+  "subgenres": [
+    {
+      "name": "丧尸末世流",
+      "features": "病毒爆发，死者复生，人类苟延残喘",
+      "core_payoffs": "杀丧尸升级、建立安全区、拯救幸存者"
+    },
+    {
+      "name": "异变末世流",
+      "features": "灵气复苏/辐射变异，动植物进化，人类觉醒异能",
+      "core_payoffs": "异能觉醒、猎杀变异兽、收集进化材料"
+    },
+    {
+      "name": "天灾末世流",
+      "features": "自然灾害（冰河/干旱/地震），资源极度匮乏",
+      "core_payoffs": "资源囤积、避难所经营、探索废墟"
+    },
+    {
+      "name": "秩序重建流",
+      "features": "灾后重建，势力争霸，建立新文明",
+      "core_payoffs": "势力扩张、人才招募、制度建设"
+    }
+  ],
+  "worldview": {
+    "description": "末世社会学：资源法则与人性光谱",
+    "resource_rules": [
+      {
+        "name": "食物",
+        "description": "最硬的通货，为了一口吃的可以杀人"
+      },
+      {
+        "name": "水源",
+        "description": "干净水源比黄金珍贵"
+      },
+      {
+        "name": "药品",
+        "description": "一瓶抗生素能换一条命"
+      },
+      {
+        "name": "燃料",
+        "description": "控制燃料就控制机动性"
+      }
+    ],
+    "humanity_spectrum": [
+      "圣人（稀有）",
+      "普通人",
+      "灰色地带",
+      "恶人"
+    ],
+    "faction_types": [
+      {
+        "name": "军方残部",
+        "features": "有组织有纪律",
+        "relation": "可合作/可对抗"
+      },
+      {
+        "name": "幸存者聚落",
+        "features": "抱团取暖",
+        "relation": "可加入/可建立"
+      },
+      {
+        "name": "掠夺者",
+        "features": "以抢劫为生",
+        "relation": "主要敌人"
+      },
+      {
+        "name": "邪教组织",
+        "features": "末世信仰",
+        "relation": "中后期BOSS"
+      },
+      {
+        "name": "科研机构",
+        "features": "寻找解药/真相",
+        "relation": "任务来源"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "异能/进化体系",
+    "awakening_levels": [
+      {
+        "name": "一阶",
+        "description": "身体强化，比普通人强2-3倍"
+      },
+      {
+        "name": "二阶",
+        "description": "元素初现，可操控单一元素"
+      },
+      {
+        "name": "三阶",
+        "description": "元素精通，AOE攻击"
+      },
+      {
+        "name": "四阶",
+        "description": "领域形成，小范围规则扭曲"
+      },
+      {
+        "name": "五阶",
+        "description": "传说级，一人可灭一城丧尸"
+      }
+    ],
+    "ability_categories": [
+      {
+        "name": "力量系",
+        "description": "蛮力碾压",
+        "rarity": "常见"
+      },
+      {
+        "name": "速度系",
+        "description": "机动灵活",
+        "rarity": "常见"
+      },
+      {
+        "name": "元素系",
+        "description": "火/冰/雷/风",
+        "rarity": "较稀有"
+      },
+      {
+        "name": "精神系",
+        "description": "控制/感知",
+        "rarity": "稀有"
+      },
+      {
+        "name": "空间系",
+        "description": "储物/传送",
+        "rarity": "极稀有"
+      },
+      {
+        "name": "治愈系",
+        "description": "恢复伤势",
+        "rarity": "极稀有"
+      }
+    ],
+    "evolution_materials": [
+      "晶核",
+      "进化药剂",
+      "特殊食物"
+    ]
+  },
+  "outline_structure": {
+    "description": "200万字标准大纲",
+    "volumes": [
+      {
+        "name": "求生",
+        "chapters": "1-80章",
+        "focus": "末世降临，主角觉醒，艰难求生"
+      },
+      {
+        "name": "立足",
+        "chapters": "81-180章",
+        "focus": "建立/加入据点，击退大规模尸潮"
+      },
+      {
+        "name": "扩张",
+        "chapters": "181-350章",
+        "focus": "势力扩张，成为区域霸主"
+      },
+      {
+        "name": "争霸",
+        "chapters": "351-550章",
+        "focus": "与其他大势力博弈，发现末世真相"
+      },
+      {
+        "name": "终局",
+        "chapters": "551-700章",
+        "focus": "解决末世根源，建立新秩序"
+      }
+    ]
+  },
+  "story_rules": [
+    "物资囤积：别人饿肚子，主角吃香喝辣，要有合理理由",
+    "基地建设：从破烂到堡垒，从孤身到团队，展示建设过程",
+    "救人收服：收获忠诚追随者，被救者要有用",
+    "势力碾压：一人灭一帮，震慑四方，要有足够铺垫"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "空间储物",
+      "预知未来",
+      "异能觉醒",
+      "基地系统"
+    ],
+    "fit_requirements": [
+      "要符合末世背景",
+      "资源始终紧张",
+      "成长路径要清晰"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "末世强者",
+      "重生者",
+      "团队领袖",
+      "科研天才"
+    ],
+    "team_roles": [
+      {
+        "name": "战士",
+        "position": "输出",
+        "ability": "力量/元素"
+      },
+      {
+        "name": "刺客",
+        "position": "侦察",
+        "ability": "速度/隐匿"
+      },
+      {
+        "name": "医疗",
+        "position": "辅助",
+        "ability": "治愈"
+      },
+      {
+        "name": "后勤",
+        "position": "管理",
+        "ability": "非战斗"
+      }
+    ],
+    "conflict_types": [
+      "生存危机",
+      "势力斗争",
+      "人性抉择",
+      "真相揭露"
+    ]
+  }
+}

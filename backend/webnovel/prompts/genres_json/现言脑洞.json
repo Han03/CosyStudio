@@ -1,0 +1,129 @@
+{
+  "title": "现言脑洞题材模板",
+  "canonical_genre":"现言",
+  "core_selling_points": "现实关系 + 规则/异象 + 情感反转。当超自然规则入侵现代爱情，感情与规则如何共存？",
+  "creative_constraints": ["推荐约束包：Pack F03", "通用叠加：Pack U01"],
+  "subgenres": [
+    {
+      "name": "规则恋爱流",
+      "features": "恋爱被某种规则约束",
+      "core_payoffs": "规则利用、规则突破、真心战胜规则",
+      "protagonist_traits": "理智、善于发现规则、情感坚定"
+    },
+    {
+      "name": "契约情缘流",
+      "features": "因契约/交易开始的感情",
+      "core_payoffs": "假戏真做、契约反转、真心流露",
+      "protagonist_traits": "理性、善于伪装、内心柔软"
+    },
+    {
+      "name": "重生复仇流",
+      "features": "重生后改变命运，收获真爱",
+      "core_payoffs": "避坑抓机、复仇成功、真爱相伴",
+      "protagonist_traits": "坚强、有远见、懂得珍惜"
+    },
+    {
+      "name": "异能恋爱流",
+      "features": "拥有特殊能力的现代爱情",
+      "core_payoffs": "能力助攻、身份秘密、能力与爱情",
+      "protagonist_traits": "神秘、有责任感、善于隐藏"
+    }
+  ],
+  "worldview": {
+    "description": "现代都市中规则与爱情交织的世界",
+    "rule_types": [
+      {"type": "契约规则", "features": "明确的约定", "effect_on_relationship": "限制行为"},
+      {"type": "系统规则", "features": "系统强制", "effect_on_relationship": "任务驱动"},
+      {"type": "超自然规则", "features": "神秘力量", "effect_on_relationship": "命运牵引"},
+      {"type": "社会规则", "features": "现实压力", "effect_on_relationship": "外部阻碍"}
+    ],
+    "ability_types": [
+      {"ability": "读心", "features": "知道对方想法", "effect_on_relationship": "了解真心"},
+      {"ability": "预知", "features": "知道未来", "effect_on_relationship": "避免悲剧"},
+      {"ability": "时间", "features": "操控时间", "effect_on_relationship": "弥补遗憾"},
+      {"ability": "重生", "features": "重来一次", "effect_on_relationship": "改变命运"}
+    ],
+    "relationship_stages": [
+      {"stage": "相遇", "features": "命运安排", "rule_role": "触发规则"},
+      {"stage": "相知", "features": "逐渐了解", "rule_role": "规则限制"},
+      {"stage": "考验", "features": "规则冲突", "rule_role": "选择抉择"},
+      {"stage": "突破", "features": "打破规则", "rule_role": "真心战胜"}
+    ]
+  },
+  "power_system": {
+    "description": "规则与能力体系",
+    "rule_design_principles": [
+      "与感情相关：规则影响感情发展、制造感情冲突、考验真心",
+      "有漏洞可钻：真心可以突破、特定条件可解除、代价可以承受",
+      "有明确代价：违反有惩罚、突破有代价、选择有取舍"
+    ],
+    "emotional_rule_conflicts": [
+      {"conflict": "规则禁止", "expression": "不能在一起", "solution": "打破规则"},
+      {"conflict": "规则强制", "expression": "必须分开", "solution": "找到漏洞"},
+      {"conflict": "规则考验", "expression": "选择题", "solution": "证明真心"},
+      {"conflict": "规则代价", "expression": "在一起有代价", "solution": "愿意承受"}
+    ],
+    "cost_system": [
+      {"cost": "记忆代价", "features": "忘记对方", "emotional_meaning": "虐心"},
+      {"cost": "能力代价", "features": "失去能力", "emotional_meaning": "牺牲"},
+      {"cost": "身份代价", "features": "改变身份", "emotional_meaning": "选择"},
+      {"cost": "时间代价", "features": "失去时间", "emotional_meaning": "珍惜"}
+    ]
+  },
+  "outline_structure": {
+    "description": "80万字标准大纲",
+    "volumes": [
+      {"name": "相遇", "chapters": "1-50", "focus": "因规则/能力相遇，陌生人→相识，发现规则/能力"},
+      {"name": "相知", "chapters": "51-120", "focus": "在规则下相处，相识→暧昧，确认心意"},
+      {"name": "考验", "chapters": "121-200", "focus": "规则与感情冲突，暧昧→危机，面临抉择"},
+      {"name": "突破", "chapters": "201-280", "focus": "打破规则，选择真心，危机→确定"},
+      {"name": "圆满", "chapters": "281-350", "focus": "有情人终成眷属，确定→永恒"}
+    ]
+  },
+  "story_rules": [
+    "规则突破要有足够的情感铺垫",
+    "身份揭露要有伏笔",
+    "命运改写要有对比",
+    "真心证明的考验要有意义",
+    "规则与现实融合",
+    "情感发展自然",
+    "规则自洽一致",
+    "代价明确兑现"
+  ],
+  "reality_balance": {
+    "reality_base": ["现代都市背景", "真实的人际关系", "合理的社会规则"],
+    "brainstorm_elements": ["超自然规则", "特殊能力", "命运安排"],
+    "emotional_authenticity": [
+      {"aspect": "感情发展", "points": "循序渐进", "pitfall": "太快太突兀"},
+      {"aspect": "人物反应", "points": "符合性格", "pitfall": "为剧情服务"},
+      {"aspect": "冲突解决", "points": "合理可信", "pitfall": "太巧合"},
+      {"aspect": "结局", "points": "有铺垫", "pitfall": "强行HE"}
+    ],
+    "integration_principles": ["规则要融入日常生活", "能力要有使用限制", "超自然元素要有解释"]
+  },
+  "golden_finger_guidelines": {
+    "types": ["特殊能力", "系统规则", "契约", "重生"],
+    "fit_requirements": ["要符合现言脑洞世界观", "要有情感代价", "要能制造情感爽点", "升级路径要与感情发展同步"]
+  },
+  "character_guidelines": {
+    "female_protagonist_types": [
+      {"type": "规则受益者", "features": "因规则获益", "relationship_to_rule": "利用规则"},
+      {"type": "规则受害者", "features": "被规则限制", "relationship_to_rule": "想突破规则"},
+      {"type": "规则发现者", "features": "发现规则", "relationship_to_rule": "探索规则"},
+      {"type": "规则打破者", "features": "打破规则", "relationship_to_rule": "对抗规则"}
+    ],
+    "male_protagonist_types": [
+      {"type": "规则制定者", "features": "掌控规则", "attitude_to_female": "为女主改变"},
+      {"type": "规则同伴", "features": "同样受限", "attitude_to_female": "共同突破"},
+      {"type": "规则外人", "features": "不受规则", "attitude_to_female": "帮助女主"},
+      {"type": "规则对手", "features": "利用规则", "attitude_to_female": "从对手到恋人"}
+    ],
+    "supporting_roles": [
+      {"role": "闺蜜", "function": "助攻", "relationship": "情感支持"},
+      {"role": "情敌", "function": "制造冲突", "relationship": "被打脸"},
+      {"role": "规则守护者", "function": "阻碍", "relationship": "被说服"},
+      {"role": "神秘人", "function": "推动剧情", "relationship": "提供信息"}
+    ],
+    "relationship_patterns": ["命运安排", "契约开始", "从敌人到恋人", "重生后的珍惜"]
+  }
+}

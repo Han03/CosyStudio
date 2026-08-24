@@ -1,0 +1,254 @@
+{
+  "title": "替身文题材模板",
+  "canonical_genre": "现言",
+  "core_selling_points": "身份认同危机 + 真假情感辨别 + 自我价值追寻",
+  "creative_constraints": [
+    "推荐约束包：Pack F16",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "被动替身流",
+      "features": "被选择成为替身",
+      "core_payoffs": "内心挣扎、自我觉醒、成长蜕变",
+      "protagonist_traits": "善良、内心敏感、渴望被爱"
+    },
+    {
+      "name": "主动替身流",
+      "features": "主动成为替身（有目的）",
+      "core_payoffs": "清醒利用、动情挣扎、身份反转",
+      "protagonist_traits": "清醒、有计划、有野心"
+    },
+    {
+      "name": "觉醒替身流",
+      "features": "从被动到主动的转变",
+      "core_payoffs": "自我发现、找回自我、独立成长",
+      "protagonist_traits": "从迷茫到坚定、有韧性"
+    },
+    {
+      "name": "反转型替身流",
+      "features": "身份反转（替身才是真正的白月光）",
+      "core_payoffs": "真相揭露、身份反转、震撼结局",
+      "protagonist_traits": "神秘、有秘密、身份不凡"
+    }
+  ],
+  "worldview": {
+    "description": "替身与白月光的情感世界",
+    "core_triangle": {
+      "female": "身份挣扎、情感成长",
+      "male": "从执念到真爱的转变",
+      "white_moon": "对照、冲突来源"
+    },
+    "setting_options": {
+      "time_period": [
+        "现代都市",
+        "民国",
+        "古代宫廷"
+      ],
+      "identity_setting": [
+        "豪门世家",
+        "娱乐圈",
+        "古代王府"
+      ],
+      "white_moon_status": [
+        "死亡",
+        "失踪",
+        "变心",
+        "实际不存在"
+      ]
+    },
+    "emotion_ratio": {
+      "early": "甜3虐7",
+      "middle": "甜1虐9",
+      "late": "甜7虐3"
+    }
+  },
+  "power_system": {
+    "description": "情感与心理转变体系",
+    "female_growth_stages": [
+      {
+        "stage": "不自知期",
+        "description": "不知道自己是替身/或知道但不在意，沉浸在被宠爱中"
+      },
+      {
+        "stage": "察觉期",
+        "description": "发现蛛丝马迹，开始怀疑、内心动摇"
+      },
+      {
+        "stage": "确认期",
+        "description": "确认替身身份，情感崩溃、自我价值崩塌"
+      },
+      {
+        "stage": "决绝期",
+        "description": "决定离开、找回自我、不再依附"
+      },
+      {
+        "stage": "放下期",
+        "description": "真正释然、完成自我成长"
+      }
+    ],
+    "male_transformation_stages": [
+      {
+        "stage": "执念期",
+        "description": "沉浸在对白月光的执念中，把女主当替身、看不到女主本人"
+      },
+      {
+        "stage": "混淆期",
+        "description": "开始分不清、对女主产生真实情感，但不愿承认"
+      },
+      {
+        "stage": "确认期",
+        "description": "确认爱上的是女主而非白月光的影子，内心挣扎"
+      },
+      {
+        "stage": "悔悟期",
+        "description": "意识到自己的错误、后悔伤害女主，想要弥补"
+      },
+      {
+        "stage": "挽回期",
+        "description": "追妻火葬场，用行动证明、等待女主原谅"
+      }
+    ],
+    "plot_nodes": [
+      "相遇节点",
+      "甜蜜期",
+      "裂痕出现",
+      "真相揭露",
+      "分离期",
+      "追妻火葬场",
+      "结局选择"
+    ]
+  },
+  "outline_structure": {
+    "description": "剧情节奏",
+    "opening": [
+      "替身进入故事",
+      "建立替身关系",
+      "埋下身份伏笔"
+    ],
+    "development": [
+      "被宠爱的日常",
+      "心动瞬间",
+      "裂痕出现"
+    ],
+    "climax": [
+      "身份彻底暴露",
+      "情感崩溃",
+      "关系破裂"
+    ],
+    "resolution": [
+      "女主离开",
+      "男主悔悟",
+      "追妻火葬场",
+      "结局选择"
+    ]
+  },
+  "story_rules": [
+    "女主不能太圣母（无底线原谅）",
+    "男主追妻要有诚意（不能太轻松）",
+    "白月光不能太完美（否则难以替代）",
+    "替身身份揭露要有戏剧性",
+    "情感转变要有过程（不能突兀）",
+    "身份虐要有痛感",
+    "追妻要有诚意",
+    "结局要有铺垫"
+  ],
+  "emotion_design": {
+    "pain_points": [
+      {
+        "type": "身份虐",
+        "content": [
+          "发现自己是替身的瞬间",
+          "被当成另一个人对待",
+          "自我价值被否定"
+        ]
+      },
+      {
+        "type": "情感虐",
+        "content": [
+          "付出真心却不被看见",
+          "被爱却不是因为自己",
+          "爱而不得的痛苦"
+        ]
+      },
+      {
+        "type": "对比虐",
+        "content": [
+          "与白月光的对比",
+          "永远无法成为'那个人'",
+          "即使更好也不如原型"
+        ]
+      }
+    ],
+    "sweet_points": [
+      {
+        "type": "甜蜜日常",
+        "content": [
+          "被宠爱的小细节",
+          "无意识的偏爱",
+          "专属的温柔"
+        ]
+      },
+      {
+        "type": "觉醒之甜",
+        "content": [
+          "男主发现真心的瞬间",
+          "意识到女主独特性",
+          "开始真正看见女主"
+        ]
+      },
+      {
+        "type": "追妻之甜",
+        "content": [
+          "男主的卑微与努力",
+          "细致的补偿",
+          "真诚的告白"
+        ]
+      }
+    ]
+  },
+  "character_guidelines": {
+    "female_archetypes": [
+      "被动型替身",
+      "主动型替身",
+      "觉醒型替身",
+      "反转型替身"
+    ],
+    "male_archetypes": [
+      "执念者",
+      "逐渐清醒者",
+      "追妻者"
+    ],
+    "supporting_roles": [
+      {
+        "role": "白月光",
+        "function": "对照/冲突",
+        "status": "死亡/失踪/变心"
+      },
+      {
+        "role": "闺蜜",
+        "function": "支持",
+        "relation": "情感支撑"
+      },
+      {
+        "role": "追求者",
+        "function": "对比",
+        "relation": "备胎/真爱"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "独特性格",
+      "特殊才能",
+      "身份秘密",
+      "自我觉醒"
+    ],
+    "fit_requirements": [
+      "要符合替身文世界观",
+      "要有情感成长",
+      "要能制造情感爽点",
+      "升级路径要与自我成长同步"
+    ]
+  }
+}

@@ -1,0 +1,244 @@
+/* ========== 加载/空状态 ========== */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--neu-text-muted);
+}
+
+.loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid var(--neu-dark);
+    border-top-color: var(--neu-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ========== Toast ========== */
+.toast-msg {
+    position: fixed;
+    top: 70px;
+    right: 24px;
+    z-index: 9999;
+    padding: 12px 24px;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: translateX(20px);
+    transition: all 0.3s;
+}
+
+.toast-msg.show { opacity: 1; transform: translateX(0); }
+.toast-msg.success { background: #10b981; }
+.toast-msg.error { background: #ef4444; }
+.toast-msg.info { background: #3b82f6; }
+.toast-msg.warning { background: #f59e0b; }
+
+/* ========== 生成进度条 ========== */
+.progress-container {
+    background: var(--neu-bg);
+    padding: 0 20px 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+}
+
+.progress-bar-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.progress-label {
+    font-size: 12px;
+    color: var(--neu-text-muted);
+    white-space: nowrap;
+    min-width: 60px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--neu-bg);
+    border-radius: 4px;
+    box-shadow: var(--neu-shadow-inset);
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--neu-accent), #a78bfa, var(--neu-accent));
+    background-size: 200% 100%;
+    border-radius: 4px;
+    animation: colorFlow 3s infinite ease-in-out;
+}
+
+@keyframes colorFlow {
+    0% { background-position: 0% 0; }
+    50% { background-position: 100% 0; }
+    100% { background-position: 0% 0; }
+}
+
+.progress-message {
+    font-size: 12px;
+    color: var(--neu-text-muted);
+    margin-top: 6px;
+    text-align: center;
+}
+
+.stop-btn {
+    background: var(--neu-bg);
+    border: none;
+    border-radius: 8px;
+    box-shadow: var(--neu-shadow-small);
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #ef4444;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.stop-btn:hover {
+    color: #dc2626;
+    box-shadow: var(--neu-shadow-small), 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.stop-btn:active {
+    transform: scale(0.96);
+}
+
+/* ========== 新语句淡入动画 ========== */
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.script-line.new-line {
+    animation: fadeInSlide 0.4s ease-out;
+}
+
+/* ========== 骨架屏占位条目 ========== */
+.line-placeholder {
+    background: var(--neu-bg);
+    border-radius: 12px;
+    box-shadow: var(--neu-shadow-small);
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 14px;
+}
+
+.skeleton {
+    background: linear-gradient(90deg, var(--neu-dark) 25%, var(--neu-bg) 50%, var(--neu-dark) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.line-placeholder .ph-drag {
+    width: 20px;
+    flex-shrink: 0;
+}
+
+.line-placeholder .ph-number {
+    width: 28px;
+    flex-shrink: 0;
+}
+
+.line-placeholder .ph-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.line-placeholder .ph-header {
+    display: flex;
+    gap: 8px;
+}
+
+.line-placeholder .ph-role {
+    width: 90px;
+    height: 24px;
+}
+
+.line-placeholder .ph-instruction {
+    width: 80px;
+    height: 24px;
+}
+
+.line-placeholder .ph-content {
+    height: 22px;
+    width: 85%;
+}
+
+.line-placeholder .ph-content-short {
+    height: 22px;
+    width: 60%;
+}
+
+.line-placeholder .ph-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.line-placeholder .ph-action {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+}
+
+/* ========== WebSocket 连接状态指示灯 ========== */
+.ws-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.ws-status-dot.connected {
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.ws-status-dot.connecting {
+    background: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.ws-status-dot.disconnected {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+

@@ -1,0 +1,229 @@
+{
+  "title": "青春甜宠题材模板",
+  "canonical_genre": "现言",
+  "core_selling_points": "轻甜氛围 + 高密度互动 + 成长共鸣。在最美好的年纪，遇见最对的人。",
+  "creative_constraints": [
+    "推荐约束包：Pack F06",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "校园恋爱流",
+      "features": "高中/大学校园，纯爱故事",
+      "core_payoffs": "暧昧互动、告白心动、甜蜜日常"
+    },
+    {
+      "name": "青梅竹马流",
+      "features": "从小一起长大，日久生情",
+      "core_payoffs": "默契互动、身份转变、守护成长"
+    },
+    {
+      "name": "欢喜冤家流",
+      "features": "初见不对付，斗嘴变真爱",
+      "core_payoffs": "互怼日常、反差萌、真心流露"
+    },
+    {
+      "name": "治愈暖甜流",
+      "features": "温暖治愈，细水长流",
+      "core_payoffs": "温馨日常、相互治愈、平淡幸福"
+    }
+  ],
+  "worldview": {
+    "description": "青春校园：场景与人物身份",
+    "scenes": [
+      {
+        "name": "教室",
+        "function": "日常互动",
+        "classic_scenes": [
+          "同桌",
+          "传纸条"
+        ]
+      },
+      {
+        "name": "操场",
+        "function": "运动会",
+        "classic_scenes": [
+          "加油",
+          "受伤"
+        ]
+      },
+      {
+        "name": "图书馆",
+        "function": "学习",
+        "classic_scenes": [
+          "偶遇",
+          "占座"
+        ]
+      },
+      {
+        "name": "食堂",
+        "function": "吃饭",
+        "classic_scenes": [
+          "抢座",
+          "投喂"
+        ]
+      },
+      {
+        "name": "宿舍",
+        "function": "私密空间",
+        "classic_scenes": [
+          "夜聊",
+          "探病"
+        ]
+      },
+      {
+        "name": "天台",
+        "function": "告白圣地",
+        "classic_scenes": [
+          "告白",
+          "约定"
+        ]
+      }
+    ],
+    "character_identities": [
+      {
+        "name": "学霸",
+        "description": "成绩优秀",
+        "common_settings": [
+          "高冷",
+          "温柔"
+        ]
+      },
+      {
+        "name": "学渣",
+        "description": "成绩一般",
+        "common_settings": [
+          "活泼",
+          "努力"
+        ]
+      },
+      {
+        "name": "校草",
+        "description": "颜值担当",
+        "common_settings": [
+          "受欢迎"
+        ]
+      },
+      {
+        "name": "校花",
+        "description": "美丽动人",
+        "common_settings": [
+          "被追求"
+        ]
+      },
+      {
+        "name": "体育生",
+        "description": "运动健将",
+        "common_settings": [
+          "阳光"
+        ]
+      },
+      {
+        "name": "文艺生",
+        "description": "才艺出众",
+        "common_settings": [
+          "文静"
+        ]
+      }
+    ]
+  },
+  "power_system": {},
+  "outline_structure": {
+    "description": "60万字标准大纲",
+    "volumes": [
+      {
+        "name": "相遇",
+        "chapters": "1-50章",
+        "focus": "男女主相识，第一次心动瞬间"
+      },
+      {
+        "name": "暧昧",
+        "chapters": "51-120章",
+        "focus": "互动增多，暧昧升温"
+      },
+      {
+        "name": "确认",
+        "chapters": "121-180章",
+        "focus": "告白成功，确定关系"
+      },
+      {
+        "name": "考验",
+        "chapters": "181-240章",
+        "focus": "感情遇到考验，共同克服"
+      },
+      {
+        "name": "圆满",
+        "chapters": "241-300章",
+        "focus": "修成正果，甜蜜结局"
+      }
+    ]
+  },
+  "story_rules": [
+    "甜度节奏：相识(★☆☆☆☆) → 暧昧(★★★☆☆) → 确认(★★★★★) → 考验(★★★☆☆) → 圆满(★★★★★)",
+    "互动类型：日常撒糖、吃醋互动、保护互动、默契互动、反差互动",
+    "冲突设计：内部冲突(误会、自卑、犹豫) + 外部冲突(家长反对、情敌、异地)"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "颜值",
+      "才华",
+      "温暖",
+      "默契"
+    ],
+    "fit_requirements": [
+      "要符合青春校园背景",
+      "不能太逆天",
+      "要能制造甜蜜互动"
+    ]
+  },
+  "character_guidelines": {
+    "male_protagonist_types": [
+      {
+        "name": "高冷学霸",
+        "description": "外冷内热",
+        "attitude": "只对女主温柔"
+      },
+      {
+        "name": "阳光暖男",
+        "description": "温暖体贴",
+        "attitude": "默默守护"
+      },
+      {
+        "name": "腹黑闷骚",
+        "description": "表面正经",
+        "attitude": "暗中撩拨"
+      },
+      {
+        "name": "霸道总裁",
+        "description": "强势霸道",
+        "attitude": "独占欲强"
+      }
+    ],
+    "female_protagonist_types": [
+      {
+        "name": "元气少女",
+        "description": "活泼开朗",
+        "interaction": "主动出击"
+      },
+      {
+        "name": "软萌学妹",
+        "description": "可爱软糯",
+        "interaction": "被动接受"
+      },
+      {
+        "name": "独立女强",
+        "description": "自信独立",
+        "interaction": "势均力敌"
+      },
+      {
+        "name": "治愈系",
+        "description": "温柔善良",
+        "interaction": "相互治愈"
+      }
+    ],
+    "conflict_sources": [
+      "内部冲突",
+      "外部冲突"
+    ]
+  }
+}

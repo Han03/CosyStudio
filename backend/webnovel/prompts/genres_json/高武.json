@@ -1,0 +1,117 @@
+{
+  "title": "高武题材模板",
+  "canonical_genre":"都市",
+  "core_selling_points": "武道巅峰 + 热血战斗 + 实力为尊。拳头就是道理，强者制定规则。",
+  "creative_constraints": ["推荐约束包：Pack M21", "通用叠加：Pack U03"],
+  "subgenres": [
+    {
+      "name": "全球高武流",
+      "features": "灵气复苏，全民习武，武道成为主流",
+      "core_payoffs": "武道突破、排名攀升、国战荣耀",
+      "protagonist_traits": "天赋异禀、爱国、追求极致"
+    },
+    {
+      "name": "武道宗师流",
+      "features": "传统武术，宗师境界，武学传承",
+      "core_payoffs": "武学突破、门派争霸、武林盟主",
+      "protagonist_traits": "悟性高、尊重传统、有担当"
+    },
+    {
+      "name": "格斗竞技流",
+      "features": "擂台比武，职业格斗，热血对决",
+      "core_payoffs": "擂台胜利、技术进步、冠军荣耀",
+      "protagonist_traits": "坚韧、好胜、技术精湛"
+    },
+    {
+      "name": "武道修真流",
+      "features": "武道与修真结合，以武入道",
+      "core_payoffs": "武道境界、肉身成圣、武碎虚空",
+      "protagonist_traits": "勇猛、不屈、追求武道极致"
+    }
+  ],
+  "worldview": {
+    "description": "武道至上的世界，实力决定一切",
+    "martial_arts_status": [
+      {"stage": "隐秘期", "description": "武者隐藏，普通人不知"},
+      {"stage": "公开期", "description": "武道公开，成为职业"},
+      {"stage": "主流期", "description": "武道成为社会核心，武者地位崇高"}
+    ],
+    "social_structure": [
+      {"class": "武圣", "features": "一国之力", "power": "超然地位"},
+      {"class": "宗师", "features": "镇国战力", "power": "国师级"},
+      {"class": "大师", "features": "一城之力", "power": "高层"},
+      {"class": "高手", "features": "精英战力", "power": "中层"},
+      {"class": "武者", "features": "基础战力", "power": "普通"},
+      {"class": "普通人", "features": "无武力", "power": "底层"}
+    ],
+    "factions": [
+      {"name": "国家武道部门", "nature": "官方武者组织"},
+      {"name": "武道世家", "nature": "传承悠久的武学家族"},
+      {"name": "武馆/道场", "nature": "武学传授机构"},
+      {"name": "地下势力", "nature": "黑市、杀手组织"},
+      {"name": "异族/妖兽", "nature": "人类的敌人"}
+    ]
+  },
+  "power_system": {
+    "description": "武道体系",
+    "realm_levels": [
+      {"realm": "明劲", "features": "力量外放", "combat_power": "一敌十"},
+      {"realm": "暗劲", "features": "力量内敛", "combat_power": "一敌百"},
+      {"realm": "化劲", "features": "力量化虚", "combat_power": "一敌千"},
+      {"realm": "宗师", "features": "领域初成", "combat_power": "一敌万"},
+      {"realm": "大宗师", "features": "领域大成", "combat_power": "一城之力"},
+      {"realm": "武圣", "features": "武道极致", "combat_power": "一国之力"}
+    ],
+    "martial_arts_types": [
+      {"type": "外功", "features": "强化肉身", "examples": ["金钟罩", "铁布衫"]},
+      {"type": "内功", "features": "修炼内力", "examples": ["九阳神功"]},
+      {"type": "拳法", "features": "近身格斗", "examples": ["形意拳", "八极拳"]},
+      {"type": "腿法", "features": "腿部攻击", "examples": ["谭腿", "戳脚"]},
+      {"type": "兵器", "features": "武器技法", "examples": ["剑法", "刀法"]},
+      {"type": "轻功", "features": "身法速度", "examples": ["凌波微步"]}
+    ],
+    "resources": ["武学秘籍", "丹药", "天材地宝", "武器"]
+  },
+  "outline_structure": {
+    "description": "200万字标准大纲",
+    "volumes": [
+      {"name": "入门", "chapters": "1-80", "focus": "主角觉醒武道天赋，首次展现天赋，击败同级强敌"},
+      {"name": "崛起", "chapters": "81-180", "focus": "加入武道组织，参加比赛，获得重要比赛冠军"},
+      {"name": "成名", "chapters": "181-350", "focus": "成为知名武者，突破宗师，震惊武林"},
+      {"name": "争霸", "chapters": "351-550", "focus": "参与国际竞争，国战胜利，扬我国威"},
+      {"name": "巅峰", "chapters": "551-700", "focus": "追求武道极致，成为武道巅峰"}
+    ]
+  },
+  "story_rules": [
+    "擂台碾压要有足够的铺垫和对手塑造",
+    "武学突破要有积累，不能凭空",
+    "以武服人不能无脑打脸，要有节制",
+    "国战荣耀要有家国情怀的铺垫",
+    "战力体系自洽",
+    "打脸有节制，有铺垫",
+    "武学设定详细且一致",
+    "配角有独立人格"
+  ],
+  "battle_design": {
+    "rhythm": {
+      "probe": "20%：双方试探，展示基础实力",
+      "engagement": "40%：正式交手，招式对拼",
+      "climax": "30%：绝招对决，意外反转",
+      "conclusion": "10%：胜负分明，后续影响"
+    },
+    "description_points": ["招式名称要有武侠感", "力量对比要有具体描写", "环境互动", "心理描写"]
+  },
+  "martial_clan": {
+    "elements": ["传承武学", "家族历史", "资源储备", "人才培养", "外部关系"],
+    "conflicts": ["资源争夺", "排名之争", "恩怨情仇", "联姻政治"]
+  },
+  "golden_finger_guidelines": {
+    "types": ["武学天赋", "武学传承", "武道系统", "天材地宝", "奇遇"],
+    "fit_requirements": ["要符合高武世界观", "要有武道突破的积累过程", "要能制造战斗爽点", "升级路径要清晰"]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": ["武道天才", "平凡少年", "重生者", "世家子弟"],
+    "villain_types": ["武道天才", "世家反派", "异族强敌", "武道叛徒"],
+    "relationship_patterns": ["亦师亦友", "同门竞争", "家国情怀", "武道传承"]
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "title": "直播文题材模板",
+  "canonical_genre": "都市",
+  "core_selling_points": "实时互动 + 舆论反转 + 商业变现。用“观众反馈”驱动剧情即时爽感。",
+  "creative_constraints": [
+    "推荐约束包：Pack M08",
+    "通用叠加：Pack U03"
+  ],
+  "subgenres": [
+    {
+      "name": "带货逆袭流",
+      "features": "从小主播到头部主播，靠产品理解与话术破圈",
+      "core_payoffs": "单场爆单、对赌翻盘、品牌方反向求合作",
+      "protagonist_traits": "有商业头脑、善于沟通、有产品知识"
+    },
+    {
+      "name": "才艺竞技流",
+      "features": "唱跳/乐器/口才等赛道对决",
+      "core_payoffs": "临场发挥封神、全平台热搜、打脸质疑者",
+      "protagonist_traits": "有才艺、自信、临场反应强"
+    },
+    {
+      "name": "探店纪实流",
+      "features": "线下探店+行业内幕揭露",
+      "core_payoffs": "真假测评、维权反击、舆论逆转",
+      "protagonist_traits": "正直、善于发现、有正义感"
+    },
+    {
+      "name": "神豪礼物流",
+      "features": "礼物榜、守护榜、直播间攻防战",
+      "core_payoffs": "榜单冲刺、PK翻盘、隐藏大哥身份揭晓",
+      "protagonist_traits": "有魅力、善于互动、有支持者"
+    }
+  ],
+  "worldview": {
+    "description": "直播平台生态与流量体系",
+    "traffic_levels": [
+      {
+        "level": "冷启动",
+        "features": "推荐少、曝光低",
+        "conflicts": [
+          "起号焦虑"
+        ]
+      },
+      {
+        "level": "成长期",
+        "features": "稳定观众增长",
+        "conflicts": [
+          "内容同质化"
+        ]
+      },
+      {
+        "level": "爆发期",
+        "features": "流量飙升",
+        "conflicts": [
+          "黑粉与节奏"
+        ]
+      },
+      {
+        "level": "头部期",
+        "features": "商业化深",
+        "conflicts": [
+          "合同、舆论、团队管理"
+        ]
+      }
+    ],
+    "key_roles": [
+      "主播",
+      "运营/剪辑",
+      "品牌方",
+      "观众群体"
+    ]
+  },
+  "power_system": {
+    "description": "直播运营与商业博弈",
+    "live_rhythm": {
+      "pre": [
+        "策划",
+        "准备"
+      ],
+      "during": [
+        "互动",
+        "节奏"
+      ],
+      "post": [
+        "复盘",
+        "数据分析"
+      ]
+    },
+    "success_factors": [
+      "内容质量",
+      "互动能力",
+      "数据分析",
+      "商业谈判"
+    ]
+  },
+  "outline_structure": {
+    "description": "150万字标准大纲",
+    "volumes": [
+      {
+        "name": "起号",
+        "chapters": "1-60",
+        "focus": "完成账号定位，拿到第一波稳定观众"
+      },
+      {
+        "name": "破圈",
+        "chapters": "61-160",
+        "focus": "内容升级+平台推荐，进入竞争赛道"
+      },
+      {
+        "name": "攻防",
+        "chapters": "161-300",
+        "focus": "应对黑粉、公关危机与团队矛盾"
+      },
+      {
+        "name": "商业化",
+        "chapters": "301-460",
+        "focus": "品牌合作、供应链、团队扩张"
+      },
+      {
+        "name": "新阶段",
+        "chapters": "461-620",
+        "focus": "从个人主播走向内容公司化"
+      }
+    ]
+  },
+  "story_rules": [
+    "直播翻车反杀证据链必须提前埋伏笔",
+    "榜单冲顶过程要有节奏波峰",
+    "品牌博弈商务逻辑要真实",
+    "账号重生要有差异化定位",
+    "每章至少体现1次观众反馈对决策的影响",
+    "直播前-直播中-直播后形成闭环",
+    "关键反转前埋2-3个可回收证据点",
+    "商业冲突与人物情绪线并行推进"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "直播天赋",
+      "商业头脑",
+      "内容创作",
+      "粉丝运营"
+    ],
+    "fit_requirements": [
+      "要符合直播文世界观",
+      "要有努力和策略",
+      "要能制造直播爽点",
+      "升级路径要与粉丝增长同步"
+    ]
+  }
+}

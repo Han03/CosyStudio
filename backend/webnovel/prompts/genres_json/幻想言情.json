@@ -1,0 +1,290 @@
+{
+  "title": "幻想言情题材模板",
+  "canonical_genre": "幻言",
+  "core_selling_points": "异世界规则 + 情感牺牲 + 宿命反转。在奇幻的世界里，书写跨越种族与命运的爱情。",
+  "creative_constraints": [
+    "推荐约束包：Pack F11",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "仙侠言情流",
+      "features": "修仙世界的爱恨情仇",
+      "core_payoffs": "仙侣双修、渡劫相守、三生三世",
+      "protagonist_traits": "善良、坚韧、有仙缘"
+    },
+    {
+      "name": "玄幻言情流",
+      "features": "架空大陆的奇幻爱情",
+      "core_payoffs": "契约羁绊、种族禁忌、命定之人",
+      "protagonist_traits": "勇敢、有天赋、命运不凡"
+    },
+    {
+      "name": "西幻言情流",
+      "features": "西方奇幻背景的爱情",
+      "core_payoffs": "种族禁恋、魔法羁绊、王国联姻",
+      "protagonist_traits": "独立、有智慧、敢于突破"
+    },
+    {
+      "name": "神话言情流",
+      "features": "神仙妖魔的爱情故事",
+      "core_payoffs": "神仙眷侣、人神禁恋、轮回相守",
+      "protagonist_traits": "神秘、有来历、注定不凡"
+    }
+  ],
+  "worldview": {
+    "description": "奇幻世界中的爱情与宿命",
+    "race_system": [
+      {
+        "race": "神族",
+        "features": "至高存在",
+        "relation_with_human": "不可亵渎"
+      },
+      {
+        "race": "仙族",
+        "features": "长生不老",
+        "relation_with_human": "高高在上"
+      },
+      {
+        "race": "妖族",
+        "features": "修炼化形",
+        "relation_with_human": "被歧视"
+      },
+      {
+        "race": "魔族",
+        "features": "天生对立",
+        "relation_with_human": "敌对"
+      },
+      {
+        "race": "人族",
+        "features": "寿命短暂",
+        "relation_with_human": "基础"
+      }
+    ],
+    "taboo_types": [
+      {
+        "taboo": "种族禁恋",
+        "reason": "血脉不容",
+        "cost": "天罚"
+      },
+      {
+        "taboo": "师徒禁恋",
+        "reason": "伦理不容",
+        "cost": "逐出师门"
+      },
+      {
+        "taboo": "仇家禁恋",
+        "reason": "立场对立",
+        "cost": "背叛族群"
+      },
+      {
+        "taboo": "人神禁恋",
+        "reason": "寿命差距",
+        "cost": "堕入轮回"
+      }
+    ],
+    "bond_types": [
+      {
+        "bond": "契约",
+        "features": "灵魂绑定",
+        "effect": "生死相依"
+      },
+      {
+        "bond": "血契",
+        "features": "血脉相连",
+        "effect": "感知对方"
+      },
+      {
+        "bond": "命定",
+        "features": "天命注定",
+        "effect": "无法逃避"
+      },
+      {
+        "bond": "轮回",
+        "features": "生生世世",
+        "effect": "必定相遇"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "力量与情感体系",
+    "power_levels": [
+      "凡人",
+      "修士",
+      "真人",
+      "仙人",
+      "神人",
+      "至高神"
+    ],
+    "emotion_power_relation": [
+      {
+        "emotion": "心魔",
+        "influence": "阻碍突破",
+        "plot_role": "制造冲突"
+      },
+      {
+        "emotion": "双修",
+        "influence": "互相增益",
+        "plot_role": "感情升温"
+      },
+      {
+        "emotion": "情劫",
+        "influence": "必须经历",
+        "plot_role": "考验感情"
+      },
+      {
+        "emotion": "殉情",
+        "influence": "力量爆发",
+        "plot_role": "高潮时刻"
+      }
+    ],
+    "fate_design": {
+      "past_cause": [
+        "前世的羁绊",
+        "未完成的约定",
+        "欠下的债"
+      ],
+      "present_effect": [
+        "命定相遇",
+        "重复的选择",
+        "打破宿命"
+      ]
+    }
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "相遇",
+        "chapters": "1-60",
+        "focus": "命定相遇，情感萌芽，第一次心动"
+      },
+      {
+        "name": "相知",
+        "chapters": "61-150",
+        "focus": "深入了解，感情升温，确认心意"
+      },
+      {
+        "name": "考验",
+        "chapters": "151-250",
+        "focus": "禁忌/阻碍出现，被迫分开"
+      },
+      {
+        "name": "守护",
+        "chapters": "251-350",
+        "focus": "为爱对抗一切，打破禁忌"
+      },
+      {
+        "name": "圆满",
+        "chapters": "351-400",
+        "focus": "有情人终成眷属"
+      }
+    ]
+  },
+  "story_rules": [
+    "宿命相遇要有前世铺垫",
+    "禁忌之恋要有真实的阻碍",
+    "牺牲守护要有价值",
+    "破茧重生要有足够的虐",
+    "规则明确自洽",
+    "感情有铺垫",
+    "虐有价值有回报",
+    "配角有血有肉"
+  ],
+  "character_guidelines": {
+    "female_archetypes": [
+      "天真型",
+      "坚韧型",
+      "隐藏身份",
+      "转世重生"
+    ],
+    "male_archetypes": [
+      "高冷神尊",
+      "腹黑魔尊",
+      "温润仙君",
+      "霸道帝王"
+    ],
+    "supporting_roles": [
+      {
+        "role": "痴情备胎",
+        "function": "制造三角",
+        "ending": "成全/黑化"
+      },
+      {
+        "role": "恶毒女配",
+        "function": "制造冲突",
+        "ending": "被惩罚"
+      },
+      {
+        "role": "师尊长辈",
+        "function": "阻碍/支持",
+        "ending": "认可"
+      },
+      {
+        "role": "忠心属下",
+        "function": "助攻",
+        "ending": "也收获幸福"
+      }
+    ]
+  },
+  "fantasy_elements": {
+    "world_elements": [
+      {
+        "element": "神器",
+        "function": "情感信物",
+        "example": "定情之物"
+      },
+      {
+        "element": "禁地",
+        "function": "关键场景",
+        "example": "相遇/分离"
+      },
+      {
+        "element": "天劫",
+        "function": "考验",
+        "example": "共同面对"
+      },
+      {
+        "element": "轮回",
+        "function": "宿命",
+        "example": "三生三世"
+      }
+    ],
+    "emotion_items": [
+      {
+        "item": "忘情水",
+        "function": "忘记感情",
+        "role": "虐心"
+      },
+      {
+        "item": "同心结",
+        "function": "感知对方",
+        "role": "甜蜜"
+      },
+      {
+        "item": "血契符",
+        "function": "生死相依",
+        "role": "羁绊"
+      },
+      {
+        "item": "转世珠",
+        "function": "保留记忆",
+        "role": "重逢"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "特殊体质",
+      "前世记忆",
+      "特殊血脉",
+      "契约伙伴"
+    ],
+    "fit_requirements": [
+      "要符合幻想言情世界观",
+      "要有情感关联",
+      "要能制造宿命感",
+      "升级路径要与情感发展同步"
+    ]
+  }
+}

@@ -1,0 +1,297 @@
+{
+  "title": "宫斗宅斗题材模板",
+  "canonical_genre": "古言",
+  "core_selling_points": "规则博弈 + 心机对决 + 地位跃迁。在深宅大院中步步为营，用智慧改写命运。",
+  "creative_constraints": [
+    "推荐约束包：Pack F05",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "后宫争宠流",
+      "features": "皇宫后妃争斗，争夺帝王宠爱",
+      "core_payoffs": "智斗对手、获得圣宠、地位跃升",
+      "protagonist_traits": "聪明、善于伪装、有谋略"
+    },
+    {
+      "name": "宅门内斗流",
+      "features": "大家族内部争斗，嫡庶之争",
+      "core_payoffs": "反击陷害、掌控家权、复仇成功",
+      "protagonist_traits": "贤惠、善于持家、有智慧"
+    },
+    {
+      "name": "权谋宫斗流",
+      "features": "宫廷政治，权力博弈",
+      "core_payoffs": "政治布局、扳倒对手、权倾朝野",
+      "protagonist_traits": "有谋略、善于布局、有远见"
+    },
+    {
+      "name": "重生复仇流",
+      "features": "重生回到过去，改变悲惨命运",
+      "core_payoffs": "先知先觉、复仇打脸、逆转人生",
+      "protagonist_traits": "冷静、有城府、目标明确"
+    }
+  ],
+  "worldview": {
+    "description": "等级森严的宫廷或大宅门世界",
+    "harem_ranks": [
+      {
+        "rank": "一等",
+        "title": "皇后",
+        "number": 1,
+        "power": "统领后宫"
+      },
+      {
+        "rank": "二等",
+        "title": "皇贵妃",
+        "number": 1,
+        "power": "副后"
+      },
+      {
+        "rank": "三等",
+        "title": "贵妃",
+        "number": 2,
+        "power": "高位妃嫔"
+      },
+      {
+        "rank": "四等",
+        "title": "妃",
+        "number": 4,
+        "power": "一宫主位"
+      },
+      {
+        "rank": "五等",
+        "title": "嫔",
+        "number": 6,
+        "power": "有封号"
+      },
+      {
+        "rank": "六等",
+        "title": "贵人",
+        "number": "不限",
+        "power": "低位"
+      },
+      {
+        "rank": "七等",
+        "title": "常在/答应",
+        "number": "不限",
+        "power": "最低"
+      }
+    ],
+    "family_ranks": [
+      {
+        "identity": "老太太",
+        "status": "最高",
+        "power": "一言九鼎"
+      },
+      {
+        "identity": "当家主母",
+        "status": "管家",
+        "power": "掌控内务"
+      },
+      {
+        "identity": "嫡子/嫡女",
+        "status": "正统",
+        "power": "继承权"
+      },
+      {
+        "identity": "庶子/庶女",
+        "status": "次等",
+        "power": "有限权利"
+      },
+      {
+        "identity": "姨娘/通房",
+        "status": "低等",
+        "power": "依附主母"
+      },
+      {
+        "identity": "丫鬟/仆从",
+        "status": "最低",
+        "power": "无权"
+      }
+    ],
+    "resource_system": [
+      "宠爱",
+      "银钱",
+      "人脉",
+      "情报",
+      "子嗣"
+    ]
+  },
+  "power_system": {
+    "description": "斗争手段与防御体系",
+    "open_methods": [
+      {
+        "method": "争宠",
+        "features": "直接竞争",
+        "risk": "树敌"
+      },
+      {
+        "method": "告状",
+        "features": "借力打力",
+        "risk": "反噬"
+      },
+      {
+        "method": "联盟",
+        "features": "抱团取暖",
+        "risk": "背叛"
+      },
+      {
+        "method": "示弱",
+        "features": "韬光养晦",
+        "risk": "被欺"
+      }
+    ],
+    "secret_methods": [
+      {
+        "method": "陷害",
+        "features": "栽赃嫁祸",
+        "risk": "败露"
+      },
+      {
+        "method": "下药",
+        "features": "暗中伤害",
+        "risk": "查出"
+      },
+      {
+        "method": "收买",
+        "features": "策反对方人",
+        "risk": "双面"
+      },
+      {
+        "method": "造谣",
+        "features": "舆论攻击",
+        "risk": "反噬"
+      }
+    ],
+    "defense_methods": [
+      "试毒",
+      "眼线",
+      "靠山",
+      "把柄"
+    ],
+    "core_rules": [
+      "尊卑有序",
+      "嫡庶分明",
+      "母凭子贵",
+      "宠爱为王"
+    ],
+    "taboo_red_lines": [
+      "弑主",
+      "通奸",
+      "谋反",
+      "巫蛊"
+    ]
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "入局",
+        "chapters": "1-50",
+        "focus": "主角进入宫/府，了解规则，首次化解危机"
+      },
+      {
+        "name": "立足",
+        "chapters": "51-120",
+        "focus": "建立关系网，获得初步地位，击败第一个对手"
+      },
+      {
+        "name": "崛起",
+        "chapters": "121-200",
+        "focus": "卷入核心争斗，扳倒主要对手，大幅晋升"
+      },
+      {
+        "name": "巅峰",
+        "chapters": "201-280",
+        "focus": "争夺最高位置，成为最终赢家"
+      },
+      {
+        "name": "收尾",
+        "chapters": "281-350",
+        "focus": "处理遗留问题，圆满结局"
+      }
+    ]
+  },
+  "story_rules": [
+    "对手要有智商",
+    "主角靠智慧取胜",
+    "感情线要有波折",
+    "斗争手段多样化",
+    "反击陷害要有伏笔，不能凭空翻盘",
+    "智斗打脸要符合身份，不能太出格",
+    "地位跃升要有铺垫，不能太突兀",
+    "复仇要有分寸，不能太残忍"
+  ],
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "小宫女",
+      "新嫁娘",
+      "落魄贵女",
+      "重生者"
+    ],
+    "core_relationships": [
+      {
+        "relation": "男主",
+        "function": "情感线",
+        "development": "从陌生到相爱"
+      },
+      {
+        "relation": "闺蜜",
+        "function": "助力",
+        "development": "可能背叛"
+      },
+      {
+        "relation": "对手",
+        "function": "冲突",
+        "development": "从敌到友/彻底失败"
+      },
+      {
+        "relation": "长辈",
+        "function": "靠山/阻碍",
+        "development": "获得认可"
+      },
+      {
+        "relation": "下人",
+        "function": "情报/执行",
+        "development": "忠诚培养"
+      }
+    ],
+    "opponent_types": [
+      {
+        "type": "蠢恶型",
+        "features": "嚣张跋扈",
+        "ending": "早期被打脸"
+      },
+      {
+        "type": "心机型",
+        "features": "表面和善",
+        "ending": "中期被揭穿"
+      },
+      {
+        "type": "强敌型",
+        "features": "实力强大",
+        "ending": "后期被击败"
+      },
+      {
+        "type": "悲情型",
+        "features": "有苦衷",
+        "ending": "可能和解"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "智慧谋略",
+      "预知能力",
+      "特殊才艺",
+      "身份背景"
+    ],
+    "fit_requirements": [
+      "要符合宫斗宅斗世界观",
+      "要有身份限制",
+      "要能制造智斗爽点",
+      "升级路径要符合等级规则"
+    ]
+  }
+}

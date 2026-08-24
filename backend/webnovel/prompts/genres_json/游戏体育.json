@@ -1,0 +1,288 @@
+{
+  "title": "游戏体育题材模板",
+  "canonical_genre": "游戏",
+  "core_selling_points": "竞技对抗 + 规则博弈 + 团队成长。在赛场上燃烧青春，用实力证明一切。",
+  "creative_constraints": [
+    "推荐约束包：Pack M09",
+    "通用叠加：Pack U03"
+  ],
+  "subgenres": [
+    {
+      "name": "电竞竞技流",
+      "features": "职业电竞，战队比赛，冠军之路",
+      "core_payoffs": "操作碾压、战术反杀、夺冠荣耀",
+      "protagonist_traits": "有天赋、努力、抗压能力强"
+    },
+    {
+      "name": "传统体育流",
+      "features": "足球/篮球/网球等传统体育",
+      "core_payoffs": "绝杀时刻、逆转比赛、冠军梦想",
+      "protagonist_traits": "身体素质好、有毅力、团队意识强"
+    },
+    {
+      "name": "棋牌竞技流",
+      "features": "围棋/象棋/麻将等智力竞技",
+      "core_payoffs": "智力碾压、绝妙手筋、天才对决",
+      "protagonist_traits": "智商高、记忆力强、善于思考"
+    },
+    {
+      "name": "游戏人生流",
+      "features": "游戏与现实交织，游戏改变人生",
+      "core_payoffs": "游戏成就、现实逆袭、虚拟与真实",
+      "protagonist_traits": "游戏天赋高、适应力强、有策略"
+    }
+  ],
+  "worldview": {
+    "description": "竞技世界的生态与赛事体系",
+    "esports_ecology": [
+      {
+        "level": "顶级战队",
+        "features": "世界赛常客",
+        "income": "千万级"
+      },
+      {
+        "level": "一线战队",
+        "features": "联赛强队",
+        "income": "百万级"
+      },
+      {
+        "level": "二线战队",
+        "features": "联赛中游",
+        "income": "十万级"
+      },
+      {
+        "level": "青训队",
+        "features": "培养新人",
+        "income": "基础工资"
+      },
+      {
+        "level": "路人王",
+        "features": "天梯高手",
+        "income": "无固定"
+      }
+    ],
+    "tournament_system": [
+      {
+        "level": "S级",
+        "tournament": "世界赛",
+        "importance": "最高荣誉"
+      },
+      {
+        "level": "A级",
+        "tournament": "洲际赛",
+        "importance": "区域荣誉"
+      },
+      {
+        "level": "B级",
+        "tournament": "联赛",
+        "importance": "常规赛季"
+      },
+      {
+        "level": "C级",
+        "tournament": "杯赛",
+        "importance": "额外荣誉"
+      },
+      {
+        "level": "D级",
+        "tournament": "线下赛",
+        "importance": "练兵/曝光"
+      }
+    ],
+    "team_structure": [
+      {
+        "role": "队长",
+        "responsibility": "指挥决策",
+        "importance": "核心"
+      },
+      {
+        "role": "主C",
+        "responsibility": "核心输出",
+        "importance": "关键"
+      },
+      {
+        "role": "辅助",
+        "responsibility": "保护/控制",
+        "importance": "重要"
+      },
+      {
+        "role": "教练",
+        "responsibility": "战术制定",
+        "importance": "幕后"
+      },
+      {
+        "role": "分析师",
+        "responsibility": "数据分析",
+        "importance": "辅助"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "选手能力与比赛体系",
+    "growth_path": [
+      "天赋觉醒",
+      "基础训练",
+      "战队试训",
+      "替补上场",
+      "主力位置",
+      "明星选手",
+      "传奇"
+    ],
+    "ability_dimensions": [
+      {
+        "dimension": "操作",
+        "description": "手速/精准度",
+        "training": "反复练习"
+      },
+      {
+        "dimension": "意识",
+        "description": "大局观/预判",
+        "training": "复盘分析"
+      },
+      {
+        "dimension": "心态",
+        "description": "抗压/稳定",
+        "training": "比赛历练"
+      },
+      {
+        "dimension": "配合",
+        "description": "团队默契",
+        "training": "磨合训练"
+      },
+      {
+        "dimension": "战术",
+        "description": "理解执行",
+        "training": "教练指导"
+      }
+    ],
+    "game_rhythm": {
+      "bp": {
+        "percentage": "10%",
+        "content": [
+          "阵容博弈",
+          "战术意图"
+        ]
+      },
+      "early": {
+        "percentage": "25%",
+        "content": [
+          "对线/发育",
+          "小规模冲突"
+        ]
+      },
+      "mid": {
+        "percentage": "35%",
+        "content": [
+          "资源争夺",
+          "团战爆发"
+        ]
+      },
+      "late": {
+        "percentage": "25%",
+        "content": [
+          "决战时刻",
+          "胜负分明"
+        ]
+      },
+      "post": {
+        "percentage": "5%",
+        "content": [
+          "复盘总结",
+          "情绪处理"
+        ]
+      }
+    }
+  },
+  "outline_structure": {
+    "description": "150万字标准大纲",
+    "volumes": [
+      {
+        "name": "入门",
+        "chapters": "1-60",
+        "focus": "主角展现天赋，加入战队，首次上场"
+      },
+      {
+        "name": "成长",
+        "chapters": "61-150",
+        "focus": "成为主力，参加联赛，联赛取得好成绩"
+      },
+      {
+        "name": "崛起",
+        "chapters": "151-280",
+        "focus": "成为明星选手，获得联赛冠军"
+      },
+      {
+        "name": "巅峰",
+        "chapters": "281-400",
+        "focus": "冲击世界赛，世界赛夺冠"
+      },
+      {
+        "name": "传奇",
+        "chapters": "401-500",
+        "focus": "成为传奇，功成身退"
+      }
+    ]
+  },
+  "story_rules": [
+    "绝境翻盘要有铺垫",
+    "天才对决双方都要有高光",
+    "战术碾压要合理可信",
+    "复仇成功要有情感铺垫",
+    "比赛与人物成长结合",
+    "战术要专业可信",
+    "主角有失败有成长",
+    "队友有独立人格"
+  ],
+  "team_design": {
+    "team_config": [
+      {
+        "role": "主角",
+        "position": "核心C",
+        "personality": "成长型",
+        "function": "关键时刻carry"
+      },
+      {
+        "role": "队长",
+        "position": "指挥",
+        "personality": "稳重",
+        "function": "团队核心"
+      },
+      {
+        "role": "天才",
+        "position": "副C",
+        "personality": "傲气",
+        "function": "双核输出"
+      },
+      {
+        "role": "老将",
+        "position": "辅助",
+        "personality": "沉稳",
+        "function": "经验传承"
+      },
+      {
+        "role": "新人",
+        "position": "替补",
+        "personality": "热血",
+        "function": "成长对照"
+      }
+    ],
+    "team_development": [
+      "初期:弱队/新队，磨合期",
+      "中期:联赛中游，稳步上升",
+      "后期:顶级强队，争夺冠军"
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "游戏天赋",
+      "战术洞察力",
+      "心理素质",
+      "团队领导力"
+    ],
+    "fit_requirements": [
+      "要符合游戏体育世界观",
+      "要有训练和努力",
+      "要能制造竞技爽点",
+      "升级路径要与比赛成绩同步"
+    ]
+  }
+}

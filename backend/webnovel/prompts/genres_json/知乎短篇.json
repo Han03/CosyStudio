@@ -1,0 +1,290 @@
+{
+  "title": "知乎短篇题材模板",
+  "canonical_genre": "衍生",
+  "core_selling_points": "短平快 + 强冲突 + 极致反转。3000-15000字内完成起承转合，前300字定生死。",
+  "creative_constraints": [
+    "推荐约束包：Pack M17",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "微短篇",
+      "features": "3000-5000字，单一反转",
+      "core_payoffs": "情绪爆发、快速反转",
+      "protagonist_traits": "简单直接、有冲击力"
+    },
+    {
+      "name": "标准短篇",
+      "features": "5000-10000字，双重反转",
+      "core_payoffs": "完整弧光、深度反转",
+      "protagonist_traits": "有层次、有成长"
+    },
+    {
+      "name": "长短篇",
+      "features": "10000-15000字，多重反转",
+      "core_payoffs": "复杂情感、层层反转",
+      "protagonist_traits": "立体、多面"
+    }
+  ],
+  "worldview": {
+    "description": "短篇故事的节奏与结构",
+    "golden_300": {
+      "0-50": "制造悬念或冲突",
+      "50-150": "建立人物处境",
+      "150-300": "抛出核心矛盾"
+    },
+    "opening_hooks": [
+      {
+        "type": "死亡开局",
+        "template": "我死了，然后[反转]",
+        "scenarios": [
+          "复仇",
+          "悬疑",
+          "虐文"
+        ]
+      },
+      {
+        "type": "时间倒叙",
+        "template": "[结果]，一切要从[时间点]说起",
+        "scenarios": [
+          "追妻火葬场",
+          "破镜重圆"
+        ]
+      },
+      {
+        "type": "身份反转",
+        "template": "所有人都以为我是[A]，其实我是[B]",
+        "scenarios": [
+          "打脸",
+          "爽文",
+          "豪门"
+        ]
+      },
+      {
+        "type": "极端处境",
+        "template": "[极端情况]，我[反常反应]",
+        "scenarios": [
+          "虐文",
+          "救赎",
+          "悬疑"
+        ]
+      },
+      {
+        "type": "对话开场",
+        "template": "\"[冲击性台词]\"",
+        "scenarios": [
+          "婚恋",
+          "虐文",
+          "爽文"
+        ]
+      },
+      {
+        "type": "重生/穿越",
+        "template": "睁开眼，我回到了[关键时间点]",
+        "scenarios": [
+          "重生复仇",
+          "穿书"
+        ]
+      },
+      {
+        "type": "秘密揭露",
+        "template": "[某人]不知道的是，[秘密]",
+        "scenarios": [
+          "反转",
+          "复仇",
+          "爽文"
+        ]
+      },
+      {
+        "type": "数字冲击",
+        "template": "[数字] + [反常事实]",
+        "scenarios": [
+          "虐文",
+          "觉醒",
+          "复仇"
+        ]
+      },
+      {
+        "type": "对比反差",
+        "template": "曾经[A状态]，如今[B状态]",
+        "scenarios": [
+          "逆袭",
+          "追妻"
+        ]
+      },
+      {
+        "type": "悬念提问",
+        "template": "你知道[问题]吗？",
+        "scenarios": [
+          "虐文",
+          "情感"
+        ]
+      }
+    ]
+  },
+  "power_system": {
+    "description": "短篇故事结构与节奏",
+    "word_count_ratio": {
+      "hook": "5%",
+      "setup": "15%",
+      "rising": "40%",
+      "climax": "25%",
+      "ending": "15%"
+    },
+    "story_templates": {
+      "chase_wife": {
+        "structure": [
+          "结果",
+          "回忆",
+          "转折",
+          "追妻",
+          "结局"
+        ],
+        "word_count": 8000
+      },
+      "rebirth_revenge": {
+        "structure": [
+          "惨死",
+          "重生",
+          "布局",
+          "反击",
+          "结局"
+        ],
+        "word_count": 6000
+      },
+      "face_slapping": {
+        "structure": [
+          "被欺",
+          "隐忍",
+          "身份曝光",
+          "打脸",
+          "收尾"
+        ],
+        "word_count": 5000
+      }
+    },
+    "ending_types": [
+      "HE",
+      "BE",
+      "开放式"
+    ]
+  },
+  "outline_structure": {
+    "description": "短篇故事结构",
+    "templates": {
+      "chase_wife": [
+        {
+          "act": "第一幕",
+          "words": 1000,
+          "focus": "男主卑微求复合，女主冷漠"
+        },
+        {
+          "act": "第二幕",
+          "words": 3000,
+          "focus": "倒叙婚姻中的虐待/忽视"
+        },
+        {
+          "act": "第三幕",
+          "words": 1500,
+          "focus": "女主离开的导火索"
+        },
+        {
+          "act": "第四幕",
+          "words": 2000,
+          "focus": "男主追妻过程"
+        },
+        {
+          "act": "第五幕",
+          "words": 500,
+          "focus": "HE或BE结局"
+        }
+      ],
+      "rebirth_revenge": [
+        {
+          "act": "第一幕",
+          "words": 800,
+          "focus": "前世惨死场景"
+        },
+        {
+          "act": "第二幕",
+          "words": 500,
+          "focus": "重生，立下誓言"
+        },
+        {
+          "act": "第三幕",
+          "words": 2500,
+          "focus": "改变命运，步步为营"
+        },
+        {
+          "act": "第四幕",
+          "words": 1700,
+          "focus": "关键反击，真相揭露"
+        },
+        {
+          "act": "第五幕",
+          "words": 500,
+          "focus": "仇人结局 + 新生"
+        }
+      ],
+      "face_slapping": [
+        {
+          "act": "第一幕",
+          "words": 800,
+          "focus": "被瞧不起/欺负"
+        },
+        {
+          "act": "第二幕",
+          "words": 1200,
+          "focus": "隐忍积累情绪"
+        },
+        {
+          "act": "第三幕",
+          "words": 1500,
+          "focus": "身份曝光过程"
+        },
+        {
+          "act": "第四幕",
+          "words": 1200,
+          "focus": "打脸高潮"
+        },
+        {
+          "act": "第五幕",
+          "words": 300,
+          "focus": "众人反应 + 结局"
+        }
+      ]
+    }
+  },
+  "story_rules": [
+    "前300字必须抓住读者",
+    "节奏要快，不要拖沓",
+    "反转要有铺垫",
+    "情绪要饱满",
+    "避免长篇大论的背景介绍",
+    "避免过多的心理描写",
+    "避免拖沓的过渡场景",
+    "铺垫太久必须爆发"
+  ],
+  "character_guidelines": {
+    "three_second_method": "职业/身份 + 核心特质 + 关键矛盾",
+    "contrast_method": [
+      "前期卑微 → 后期女王",
+      "前期冷漠 → 后期卑微",
+      "前期风光 → 后期落魄"
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "身份秘密",
+      "前世记忆",
+      "特殊能力",
+      "反转伏笔"
+    ],
+    "fit_requirements": [
+      "要符合短篇故事世界观",
+      "要有冲击力",
+      "要能制造反转爽点",
+      "升级路径要与故事节奏同步"
+    ]
+  }
+}

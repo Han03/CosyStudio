@@ -1,0 +1,82 @@
+{
+  "title": "多子多福题材模板",
+  "canonical_genre":"古言",
+  "core_selling_points": "系统升级 + 后宫收集 + 爽点密集 + 情感满足",
+  "creative_constraints": ["推荐约束包：Pack F17", "通用叠加：Pack U03"],
+  "subgenres": [
+    {
+      "name": "系统后宫流",
+      "features": "系统驱动后宫收集与子嗣养成",
+      "core_payoffs": "系统升级、后宫扩张、子嗣成才",
+      "protagonist_traits": "善于经营、有魅力、有责任感"
+    },
+    {
+      "name": "情感收集流",
+      "features": "注重情感发展与后宫互动",
+      "core_payoffs": "情感满足、后宫齐心、家庭温馨",
+      "protagonist_traits": "温柔体贴、善于沟通、有担当"
+    },
+    {
+      "name": "势力扩张流",
+      "features": "以子嗣和后宫为基础扩张势力",
+      "core_payoffs": "势力壮大、称霸一方、传承延续",
+      "protagonist_traits": "有远见、善于规划、有野心"
+    }
+  ],
+  "worldview": {
+    "description": "系统辅助的多女主后宫世界",
+    "background_options": ["修仙世界", "武侠江湖", "异世大陆", "都市异能", "星际时代"],
+    "faction_design": ["主角势力", "敌对势力", "中立势力", "潜在盟友"]
+  },
+  "power_system": {
+    "description": "系统与子嗣能力体系",
+    "system_panels": ["等级", "经验", "子嗣数", "后宫数", "属性点", "技能点", "金币"],
+    "core_mechanics": ["子嗣系统", "后宫系统", "升级系统", "任务系统", "奖励系统"],
+    "offspring_quality": [
+      {"quality": "普通", "probability": "60%", "inheritance": "继承10%属性"},
+      {"quality": "优秀", "probability": "25%", "inheritance": "继承30%属性"},
+      {"quality": "精英", "probability": "10%", "inheritance": "继承50%属性"},
+      {"quality": "传说", "probability": "4%", "inheritance": "继承80%属性"},
+      {"quality": "神话", "probability": "1%", "inheritance": "继承100%+变异"}
+    ]
+  },
+  "outline_structure": {
+    "description": "剧情节奏",
+    "opening": ["系统激活", "收入第1位女主", "第1个子嗣出生", "建立基础设定"],
+    "development": ["后宫逐步扩大(3-5位)", "子嗣数量增加(10-50位)", "系统功能解锁", "势力逐步扩张"],
+    "climax": ["后宫稳定(5-10位)", "子嗣成才(优秀/传说品质)", "系统满级", "称霸一方/成神"]
+  },
+  "story_rules": [
+    "后宫女主不能太多(5-10位为宜)",
+    "每位女主都要有个性(避免脸谱化)",
+    "子嗣不能只是数字(重点培养几个)",
+    "系统奖励要有节制(避免失控)",
+    "情感线不能太水(要有真实情感)",
+    "爽点密度要控制(每章1-2个)",
+    "后宫要平衡(戏份、情感、能力、剧情)",
+    "子嗣成长要有成就感"
+  ],
+  "character_guidelines": {
+    "female_types": [
+      {"type": "温柔型", "features": "善解人意、体贴", "strategy": "真诚、关心"},
+      {"type": "活泼型", "features": "开朗、爱闹", "strategy": "陪玩、惊喜"},
+      {"type": "冷艳型", "features": "高冷、傲娇", "strategy": "耐心、实力"},
+      {"type": "腹黑型", "features": "聪明、有心机", "strategy": "智斗、征服"},
+      {"type": "傲娇型", "features": "口是心非", "strategy": "坚持、戳穿"}
+    ],
+    "background_types": ["世家千金", "江湖侠女", "异族公主", "平民女子", "天才少女"],
+    "ability_types": ["战斗型", "辅助型", "智谋型", "特殊型"],
+    "affection_system": ["陌生(0-20)", "认识(21-40)", "好感(41-60)", "喜欢(61-80)", "爱慕(81-95)", "挚爱(96-100)"],
+    "interaction_methods": [
+      {"method": "日常对话", "affection": "+1-3", "cooldown": "无"},
+      {"method": "赠送礼物", "affection": "+5-20", "cooldown": "1天"},
+      {"method": "约会", "affection": "+10-30", "cooldown": "3天"},
+      {"method": "共同战斗", "affection": "+5-15", "cooldown": "无"},
+      {"method": "特殊事件", "affection": "+20-50", "cooldown": "触发型"}
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": ["系统", "天赋", "身份", "特殊能力"],
+    "fit_requirements": ["要符合多子多福世界观", "要有成长路径", "要能制造收集爽点", "升级路径要与后宫和子嗣发展同步"]
+  }
+}

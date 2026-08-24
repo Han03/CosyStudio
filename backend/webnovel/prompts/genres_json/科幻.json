@@ -1,0 +1,242 @@
+{
+  "title": "科幻题材模板",
+  "canonical_genre": "科幻",
+  "core_selling_points": "科技设定 + 伦理冲突 + 宏大想象。在星辰大海中探索人类的未来与边界。",
+  "creative_constraints": [
+    "推荐约束包：Pack M18",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "赛博朋克流",
+      "features": "高科技低生活，义体改造，巨型企业统治",
+      "core_payoffs": "黑客入侵、义体升级、反抗体制"
+    },
+    {
+      "name": "太空歌剧流",
+      "features": "星际航行，外星文明，宇宙战争",
+      "core_payoffs": "星舰战斗、外星探索、文明碰撞"
+    },
+    {
+      "name": "硬科幻流",
+      "features": "科学原理严谨，技术细节真实",
+      "core_payoffs": "科学解谜、技术突破、逻辑推演"
+    },
+    {
+      "name": "末日科幻流",
+      "features": "科技灾难，人类存亡，文明重建",
+      "core_payoffs": "绝境求生、科技救世、人性抉择"
+    },
+    {
+      "name": "机甲/战争流",
+      "features": "巨型机甲，星际战争，热血战斗",
+      "core_payoffs": "机甲驾驶、战术指挥、王牌飞行员"
+    }
+  ],
+  "worldview": {
+    "description": "科幻社会学：科技等级与社会形态",
+    "tech_levels": [
+      {
+        "name": "0.7型",
+        "energy": "行星部分",
+        "feature": "当代地球"
+      },
+      {
+        "name": "1型",
+        "energy": "整颗行星",
+        "feature": "全球统一"
+      },
+      {
+        "name": "2型",
+        "energy": "恒星系统",
+        "feature": "戴森球"
+      },
+      {
+        "name": "3型",
+        "energy": "星系级",
+        "feature": "银河帝国"
+      }
+    ],
+    "social_forms": [
+      {
+        "name": "企业统治",
+        "features": "巨型公司掌权",
+        "conflict": "阶级压迫"
+      },
+      {
+        "name": "联邦制",
+        "features": "多星球联盟",
+        "conflict": "政治博弈"
+      },
+      {
+        "name": "帝国制",
+        "features": "中央集权",
+        "conflict": "皇位争夺"
+      },
+      {
+        "name": "AI统治",
+        "features": "人工智能管理",
+        "conflict": "人机矛盾"
+      },
+      {
+        "name": "无政府",
+        "features": "边缘星域",
+        "conflict": "海盗横行"
+      }
+    ],
+    "factions": [
+      "联邦/帝国",
+      "企业财团",
+      "反抗组织",
+      "外星文明",
+      "AI势力"
+    ]
+  },
+  "power_system": {
+    "description": "科技体系设计：核心科技树",
+    "tech_tree": [
+      {
+        "field": "能源",
+        "levels": [
+          "核聚变",
+          "反物质",
+          "真空能"
+        ]
+      },
+      {
+        "field": "推进",
+        "levels": [
+          "离子引擎",
+          "曲率驱动",
+          "虫洞跳跃"
+        ]
+      },
+      {
+        "field": "武器",
+        "levels": [
+          "激光/电磁",
+          "粒子束",
+          "恒星炮"
+        ]
+      },
+      {
+        "field": "防御",
+        "levels": [
+          "能量护盾",
+          "力场",
+          "空间折叠"
+        ]
+      },
+      {
+        "field": "通讯",
+        "levels": [
+          "量子通讯",
+          "超光速",
+          "意识链接"
+        ]
+      },
+      {
+        "field": "生物",
+        "levels": [
+          "基因改造",
+          "义体改造",
+          "意识上传"
+        ]
+      }
+    ],
+    "cyber_body_levels": [
+      {
+        "name": "民用级",
+        "description": "修复残疾，增强感官"
+      },
+      {
+        "name": "军用级",
+        "description": "战斗强化，武器内置"
+      },
+      {
+        "name": "实验级",
+        "description": "突破人体极限，有副作用"
+      },
+      {
+        "name": "禁忌级",
+        "description": "完全机械化，失去人性"
+      }
+    ],
+    "costs": [
+      "能源消耗",
+      "副作用",
+      "伦理问题",
+      "技术失控"
+    ]
+  },
+  "outline_structure": {
+    "description": "200万字标准大纲",
+    "volumes": [
+      {
+        "name": "觉醒",
+        "chapters": "1-80章",
+        "focus": "主角获得特殊能力/技术，首次展现实力"
+      },
+      {
+        "name": "崛起",
+        "chapters": "81-180章",
+        "focus": "加入组织，建立地位"
+      },
+      {
+        "name": "争霸",
+        "chapters": "181-350章",
+        "focus": "卷入势力争斗，成为一方核心"
+      },
+      {
+        "name": "战争",
+        "chapters": "351-550章",
+        "focus": "参与星际战争，扭转战局"
+      },
+      {
+        "name": "终局",
+        "chapters": "551-700章",
+        "focus": "面对终极威胁，改变宇宙格局"
+      }
+    ]
+  },
+  "story_rules": [
+    "技术碾压：用高科技吊打低科技敌人，技术来源要合理",
+    "机甲觉醒：人机合一，战力飙升，机甲要有独特性",
+    "星舰指挥：战术碾压，以少胜多，展示指挥才能",
+    "文明接触：文化冲击、技术交流、危机化解"
+  ],
+  "golden_finger_guidelines": {
+    "types": [
+      "超前技术",
+      "机甲天赋",
+      "星舰指挥",
+      "外星传承"
+    ],
+    "fit_requirements": [
+      "要符合科幻背景",
+      "科技有明确限制",
+      "要有代价"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "天才科学家",
+      "王牌飞行员",
+      "星际探险家",
+      "反抗领袖"
+    ],
+    "alien_types": [
+      "类人型",
+      "硅基生命",
+      "集群意识",
+      "能量生命",
+      "机械文明"
+    ],
+    "conflict_types": [
+      "科技伦理",
+      "文明碰撞",
+      "权力斗争",
+      "生存危机"
+    ]
+  }
+}

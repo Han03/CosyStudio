@@ -1,0 +1,325 @@
+{
+  "title": "无限流题材模板",
+  "canonical_genre": "悬疑",
+  "core_selling_points": "关卡闯关 + 规则解谜 + 极限生存。在死亡游戏中成长，用智慧和勇气打破规则。",
+  "creative_constraints": [
+    "推荐约束包：Pack M19",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "恐怖副本流",
+      "features": "进入恐怖电影/都市传说世界，完成任务才能离开",
+      "core_payoffs": "规则破解、绝境逃生、智斗鬼怪",
+      "protagonist_traits": "勇敢、理智、善于发现规则"
+    },
+    {
+      "name": "规则怪谈流",
+      "features": "每个副本有独特规则，违反即死",
+      "core_payoffs": "发现规则、利用规则、规则反杀",
+      "protagonist_traits": "理性、善于分析、观察力强"
+    },
+    {
+      "name": "团队竞技流",
+      "features": "多人组队闯关，队友可能是敌人",
+      "core_payoffs": "团队配合、背叛反转、人性博弈",
+      "protagonist_traits": "善于识人、有领导力、谨慎"
+    },
+    {
+      "name": "主神空间流",
+      "features": "有明确的主神/系统管理，积分兑换能力",
+      "core_payoffs": "能力搭配、资源管理、跨世界冒险",
+      "protagonist_traits": "善于规划、精打细算、有远见"
+    }
+  ],
+  "worldview": {
+    "description": "无限空间，玩家在各种副本中生存和成长",
+    "player_ecosystem": [
+      {
+        "level": "新人",
+        "description": "存活率极低，被老玩家当炮灰"
+      },
+      {
+        "level": "中层",
+        "description": "有一定实力，组建固定队伍"
+      },
+      {
+        "level": "大佬",
+        "description": "掌握核心规则，可以solo高难副本"
+      },
+      {
+        "level": "管理者",
+        "description": "神秘存在，制定规则的人"
+      }
+    ],
+    "resource_system": [
+      {
+        "resource": "积分",
+        "description": "通关奖励，用于兑换能力/道具"
+      },
+      {
+        "resource": "道具",
+        "description": "一次性消耗品，关键时刻救命"
+      },
+      {
+        "resource": "技能",
+        "description": "永久能力，需要大量积分"
+      },
+      {
+        "resource": "情报",
+        "description": "副本攻略，可交易的硬通货"
+      }
+    ],
+    "difficulty_levels": [
+      {
+        "level": "D级",
+        "description": "新手副本",
+        "survival_rate": "70%"
+      },
+      {
+        "level": "C级",
+        "description": "普通副本",
+        "survival_rate": "50%"
+      },
+      {
+        "level": "B级",
+        "description": "困难副本",
+        "survival_rate": "30%"
+      },
+      {
+        "level": "A级",
+        "description": "噩梦副本",
+        "survival_rate": "10%"
+      },
+      {
+        "level": "S级",
+        "description": "地狱副本",
+        "survival_rate": "1%"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "能力体系",
+    "ability_categories": [
+      {
+        "type": "战斗系",
+        "features": "直接伤害",
+        "examples": [
+          "火焰",
+          "雷电",
+          "强化"
+        ]
+      },
+      {
+        "type": "辅助系",
+        "features": "增益减益",
+        "examples": [
+          "治疗",
+          "加速",
+          "弱化"
+        ]
+      },
+      {
+        "type": "探索系",
+        "features": "信息获取",
+        "examples": [
+          "透视",
+          "预知",
+          "感应"
+        ]
+      },
+      {
+        "type": "特殊系",
+        "features": "规则干涉",
+        "examples": [
+          "时停",
+          "空间",
+          "因果"
+        ]
+      }
+    ],
+    "ability_acquisition": [
+      "副本奖励",
+      "积分兑换",
+      "特殊机缘",
+      "能力融合"
+    ]
+  },
+  "outline_structure": {
+    "description": "200万字标准大纲",
+    "volumes": [
+      {
+        "name": "新手村",
+        "chapters": "1-50",
+        "focus": "第一个副本，建立规则认知，从小白到合格玩家"
+      },
+      {
+        "name": "组队期",
+        "chapters": "51-150",
+        "focus": "加入/组建固定队伍，学会团队配合，能力体系成型"
+      },
+      {
+        "name": "中层崛起",
+        "chapters": "151-300",
+        "focus": "在玩家群体中崭露头角，掌握多种能力，独自通关A级副本"
+      },
+      {
+        "name": "真相探索",
+        "chapters": "301-500",
+        "focus": "探索无限空间的真相，接触管理者层面的秘密"
+      },
+      {
+        "name": "终局",
+        "chapters": "501-700",
+        "focus": "挑战/改变无限空间规则，成为规则制定者，打破无限空间"
+      }
+    ]
+  },
+  "story_rules": [
+    "规则反杀要发现更深层的规则",
+    "绝境翻盘的底牌必须有伏笔",
+    "情报碾压要有限制（过时/有误）",
+    "能力觉醒需要付出代价",
+    "每个副本规则自洽",
+    "能力有明确上限和代价",
+    "队友有独立人格和故事线",
+    "副本类型多样，难度递进"
+  ],
+  "dungeon_design": {
+    "elements": [
+      "背景设定",
+      "通关条件",
+      "死亡条件"
+    ],
+    "structure": {
+      "entry": "10%：传送进入，获得初始信息，确认队友/敌人",
+      "exploration": "30%：收集线索，试探规则边界，有人违规死亡",
+      "breakthrough": "40%：发现规则漏洞，制定通关计划，执行过程中的意外",
+      "settlement": "20%：完成通关条件，获得奖励，返回主空间"
+    },
+    "types": [
+      {
+        "type": "生存类",
+        "features": "活到时间结束",
+        "examples": [
+          "丧尸围城",
+          "荒岛求生"
+        ]
+      },
+      {
+        "type": "解谜类",
+        "features": "找到真相/出口",
+        "examples": [
+          "密室逃脱",
+          "鬼屋探险"
+        ]
+      },
+      {
+        "type": "对抗类",
+        "features": "击败BOSS/敌人",
+        "examples": [
+          "怪物猎杀",
+          "阵营战争"
+        ]
+      },
+      {
+        "type": "任务类",
+        "features": "完成特定目标",
+        "examples": [
+          "护送NPC",
+          "收集道具"
+        ]
+      },
+      {
+        "type": "剧情类",
+        "features": "改变/完成剧情",
+        "examples": [
+          "电影世界",
+          "历史副本"
+        ]
+      }
+    ]
+  },
+  "team_design": {
+    "classic_config": [
+      {
+        "role": "老手",
+        "position": "导师",
+        "function": "教主角规则",
+        "fate": "中期牺牲"
+      },
+      {
+        "role": "新人",
+        "position": "对照",
+        "function": "展示成长",
+        "fate": "可能黑化"
+      },
+      {
+        "role": "智囊",
+        "position": "辅助",
+        "function": "分析规则",
+        "fate": "关键时刻献策"
+      },
+      {
+        "role": "战力",
+        "position": "输出",
+        "function": "正面对抗",
+        "fate": "高光后退场"
+      },
+      {
+        "role": "叛徒",
+        "position": "反转",
+        "function": "制造冲突",
+        "fate": "被主角击败"
+      }
+    ],
+    "death_rhythm": [
+      {
+        "stage": "前期",
+        "description": "炮灰队友死亡，建立紧张感"
+      },
+      {
+        "stage": "中期",
+        "description": "重要队友牺牲，情感冲击"
+      },
+      {
+        "stage": "后期",
+        "description": "核心队友危机，但可以救回"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "规则感知",
+      "能力融合",
+      "情报优势",
+      "特殊体质"
+    ],
+    "fit_requirements": [
+      "要符合无限流世界观",
+      "要有代价和限制",
+      "要能制造智斗爽点",
+      "升级路径要清晰"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "普通人",
+      "聪明人",
+      "战斗天才",
+      "重生者"
+    ],
+    "villain_types": [
+      "副本BOSS",
+      "敌对玩家",
+      "管理者",
+      "系统"
+    ],
+    "relationship_patterns": [
+      "队友信任",
+      "背叛与复仇",
+      "师徒传承",
+      "竞争与合作"
+    ]
+  }
+}

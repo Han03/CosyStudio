@@ -1,0 +1,427 @@
+{
+  "title": "种田题材模板",
+  "canonical_genre": "种田",
+  "core_selling_points": "资源积累 + 势力建设 + 稳步成长。\"高筑墙，广积粮，缓称王\"——用经营的智慧征服世界。",
+  "creative_constraints": [
+    "推荐约束包：Pack F12",
+    "通用叠加：Pack U03"
+  ],
+  "subgenres": [
+    {
+      "name": "势力经营流",
+      "features": "建立根据地，发展农业/经济/军事/政治，以内政优势碾压对手",
+      "core_payoffs": "势力扩张、科技碾压、征服天下",
+      "protagonist_traits": "有远见、善于规划、有领导力"
+    },
+    {
+      "name": "领地建设流",
+      "features": "获得领地/封地，从零开始建设",
+      "core_payoffs": "领地升级、人口增长、经济繁荣",
+      "protagonist_traits": "善于经营、有耐心、注重细节"
+    },
+    {
+      "name": "基地发展流",
+      "features": "末世/星际/异界建设安全基地",
+      "core_payoffs": "基地扩张、资源积累、团队壮大",
+      "protagonist_traits": "有远见、善于管理、重视团队"
+    },
+    {
+      "name": "家长里短流",
+      "features": "古代/近现代背景，小人物的平淡生活",
+      "core_payoffs": "发家致富、改善生活、家庭和睦",
+      "protagonist_traits": "勤劳、善良、善于持家"
+    }
+  ],
+  "worldview": {
+    "description": "以经营和发展为核心的世界，资源积累是关键",
+    "power_management_worldview": {
+      "development_stages": [
+        {
+          "stage": "立足期",
+          "features": "获得根据地",
+          "core_task": "站稳脚跟"
+        },
+        {
+          "stage": "发展期",
+          "features": "内政建设",
+          "core_task": "积累实力"
+        },
+        {
+          "stage": "扩张期",
+          "features": "吞并周边",
+          "core_task": "扩大势力"
+        },
+        {
+          "stage": "争霸期",
+          "features": "逐鹿天下",
+          "core_task": "统一/称霸"
+        }
+      ],
+      "internal_affairs_system": [
+        {
+          "domain": "农业",
+          "content": "粮食生产",
+          "function": "人口基础"
+        },
+        {
+          "domain": "工业",
+          "content": "制造业",
+          "function": "装备/商品"
+        },
+        {
+          "domain": "商业",
+          "content": "贸易流通",
+          "function": "财富积累"
+        },
+        {
+          "domain": "军事",
+          "content": "军队建设",
+          "function": "武力保障"
+        },
+        {
+          "domain": "科技",
+          "content": "技术研发",
+          "function": "代差优势"
+        },
+        {
+          "domain": "政治",
+          "content": "制度建设",
+          "function": "效率提升"
+        }
+      ]
+    },
+    "domestic_life_worldview": {
+      "social_structure": [
+        {
+          "class": "地主",
+          "features": "有大量土地",
+          "resources": "丰富"
+        },
+        {
+          "class": "富农",
+          "features": "有余粮",
+          "resources": "充足"
+        },
+        {
+          "class": "中农",
+          "features": "自给自足",
+          "resources": "一般"
+        },
+        {
+          "class": "贫农",
+          "features": "勉强糊口",
+          "resources": "匮乏"
+        },
+        {
+          "class": "佃户",
+          "features": "租地耕种",
+          "resources": "极少"
+        }
+      ],
+      "resource_system": [
+        {
+          "resource": "土地",
+          "acquisition": "购买/开荒",
+          "usage": "种植基础"
+        },
+        {
+          "resource": "种子",
+          "acquisition": "购买/培育",
+          "usage": "作物来源"
+        },
+        {
+          "resource": "银钱",
+          "acquisition": "售卖/积累",
+          "usage": "流通货币"
+        },
+        {
+          "resource": "人脉",
+          "acquisition": "经营关系",
+          "usage": "社会资本"
+        }
+      ]
+    }
+  },
+  "power_system": {
+    "description": "科技树与人才体系",
+    "tech_tree": {
+      "agriculture": [
+        "原始农耕",
+        "铁器农具",
+        "水利灌溉",
+        "轮作制度",
+        "良种培育"
+      ],
+      "industry": [
+        "手工作坊",
+        "水力机械",
+        "标准化生产",
+        "流水线",
+        "工业革命"
+      ],
+      "military": [
+        "冷兵器",
+        "弓弩改良",
+        "火药武器",
+        "火枪火炮",
+        "热武器"
+      ],
+      "commerce": [
+        "以物易物",
+        "货币流通",
+        "票号银行",
+        "股份制度",
+        "金融体系"
+      ]
+    },
+    "talent_system": [
+      {
+        "type": "谋士",
+        "function": "战略规划",
+        "acquisition": "招募/投奔"
+      },
+      {
+        "type": "武将",
+        "function": "军事指挥",
+        "acquisition": "招募/培养"
+      },
+      {
+        "type": "内政",
+        "function": "经济管理",
+        "acquisition": "科举/推荐"
+      },
+      {
+        "type": "工匠",
+        "function": "技术研发",
+        "acquisition": "招募/培养"
+      },
+      {
+        "type": "商人",
+        "function": "贸易经营",
+        "acquisition": "合作/招募"
+      }
+    ],
+    "institution_building": [
+      {
+        "type": "政治制度",
+        "options": [
+          "中央集权",
+          "分封制",
+          "议会制"
+        ]
+      },
+      {
+        "type": "经济制度",
+        "options": [
+          "计划经济",
+          "市场经济",
+          "混合制"
+        ]
+      },
+      {
+        "type": "军事制度",
+        "options": [
+          "府兵制",
+          "募兵制",
+          "义务兵役"
+        ]
+      },
+      {
+        "type": "选拔制度",
+        "options": [
+          "科举",
+          "推荐",
+          "考核"
+        ]
+      }
+    ]
+  },
+  "outline_structure": {
+    "power_management": {
+      "description": "200万字标准大纲",
+      "volumes": [
+        {
+          "name": "立足",
+          "chapters": "1-80",
+          "focus": "获得根据地，站稳脚跟，击退第一波威胁"
+        },
+        {
+          "name": "发展",
+          "chapters": "81-200",
+          "focus": "内政建设，积累实力，科技/制度初见成效"
+        },
+        {
+          "name": "扩张",
+          "chapters": "201-400",
+          "focus": "吞并周边，扩大势力，成为一方霸主"
+        },
+        {
+          "name": "争霸",
+          "chapters": "401-600",
+          "focus": "逐鹿天下，决定性战役胜利"
+        },
+        {
+          "name": "统一",
+          "chapters": "601-700",
+          "focus": "统一天下，建立新秩序"
+        }
+      ]
+    },
+    "domestic_life": {
+      "description": "100万字标准大纲",
+      "volumes": [
+        {
+          "name": "起步",
+          "chapters": "1-60",
+          "focus": "分家/穿越，获得基础资源，第一次丰收"
+        },
+        {
+          "name": "发展",
+          "chapters": "61-150",
+          "focus": "扩大种植，开始加工，打开销路"
+        },
+        {
+          "name": "壮大",
+          "chapters": "151-250",
+          "focus": "建立产业，雇佣人手，成为当地富户"
+        },
+        {
+          "name": "巅峰",
+          "chapters": "251-350",
+          "focus": "商业帝国，地位提升，获得官方认可"
+        },
+        {
+          "name": "圆满",
+          "chapters": "351-400",
+          "focus": "家族兴旺，世家大族"
+        }
+      ]
+    }
+  },
+  "story_rules": [
+    "科技碾压要展示发展过程",
+    "内政优势要厚积薄发",
+    "人才要有特色",
+    "发家致富要展示积累过程",
+    "打脸极品不能太刻意",
+    "有冲突有波折",
+    "发展有阻碍有代价",
+    "科技/制度循序渐进",
+    "数据要合理"
+  ],
+  "farming_system": {
+    "agriculture_system": [
+      {
+        "type": "粮食",
+        "cycle": "长",
+        "profit": "低",
+        "risk": "低"
+      },
+      {
+        "type": "蔬菜",
+        "cycle": "短",
+        "profit": "中",
+        "risk": "中"
+      },
+      {
+        "type": "经济作物",
+        "cycle": "中",
+        "profit": "高",
+        "risk": "中"
+      },
+      {
+        "type": "药材",
+        "cycle": "长",
+        "profit": "高",
+        "risk": "高"
+      }
+    ],
+    "processing_system": [
+      "初级加工",
+      "中级加工",
+      "高级加工"
+    ],
+    "economic_cycle": "生产 → 加工 → 销售 → 资本积累 → 扩大再生产"
+  },
+  "conflict_design": {
+    "power_management_conflicts": [
+      {
+        "conflict": "外敌入侵",
+        "source": "敌对势力",
+        "solution": "军事防御"
+      },
+      {
+        "conflict": "内部叛乱",
+        "source": "不满势力",
+        "solution": "政治手段"
+      },
+      {
+        "conflict": "资源争夺",
+        "source": "周边势力",
+        "solution": "外交/战争"
+      },
+      {
+        "conflict": "天灾人祸",
+        "source": "自然/人为",
+        "solution": "内政应对"
+      }
+    ],
+    "domestic_life_conflicts": [
+      {
+        "conflict": "土地争夺",
+        "source": "地主/邻居",
+        "solution": "据理力争"
+      },
+      {
+        "conflict": "商业竞争",
+        "source": "同行",
+        "solution": "差异化"
+      },
+      {
+        "conflict": "家庭矛盾",
+        "source": "亲戚",
+        "solution": "划清界限"
+      },
+      {
+        "conflict": "官府盘剥",
+        "source": "官员",
+        "solution": "找靠山"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "超前科技",
+      "空间能力",
+      "预知能力",
+      "人才吸引",
+      "经商天赋"
+    ],
+    "fit_requirements": [
+      "要符合种田世界观",
+      "要有发展过程",
+      "要能制造经营爽点",
+      "升级路径要清晰"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "穿越者",
+      "重生者",
+      "落魄贵族",
+      "普通农民"
+    ],
+    "villain_types": [
+      "敌对势力",
+      "贪官污吏",
+      "竞争对手",
+      "极品亲戚"
+    ],
+    "relationship_patterns": [
+      "君臣相得",
+      "兄弟同心",
+      "夫妻和睦",
+      "师徒传承"
+    ]
+  }
+}

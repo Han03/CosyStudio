@@ -1,0 +1,87 @@
+{
+  "title": "都市日常题材模板",
+  "canonical_genre":"都市",
+  "core_selling_points": "真实生活感 + 小人物逆袭 + 细节共鸣。在平凡中书写不平凡，让读者看到自己的影子。",
+  "creative_constraints": ["推荐约束包：Pack M03", "通用叠加：Pack U02"],
+  "subgenres": [
+    {
+      "name": "职场奋斗流",
+      "features": "职场打拼，升职加薪，事业成功",
+      "core_payoffs": "业绩碾压、升职打脸、财务自由"
+    },
+    {
+      "name": "市井生活流",
+      "features": "普通人的日常生活，烟火气息",
+      "core_payoffs": "生活智慧、人情冷暖、小确幸"
+    },
+    {
+      "name": "创业逆袭流",
+      "features": "白手起家，商业成功",
+      "core_payoffs": "商业智慧、资本运作、财富积累"
+    },
+    {
+      "name": "重生都市流",
+      "features": "重生回到过去，改变人生",
+      "core_payoffs": "先知先觉、投资暴富、弥补遗憾"
+    }
+  ],
+  "worldview": {
+    "description": "都市社会学：社会阶层与资源体系",
+    "social_classes": [
+      {"name": "富豪", "description": "资本家", "resources": "无限"},
+      {"name": "中产", "description": "白领精英", "resources": "充足"},
+      {"name": "工薪", "description": "普通上班族", "resources": "有限"},
+      {"name": "底层", "description": "打工人", "resources": "匮乏"}
+    ],
+    "resources": ["金钱", "人脉", "能力", "信息", "时间"],
+    "workplace_roles": [
+      {"name": "老板", "description": "决策者"},
+      {"name": "上司", "description": "直接领导"},
+      {"name": "同事", "description": "竞争者"},
+      {"name": "下属", "description": "执行者"},
+      {"name": "客户", "description": "资源方"}
+    ]
+  },
+  "power_system": {
+    "description": "职场职级体系",
+    "levels": [
+      {"name": "C级", "description": "CEO/CFO/COO", "power": "决策层"},
+      {"name": "VP", "description": "副总裁", "power": "高管层"},
+      {"name": "总监", "description": "部门负责人", "power": "中层"},
+      {"name": "经理", "description": "团队负责人", "power": "基层管理"},
+      {"name": "主管", "description": "小组负责人", "power": "执行层"},
+      {"name": "专员", "description": "普通员工", "power": "底层"}
+    ],
+    "promotion_path": "专员 → 主管 → 经理 → 总监 → VP → C级"
+  },
+  "outline_structure": {
+    "description": "150万字标准大纲",
+    "volumes": [
+      {"name": "起步", "chapters": "1-80章", "focus": "主角进入职场/开始创业，首次证明自己"},
+      {"name": "立足", "chapters": "81-180章", "focus": "站稳脚跟，首次晋升/项目成功"},
+      {"name": "崛起", "chapters": "181-300章", "focus": "快速上升，重大项目成功"},
+      {"name": "巅峰", "chapters": "301-450章", "focus": "成为行业精英，事业巅峰"},
+      {"name": "圆满", "chapters": "451-550章", "focus": "事业家庭双丰收"}
+    ]
+  },
+  "story_rules": [
+    "业绩碾压：要展示过程，不能只有结果",
+    "升职打脸：要有铺垫，不能太刻意",
+    "投资暴富：要有合理的信息来源",
+    "人脉变现：人脉要提前铺垫"
+  ],
+  "golden_finger_guidelines": {
+    "types": ["商业头脑", "投资眼光", "专业技能", "人脉资源"],
+    "fit_requirements": ["要符合都市背景", "成功要有铺垫", "成长路径要清晰"]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": ["草根逆袭", "重生开挂", "天才型", "稳扎稳打"],
+    "supporting_types": [
+      {"name": "贵人", "description": "提携帮助", "role": "导师/伯乐"},
+      {"name": "对手", "description": "制造冲突", "role": "竞争关系"},
+      {"name": "盟友", "description": "并肩作战", "role": "合作伙伴"},
+      {"name": "小人", "description": "使绊子", "role": "需要提防"}
+    ],
+    "conflict_types": ["职场冲突", "生活冲突"]
+  }
+}

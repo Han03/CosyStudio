@@ -1,0 +1,288 @@
+{
+  "title": "民国言情题材模板",
+  "canonical_genre": "年代",
+  "core_selling_points": "时代动荡 + 身份隐秘 + 爱恨纠葛。在乱世的风云中，书写刻骨铭心的爱情传奇。",
+  "creative_constraints": [
+    "推荐约束包：Pack F10",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "豪门恩怨流",
+      "features": "民国大家族的爱恨情仇",
+      "core_payoffs": "家族争斗、身份反转、虐恋情深",
+      "protagonist_traits": "温婉知礼、坚韧不屈、有智慧"
+    },
+    {
+      "name": "乱世佳人流",
+      "features": "战乱背景下的爱情",
+      "core_payoffs": "乱世相守、生死不渝、家国情怀",
+      "protagonist_traits": "勇敢、坚强、有家国情怀"
+    },
+    {
+      "name": "名媛风华流",
+      "features": "民国名媛的传奇人生",
+      "core_payoffs": "独立女性、时代风华、爱情抉择",
+      "protagonist_traits": "独立、有才华、有主见"
+    },
+    {
+      "name": "谍影情深流",
+      "features": "谍战背景下的爱情",
+      "core_payoffs": "身份秘密、信任考验、生死相依",
+      "protagonist_traits": "冷静、机智、有秘密"
+    }
+  ],
+  "worldview": {
+    "description": "民国时期的乱世爱情世界",
+    "social_classes": [
+      {
+        "class": "军阀/政要",
+        "features": "权力核心",
+        "life": "奢华/危险"
+      },
+      {
+        "class": "世家大族",
+        "features": "传统势力",
+        "life": "讲究/保守"
+      },
+      {
+        "class": "新兴资本",
+        "features": "商业新贵",
+        "life": "开放/逐利"
+      },
+      {
+        "class": "知识分子",
+        "features": "思想先锋",
+        "life": "理想/清贫"
+      },
+      {
+        "class": "平民百姓",
+        "features": "社会基础",
+        "life": "艰难/朴实"
+      }
+    ],
+    "historical_periods": [
+      {
+        "period": "北洋时期",
+        "features": "军阀混战",
+        "conflict": "权力争夺"
+      },
+      {
+        "period": "黄金十年",
+        "features": "相对稳定",
+        "conflict": "新旧冲突"
+      },
+      {
+        "period": "抗战时期",
+        "features": "民族危亡",
+        "conflict": "家国抉择"
+      },
+      {
+        "period": "解放前夕",
+        "features": "风云变幻",
+        "conflict": "命运选择"
+      }
+    ],
+    "female_situations": [
+      {
+        "type": "大家闺秀",
+        "features": "家教严格",
+        "dilemma": "婚姻不自主"
+      },
+      {
+        "type": "新女性",
+        "features": "追求独立",
+        "dilemma": "社会偏见"
+      },
+      {
+        "type": "交际花",
+        "features": "周旋权贵",
+        "dilemma": "身不由己"
+      },
+      {
+        "type": "革命女性",
+        "features": "投身革命",
+        "dilemma": "生死考验"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "民国身份与时代体系",
+    "scene_settings": [
+      {
+        "scene": "十里洋场",
+        "features": "繁华/堕落",
+        "function": "主要舞台"
+      },
+      {
+        "scene": "大宅门",
+        "features": "规矩/压抑",
+        "function": "家族戏"
+      },
+      {
+        "scene": "租界",
+        "features": "中西交融",
+        "function": "身份周旋"
+      },
+      {
+        "scene": "战场",
+        "features": "残酷/热血",
+        "function": "家国情怀"
+      }
+    ],
+    "identity_settings": [
+      {
+        "identity": "大小姐",
+        "features": "金枝玉叶",
+        "plot_function": "身份落差"
+      },
+      {
+        "identity": "军官",
+        "features": "铁血柔情",
+        "plot_function": "保护者"
+      },
+      {
+        "identity": "商人",
+        "features": "精明/深情",
+        "plot_function": "资源提供"
+      },
+      {
+        "identity": "特工",
+        "features": "双面人生",
+        "plot_function": "悬疑元素"
+      },
+      {
+        "identity": "戏子",
+        "features": "卑微/才华",
+        "plot_function": "身份反转"
+      }
+    ],
+    "era_items": [
+      "旗袍、中山装、西装",
+      "黄包车、汽车、火车",
+      "电报、书信、报纸",
+      "舞厅、咖啡馆、戏院"
+    ]
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "相遇",
+        "chapters": "1-60",
+        "focus": "命运交织，情感萌芽，第一次心动"
+      },
+      {
+        "name": "相知",
+        "chapters": "61-150",
+        "focus": "深入了解，感情升温，确认心意"
+      },
+      {
+        "name": "考验",
+        "chapters": "151-250",
+        "focus": "家族/时代阻碍，被迫分离"
+      },
+      {
+        "name": "守护",
+        "chapters": "251-350",
+        "focus": "为爱对抗一切，克服阻碍"
+      },
+      {
+        "name": "圆满",
+        "chapters": "351-400",
+        "focus": "有情人终成眷属"
+      }
+    ]
+  },
+  "story_rules": [
+    "身份反转要有伏笔铺垫",
+    "乱世相守要有真实的危机",
+    "家族认可要展示女主的闪光点",
+    "复仇要有底线",
+    "时代细节准确",
+    "冲突有深度",
+    "女主有成长",
+    "历史背景合理"
+  ],
+  "atmosphere_design": {
+    "language_style": [
+      "使用民国时期的称谓（太太、小姐、先生）",
+      "适当使用文言词汇",
+      "避免现代网络用语"
+    ],
+    "life_details": {
+      "clothing": {
+        "points": "旗袍/西装",
+        "pitfall": "款式错误"
+      },
+      "etiquette": {
+        "points": "中西结合",
+        "pitfall": "太现代"
+      },
+      "address": {
+        "points": "时代特色",
+        "pitfall": "乱用称呼"
+      },
+      "transport": {
+        "points": "黄包车/汽车",
+        "pitfall": "穿越道具"
+      }
+    },
+    "major_events": [
+      "五四运动",
+      "北伐战争",
+      "抗日战争",
+      "解放战争"
+    ]
+  },
+  "character_guidelines": {
+    "female_archetypes": [
+      "大家闺秀",
+      "新女性",
+      "落难千金",
+      "革命女性"
+    ],
+    "male_archetypes": [
+      "军阀少帅",
+      "世家公子",
+      "革命志士",
+      "商界精英"
+    ],
+    "supporting_roles": [
+      {
+        "role": "恶毒姨太",
+        "function": "制造冲突",
+        "ending": "被惩罚"
+      },
+      {
+        "role": "痴情备胎",
+        "function": "三角关系",
+        "ending": "成全/黑化"
+      },
+      {
+        "role": "严厉长辈",
+        "function": "阻碍",
+        "ending": "认可"
+      },
+      {
+        "role": "忠心丫鬟",
+        "function": "助攻",
+        "ending": "也收获幸福"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "身份背景",
+      "特殊才能",
+      "时代知识",
+      "勇气智慧"
+    ],
+    "fit_requirements": [
+      "要符合民国言情世界观",
+      "要有时代限制",
+      "要能制造情感爽点",
+      "升级路径要与时代进程同步"
+    ]
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "title": "都市脑洞题材模板",
+  "canonical_genre":"都市",
+  "core_selling_points": "现实都市 + 规则/异象入侵 + 高反转。当超自然规则入侵日常生活，普通人如何在夹缝中求生。",
+  "creative_constraints": ["推荐约束包：Pack M04 / Pack M05", "通用叠加：Pack U02"],
+  "subgenres": [
+    {
+      "name": "规则入侵流",
+      "features": "现实世界被超自然规则入侵",
+      "core_payoffs": "规则发现、规则利用、规则反杀",
+      "protagonist_traits": "理性、善于分析、观察力强"
+    },
+    {
+      "name": "都市异象流",
+      "features": "都市中出现各种异常现象",
+      "core_payoffs": "异象探索、真相揭露、能力觉醒",
+      "protagonist_traits": "勇敢、好奇心强、直觉敏锐"
+    },
+    {
+      "name": "系统降临流",
+      "features": "系统/游戏化入侵现实",
+      "core_payoffs": "系统利用、任务完成、等级碾压",
+      "protagonist_traits": "善于规划、执行力强、适应力强"
+    },
+    {
+      "name": "平行世界流",
+      "features": "发现/穿越平行世界",
+      "core_payoffs": "世界探索、规则差异、身份切换",
+      "protagonist_traits": "冒险精神、灵活变通、善于学习"
+    }
+  ],
+  "worldview": {
+    "description": "现实都市中异常现象和超自然规则入侵的世界",
+    "anomaly_levels": [
+      {"level": "日常级", "features": "轻微异常", "impact": "个人"},
+      {"level": "事件级", "features": "明显异常", "impact": "区域"},
+      {"level": "灾难级", "features": "严重异常", "impact": "城市"},
+      {"level": "末日级", "features": "毁灭性", "impact": "全球"}
+    ],
+    "factions": [
+      {"name": "官方机构", "nature": "管控异常", "goal": "维护秩序"},
+      {"name": "民间组织", "nature": "探索异常", "goal": "各有目的"},
+      {"name": "异常存在", "nature": "规则本身", "goal": "不可知"},
+      {"name": "普通人", "nature": "不知情", "goal": "正常生活"}
+    ],
+    "information_hierarchy": [
+      {"level": "完全知情", "knowledge": "了解全貌", "people": "高层"},
+      {"level": "部分知情", "knowledge": "了解部分", "people": "执行者"},
+      {"level": "边缘知情", "knowledge": "略知一二", "people": "相关者"},
+      {"level": "完全不知", "knowledge": "一无所知", "people": "普通人"}
+    ]
+  },
+  "power_system": {
+    "description": "规则体系与能力系统",
+    "rule_types": [
+      {"type": "禁止型", "features": "不能做某事", "example": "不能说出名字"},
+      {"type": "强制型", "features": "必须做某事", "example": "必须回应"},
+      {"type": "条件型", "features": "满足条件触发", "example": "看到就会..."},
+      {"type": "时间型", "features": "特定时间生效", "example": "凌晨三点"},
+      {"type": "空间型", "features": "特定地点生效", "example": "电梯里"}
+    ],
+    "rule_design_principles": [
+      "自洽性：规则内部不矛盾，规则之间有逻辑",
+      "可验证性：违反有明确后果，遵守有明确收益",
+      "可利用性：存在漏洞可钻，可以反向利用",
+      "有来源：规则形成有原因，可以追溯根源"
+    ],
+    "cost_system": [
+      {"type": "生理代价", "features": "身体损伤", "recovery": "时间/治疗"},
+      {"type": "精神代价", "features": "心智损耗", "recovery": "休息/特殊手段"},
+      {"type": "资源代价", "features": "消耗物品", "recovery": "获取/制作"},
+      {"type": "存在代价", "features": "存在感降低", "recovery": "特殊方式"}
+    ],
+    "ability_types": [
+      {"type": "感知类", "features": "感知异常", "limitation": "被异常感知"},
+      {"type": "干涉类", "features": "影响规则", "limitation": "消耗巨大"},
+      {"type": "防御类", "features": "抵抗异常", "limitation": "被动"},
+      {"type": "特殊类", "features": "独特能力", "limitation": "特定条件"}
+    ]
+  },
+  "outline_structure": {
+    "description": "150万字标准大纲",
+    "volumes": [
+      {"name": "入门", "chapters": "1-60", "focus": "接触异常世界，初步觉醒，首次解决异常事件"},
+      {"name": "成长", "chapters": "61-150", "focus": "能力提升，了解更多，解决重大异常事件"},
+      {"name": "深入", "chapters": "151-280", "focus": "探索异常世界的真相，能力质变，揭露部分真相"},
+      {"name": "对抗", "chapters": "281-400", "focus": "与高级异常/势力对抗，接近巅峰，击败主要敌人"},
+      {"name": "终局", "chapters": "401-500", "focus": "最终真相，终极对决，圆满结局"}
+    ],
+    "pacing": {
+      "foreshadowing": "20%：日常中的异常，不祥的预兆",
+      "escalation": "40%：异常事件发生，危险逐渐升级",
+      "climax": "30%：直面核心异常，生死一线",
+      "resolution": "10%：异常解除/延续，余韵/伏笔"
+    }
+  },
+  "story_rules": [
+    "规则破解要合理，不能太巧合",
+    "能力觉醒要有触发条件，能力要有限制",
+    "真相揭露要有伏笔铺垫",
+    "等级碾压要有成长过程",
+    "规则自洽可验证",
+    "代价明确且兑现",
+    "反转有铺垫",
+    "主角有代价有成长"
+  ],
+  "golden_finger_guidelines": {
+    "types": ["规则感知", "规则干涉", "异常免疫", "系统辅助"],
+    "fit_requirements": ["要符合都市脑洞世界观", "要有明确代价", "规则利用要有逻辑", "能力提升要有过程"]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": ["理性分析型", "直觉敏锐型", "意志坚定型", "适应力强型"],
+    "villain_types": ["异常存在", "规则化身", "幕后黑手", "失控的同类"],
+    "supporting_roles": [
+      {"role": "导师", "function": "指引", "relationship": "传授知识"},
+      {"role": "队友", "function": "配合", "relationship": "互补能力"},
+      {"role": "对手", "function": "竞争", "relationship": "互相促进"},
+      {"role": "神秘人", "function": "推动剧情", "relationship": "提供信息"}
+    ]
+  },
+  "atmosphere": {
+    "contrast": "日常场景与异常入侵的对比",
+    "horror_types": [
+      {"type": "心理恐怖", "method": "暗示/留白", "effect": "想象恐惧"},
+      {"type": "规则恐怖", "method": "违反即死", "effect": "紧张焦虑"},
+      {"type": "未知恐怖", "method": "信息不足", "effect": "不安感"},
+      {"type": "反转恐怖", "method": "认知颠覆", "effect": "震惊"}
+    ]
+  }
+}

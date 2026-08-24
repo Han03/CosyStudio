@@ -1,0 +1,320 @@
+{
+  "title": "悬疑脑洞题材模板",
+  "canonical_genre": "悬疑",
+  "core_selling_points": "逻辑推理 + 规则博弈 + 高智商反转。在规则与推理的交织中，揭开层层迷雾背后的真相。",
+  "creative_constraints": [
+    "推荐约束包：Pack M06 / Pack M07",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "规则推理流",
+      "features": "在特定规则下进行推理",
+      "core_payoffs": "规则发现、逻辑推演、规则反杀",
+      "protagonist_traits": "善于推理、细心、善于发现规则"
+    },
+    {
+      "name": "密室逃脱流",
+      "features": "被困特定空间，需要解谜逃脱",
+      "core_payoffs": "线索发现、谜题破解、绝境逃生",
+      "protagonist_traits": "观察力强、善于分析、冷静"
+    },
+    {
+      "name": "信息博弈流",
+      "features": "信息不对称下的智力对决",
+      "core_payoffs": "信息差利用、心理博弈、反转揭露",
+      "protagonist_traits": "智商高、善于伪装、心理强大"
+    },
+    {
+      "name": "时空诡计流",
+      "features": "利用时间/空间的诡计",
+      "core_payoffs": "诡计揭露、逻辑自洽、认知颠覆",
+      "protagonist_traits": "逻辑严密、善于发现、洞察力强"
+    }
+  ],
+  "worldview": {
+    "description": "充满规则与谜题的推理世界",
+    "rule_types": [
+      {
+        "type": "游戏规则",
+        "features": "明确的游戏规则",
+        "example": "狼人杀/大逃杀"
+      },
+      {
+        "type": "超自然规则",
+        "features": "超自然现象的规则",
+        "example": "诅咒/怪谈"
+      },
+      {
+        "type": "社会规则",
+        "features": "隐藏的社会规则",
+        "example": "潜规则/阴谋"
+      },
+      {
+        "type": "逻辑规则",
+        "features": "纯逻辑推理",
+        "example": "密室/不可能犯罪"
+      }
+    ],
+    "information_levels": [
+      {
+        "level": "全知",
+        "knowledge": "了解全部",
+        "role": "幕后黑手"
+      },
+      {
+        "level": "多知",
+        "knowledge": "了解大部分",
+        "role": "核心参与者"
+      },
+      {
+        "level": "少知",
+        "knowledge": "了解部分",
+        "role": "普通参与者"
+      },
+      {
+        "level": "无知",
+        "knowledge": "一无所知",
+        "role": "被蒙蔽者"
+      }
+    ],
+    "reasoning_elements": [
+      {
+        "element": "线索",
+        "description": "可发现的信息",
+        "function": "推理基础"
+      },
+      {
+        "element": "伏笔",
+        "description": "隐藏的信息",
+        "function": "反转铺垫"
+      },
+      {
+        "element": "误导",
+        "description": "错误的方向",
+        "function": "增加难度"
+      },
+      {
+        "element": "真相",
+        "description": "最终答案",
+        "function": "揭露目标"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "推理与规则博弈体系",
+    "clue_design": {
+      "obvious": {
+        "percentage": "30%",
+        "features": [
+          "直接可见",
+          "容易发现",
+          "指向表面"
+        ]
+      },
+      "hidden": {
+        "percentage": "50%",
+        "features": [
+          "需要分析",
+          "容易忽略",
+          "指向真相"
+        ]
+      },
+      "misleading": {
+        "percentage": "20%",
+        "features": [
+          "故意设置",
+          "指向错误",
+          "增加难度"
+        ]
+      }
+    },
+    "reasoning_types": [
+      {
+        "type": "演绎推理",
+        "features": "从一般到特殊",
+        "example": "规则→结论"
+      },
+      {
+        "type": "归纳推理",
+        "features": "从特殊到一般",
+        "example": "现象→规律"
+      },
+      {
+        "type": "溯因推理",
+        "features": "从结果到原因",
+        "example": "结果→原因"
+      },
+      {
+        "type": "类比推理",
+        "features": "相似性推理",
+        "example": "A类似B"
+      }
+    ],
+    "twist_design": {
+      "identity_twist": [
+        "凶手是意外之人",
+        "受害者是凶手",
+        "侦探是凶手"
+      ],
+      "motive_twist": [
+        "表面动机是假的",
+        "真实动机出人意料",
+        "无动机犯罪"
+      ],
+      "truth_twist": [
+        "案件本身是假的",
+        "多重真相",
+        "真相比想象更复杂"
+      ]
+    }
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "入局",
+        "chapters": "1-50",
+        "focus": "进入悬疑世界，首次破解谜题"
+      },
+      {
+        "name": "成长",
+        "chapters": "51-120",
+        "focus": "推理能力提升，解决重大案件"
+      },
+      {
+        "name": "深入",
+        "chapters": "121-200",
+        "focus": "接触核心谜题，发现关键线索"
+      },
+      {
+        "name": "对决",
+        "chapters": "201-280",
+        "focus": "与幕后黑手对决，揭露幕后黑手"
+      },
+      {
+        "name": "终局",
+        "chapters": "281-350",
+        "focus": "最终真相，终极对决"
+      }
+    ]
+  },
+  "story_rules": [
+    "规则破解要自洽合理",
+    "推理对决双方都要有智商",
+    "真相揭露要有伏笔",
+    "绝境逆转要有铺垫",
+    "线索公平可回溯",
+    "推理逻辑严密",
+    "真相揭露完整",
+    "规则自洽一致"
+  ],
+  "atmosphere_design": {
+    "information_control": {
+      "release_rhythm": [
+        "开局抛出谜题",
+        "中段逐步释放线索",
+        "高潮揭露真相"
+      ],
+      "hiding_techniques": [
+        "视角限制",
+        "叙述诡计",
+        "时间错位"
+      ]
+    },
+    "tension_building": [
+      {
+        "technique": "时间压力",
+        "effect": "紧迫感",
+        "example": "倒计时"
+      },
+      {
+        "technique": "生命威胁",
+        "effect": "危机感",
+        "example": "死亡游戏"
+      },
+      {
+        "technique": "信任危机",
+        "effect": "不安感",
+        "example": "内鬼"
+      },
+      {
+        "technique": "认知颠覆",
+        "effect": "震惊",
+        "example": "反转"
+      }
+    ],
+    "fairness_principles": [
+      "所有线索对读者公开",
+      "推理过程可复现",
+      "真相不能凭空出现",
+      "反转要有伏笔"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "逻辑型",
+      "直觉型",
+      "观察型",
+      "心理型"
+    ],
+    "opponent_types": [
+      {
+        "type": "高智商罪犯",
+        "features": "计划周密",
+        "threat": "难以破解"
+      },
+      {
+        "type": "规则制定者",
+        "features": "掌控规则",
+        "threat": "信息优势"
+      },
+      {
+        "type": "同类竞争者",
+        "features": "能力相当",
+        "threat": "互相博弈"
+      },
+      {
+        "type": "隐藏敌人",
+        "features": "身份不明",
+        "threat": "防不胜防"
+      }
+    ],
+    "supporting_roles": [
+      {
+        "role": "助手",
+        "function": "辅助推理",
+        "relation": "互补"
+      },
+      {
+        "role": "信息源",
+        "function": "提供线索",
+        "relation": "合作"
+      },
+      {
+        "role": "怀疑对象",
+        "function": "制造悬疑",
+        "relation": "不确定"
+      },
+      {
+        "role": "受害者",
+        "function": "推动剧情",
+        "relation": "保护/调查"
+      }
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "推理能力",
+      "观察能力",
+      "记忆能力",
+      "心理洞察"
+    ],
+    "fit_requirements": [
+      "要符合悬疑脑洞世界观",
+      "要有逻辑限制",
+      "要能制造智斗爽点",
+      "升级路径要与谜题难度同步"
+    ]
+  }
+}

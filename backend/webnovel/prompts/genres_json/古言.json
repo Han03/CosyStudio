@@ -1,0 +1,221 @@
+{
+  "title": "古言题材模板",
+  "canonical_genre": "古言",
+  "core_selling_points": "古风韵味 + 权谋争斗 + 情深缘浅。在架空或真实历史背景下，展开爱恨情仇与权力博弈。",
+  "creative_constraints": [
+    "推荐约束包：Pack F01 / Pack F18",
+    "通用叠加：Pack U01"
+  ],
+  "subgenres": [
+    {
+      "name": "宫斗流",
+      "features": "后宫争宠，步步为营，心机博弈",
+      "core_payoffs": "智斗群妃，获得圣宠，步步高升",
+      "protagonist_traits": "聪明、善于伪装、有谋略"
+    },
+    {
+      "name": "宅斗流",
+      "features": "大家族内斗，婆媳妯娌，管家争权",
+      "core_payoffs": "斗倒恶婆婆，掌握管家权，夫妻同心",
+      "protagonist_traits": "贤惠、善于持家、有智慧"
+    },
+    {
+      "name": "权谋流",
+      "features": "朝堂博弈，家国天下，智计对决",
+      "core_payoffs": "运筹帷幄，翻云覆雨，青史留名",
+      "protagonist_traits": "有谋略、善于布局、有远见"
+    },
+    {
+      "name": "甜宠流",
+      "features": "甜蜜为主，权谋为辅，糖分爆表",
+      "core_payoffs": "男主专宠，众人羡慕，甜蜜日常",
+      "protagonist_traits": "可爱、善良、有人格魅力"
+    }
+  ],
+  "worldview": {
+    "description": "古代宫廷或大家族世界，权力与情感交织",
+    "story_frameworks": {
+      "gongdou": [
+        "入宫",
+        "站稳",
+        "争宠",
+        "危机",
+        "登顶/退出"
+      ],
+      "zhaidou": [
+        "嫁入",
+        "立足",
+        "掌家",
+        "危机",
+        "当家"
+      ],
+      "quanmou": [
+        "卷入",
+        "站队",
+        "博弈",
+        "决战",
+        "新局"
+      ]
+    },
+    "era_templates": [
+      {
+        "type": "盛世",
+        "features": "国力强盛，文化繁荣",
+        "fit_for": [
+          "宫斗",
+          "甜宠"
+        ],
+        "reference": [
+          "唐朝盛世",
+          "清朝康乾"
+        ]
+      },
+      {
+        "type": "乱世",
+        "features": "战争频繁，权力更迭",
+        "fit_for": [
+          "权谋",
+          "家国"
+        ],
+        "reference": [
+          "五代十国",
+          "南北朝"
+        ]
+      },
+      {
+        "type": "末世",
+        "features": "王朝衰落，内忧外患",
+        "fit_for": [
+          "悲剧",
+          "重生"
+        ],
+        "reference": [
+          "明末",
+          "清末"
+        ]
+      }
+    ]
+  },
+  "power_system": {
+    "description": "权力与位分体系",
+    "power_ranks": [
+      "皇后",
+      "贵妃",
+      "妃",
+      "嫔",
+      "贵人",
+      "常在",
+      "答应"
+    ],
+    "power_rules": [
+      "母凭子贵",
+      "家族势力",
+      "圣宠",
+      "智慧谋略"
+    ]
+  },
+  "outline_structure": {
+    "description": "100万字标准大纲",
+    "volumes": [
+      {
+        "name": "初入深宫/大宅",
+        "chapters": "1-80",
+        "focus": "入宫/出嫁的契机，第一次危机化解"
+      },
+      {
+        "name": "步步为营",
+        "chapters": "81-180",
+        "focus": "拉拢盟友，应对敌人，获得阶段性胜利"
+      },
+      {
+        "name": "风云变幻",
+        "chapters": "181-300",
+        "focus": "更高层次的博弈，跌入谷底，关键助力出现"
+      },
+      {
+        "name": "绝地反击",
+        "chapters": "301-380",
+        "focus": "收集证据，联合盟友，真相揭露，仇人伏法"
+      },
+      {
+        "name": "圆满结局",
+        "chapters": "381-420",
+        "focus": "新格局建立，情感圆满"
+      }
+    ]
+  },
+  "story_rules": [
+    "争宠要有智慧，不能靠运气",
+    "陷害要有逻辑，翻盘要有证据",
+    "情感发展要循序渐进",
+    "古风语言要符合时代",
+    "权谋要有格局",
+    "配角要有独立人格",
+    "结局要有铺垫",
+    "代价要兑现"
+  ],
+  "plot_templates": {
+    "meeting_scenes": [
+      "救命之恩",
+      "冲撞冒犯",
+      "惊鸿一瞥",
+      "青梅竹马",
+      "替嫁/冒名"
+    ],
+    "competition_scenes": [
+      "才艺惊艳",
+      "智解困局",
+      "救驾有功",
+      "以退为进",
+      "借力打力"
+    ],
+    "frame_and_counter": {
+      "framing_methods": [
+        "栽赃",
+        "诬告",
+        "下毒",
+        "挑拨"
+      ],
+      "counter_methods": [
+        "证据",
+        "盟友",
+        "计谋",
+        "贵人"
+      ]
+    }
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "智慧谋略",
+      "预知能力",
+      "特殊才艺",
+      "身份背景"
+    ],
+    "fit_requirements": [
+      "要符合古言世界观",
+      "要有身份限制",
+      "要能制造智斗爽点",
+      "升级路径要符合古代规则"
+    ]
+  },
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "小宫女",
+      "新嫁娘",
+      "落魄贵女",
+      "重生者"
+    ],
+    "villain_types": [
+      "皇后/宠妃",
+      "恶婆婆",
+      "权臣",
+      "情敌"
+    ],
+    "relationship_patterns": [
+      "帝后情深",
+      "夫妻同心",
+      "红颜知己",
+      "亦敌亦友"
+    ]
+  }
+}

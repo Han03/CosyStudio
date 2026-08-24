@@ -1,0 +1,271 @@
+{
+  "title": "女频悬疑题材模板",
+  "canonical_genre": "悬疑",
+  "core_selling_points": "逻辑推理 + 人性情感 + 关系反转。在亲密关系的迷雾中，用细腻的观察揭开真相。",
+  "creative_constraints": [
+    "推荐约束包：Pack F13",
+    "通用叠加：Pack U02"
+  ],
+  "subgenres": [
+    {
+      "name": "情感悬疑流",
+      "features": "以情感关系为核心的悬疑",
+      "core_payoffs": "关系真相、信任崩塌、情感反转",
+      "protagonist_traits": "敏感细腻、善于观察、情感丰富"
+    },
+    {
+      "name": "家庭谜案流",
+      "features": "家庭内部的秘密与谎言",
+      "core_payoffs": "家族秘密、身世之谜、亲情反转",
+      "protagonist_traits": "重视亲情、善于挖掘、有耐心"
+    },
+    {
+      "name": "职场悬疑流",
+      "features": "职场背景下的阴谋与真相",
+      "core_payoffs": "职场阴谋、真相揭露、逆袭复仇",
+      "protagonist_traits": "职业素养高、观察力强、有韧性"
+    },
+    {
+      "name": "复仇推理流",
+      "features": "带着目的接近，揭开过去真相",
+      "core_payoffs": "复仇成功、真相大白、正义伸张",
+      "protagonist_traits": "目标明确、意志坚定、善于隐忍"
+    }
+  ],
+  "worldview": {
+    "description": "充满秘密与谎言的关系世界",
+    "relationship_types": [
+      {
+        "relation": "夫妻",
+        "features": "最亲密",
+        "suspense": "信任危机"
+      },
+      {
+        "relation": "亲子",
+        "features": "血缘羁绊",
+        "suspense": "身世秘密"
+      },
+      {
+        "relation": "闺蜜",
+        "features": "情感依赖",
+        "suspense": "背叛真相"
+      },
+      {
+        "relation": "婆媳",
+        "features": "天然对立",
+        "suspense": "家庭阴谋"
+      },
+      {
+        "relation": "同事",
+        "features": "利益关系",
+        "suspense": "职场陷害"
+      }
+    ],
+    "female_dilemmas": [
+      {
+        "dilemma": "婚姻困境",
+        "manifestation": "丈夫出轨/家暴",
+        "treatment": "消失/复仇"
+      },
+      {
+        "dilemma": "职场困境",
+        "manifestation": "性骚扰/打压",
+        "treatment": "收集证据"
+      },
+      {
+        "dilemma": "家庭困境",
+        "manifestation": "原生家庭伤害",
+        "treatment": "揭开真相"
+      },
+      {
+        "dilemma": "身份困境",
+        "manifestation": "身世之谜",
+        "treatment": "寻找答案"
+      }
+    ],
+    "clue_types": [
+      {
+        "type": "物证",
+        "features": "客观存在",
+        "acquisition": "搜索/发现"
+      },
+      {
+        "type": "人证",
+        "features": "主观陈述",
+        "acquisition": "对话/观察"
+      },
+      {
+        "type": "情感线索",
+        "features": "关系变化",
+        "acquisition": "细腻感知"
+      },
+      {
+        "type": "记忆碎片",
+        "features": "过去真相",
+        "acquisition": "回忆/触发"
+      }
+    ]
+  },
+  "power_system": {
+    "description": "推理与情感感知能力",
+    "mystery_types": [
+      {
+        "type": "身份之谜",
+        "core_question": "他/她是谁",
+        "reveal": "层层剥离"
+      },
+      {
+        "type": "动机之谜",
+        "core_question": "为什么这样做",
+        "reveal": "情感揭示"
+      },
+      {
+        "type": "关系之谜",
+        "core_question": "真实关系是什么",
+        "reveal": "反转揭露"
+      },
+      {
+        "type": "过去之谜",
+        "core_question": "发生过什么",
+        "reveal": "回溯真相"
+      }
+    ],
+    "clue_layering": [
+      {
+        "layer": "表象",
+        "content": [
+          "表面和谐的关系",
+          "看似正常的日常",
+          "微小的违和感"
+        ]
+      },
+      {
+        "layer": "疑点",
+        "content": [
+          "不合理的细节",
+          "矛盾的陈述",
+          "隐藏的情绪"
+        ]
+      },
+      {
+        "layer": "真相",
+        "content": [
+          "关系的真实面目",
+          "隐藏的过去",
+          "真正的动机"
+        ]
+      }
+    ],
+    "twist_design": [
+      {
+        "type": "身份反转",
+        "effect": "震惊",
+        "requirement": "伏笔充分"
+      },
+      {
+        "type": "关系反转",
+        "effect": "心痛",
+        "requirement": "情感铺垫"
+      },
+      {
+        "type": "动机反转",
+        "effect": "理解",
+        "requirement": "背景交代"
+      },
+      {
+        "type": "结局反转",
+        "effect": "意外",
+        "requirement": "逻辑自洽"
+      }
+    ]
+  },
+  "outline_structure": {
+    "description": "80万字标准大纲",
+    "volumes": [
+      {
+        "name": "疑云",
+        "chapters": "1-50",
+        "focus": "发现异常，产生怀疑，第一个重大发现"
+      },
+      {
+        "name": "追查",
+        "chapters": "51-120",
+        "focus": "收集线索，接近真相，发现关键证据"
+      },
+      {
+        "name": "危机",
+        "chapters": "121-200",
+        "focus": "真相即将揭露，危机四伏，身份/关系反转"
+      },
+      {
+        "name": "真相",
+        "chapters": "201-280",
+        "focus": "真相大白，正义伸张，最终对决"
+      },
+      {
+        "name": "新生",
+        "chapters": "281-350",
+        "focus": "走出阴影，开始新生活"
+      }
+    ]
+  },
+  "story_rules": [
+    "情感推理双线并进",
+    "线索公平可回溯",
+    "反转有铺垫",
+    "女主有成长有智慧",
+    "真相揭露要有伏笔，逻辑自洽",
+    "关系反转情感铺垫要充分",
+    "复仇要有底线",
+    "成长要有过程"
+  ],
+  "character_guidelines": {
+    "protagonist_archetypes": [
+      "细腻观察型",
+      "理性分析型",
+      "隐忍复仇型",
+      "成长蜕变型"
+    ],
+    "key_supporting": [
+      {
+        "role": "丈夫/男友",
+        "function": "情感核心",
+        "potential_twist": "可能是凶手"
+      },
+      {
+        "role": "闺蜜",
+        "function": "情感支持",
+        "potential_twist": "可能是内鬼"
+      },
+      {
+        "role": "家人",
+        "function": "亲情羁绊",
+        "potential_twist": "可能有秘密"
+      },
+      {
+        "role": "陌生人",
+        "function": "提供线索",
+        "potential_twist": "可能是关键"
+      }
+    ],
+    "villain_types": [
+      "亲密敌人",
+      "过去阴影",
+      "系统性恶"
+    ]
+  },
+  "golden_finger_guidelines": {
+    "types": [
+      "观察力",
+      "推理能力",
+      "共情能力",
+      "特殊感知"
+    ],
+    "fit_requirements": [
+      "要符合女频悬疑世界观",
+      "要有情感深度",
+      "要能制造推理爽点",
+      "升级路径要与成长同步"
+    ]
+  }
+}
