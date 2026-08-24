@@ -1,126 +1,222 @@
 # CosyChat
 
-> 一站式本地 AI 创作与对话平台 —— 集成文本对话、语音合成、文生图、网文创作、电子书管理等能力，所有模型均可本地部署运行。
+> 一站式本地 AI 网文创作与有声书生成平台 —— 从大纲构建到章节写作、从语音合成到整章配音，全流程本地化运行。
 
-![version](https://img.shields.io/badge/version-4.34.3-blue)
-![python](https://img.shields.io/badge/python-3.13%2B-green)
+![version](https://img.shields.io/badge/version-1.0-blue)
+![python](https://img.shields.io/badge/python-3.10%2B-green)
 ![license](https://img.shields.io/badge/license-MIT-orange)
 
 ---
 
-## 功能概览
+## 核心功能
+
+### 网文写作流水线
+
+完整的 AI 辅助网文创作系统，覆盖从项目初始化到章节成稿的全流程。采用多执行器流水线架构，每个执行器负责一个独立步骤，通过编排器统一调度，支持中断恢复和 WebSocket 实时进度推送。
+
+#### 写作流水线（核心创作路径）
+
+```
+上下文构建 → 剧情生成 → 剧情审查 → 草稿生成 → 草稿审查 → 草稿润色 → 事实记录 → 伏笔/爽点提取
+```
+
+| 步骤 | 执行器 | 说明 |
+|------|--------|------|
+| 上下文构建 | ContextBuilder | 组装核心设定、角色卡片、金手指、力量体系、世界观、卷章规划、前文回顾、RAG 语义检索结果、反套路规则 |
+| 剧情生成 | ChapterPlotGenerator | 基于章节规划和上下文，生成场景级详细剧情列表 |
+| 剧情审查 | ChapterPlotReviewer | 多维度质量审查（规划覆盖/因果逻辑/冲突张力），低于 7 分自动触发修正，最多 2 轮 |
+| 草稿生成 | DraftGenerator | 基于剧情列表创作 2000-3000 字正文草稿 |
+| 草稿审查 | DraftReviewer | 5 维度审查（爽点呈现/设定一致/节奏控制/叙事连贯/追读力），最多 3 次修改迭代 |
+| 草稿润色 | DraftPolisher | 将审查后的草稿润色为最终小说文本 |
+| 事实记录 | FactRecorder | 从成稿中提取关键事实（新角色/关系变化/重要事件/伏笔/世界观补充） |
+| 伏笔/爽点提取 | ForeshadowCoolPointExtractor | 提取伏笔（核心/支线/装饰三级）和爽点（15 种类型：装逼打脸/越级反杀/逆袭等） |
+
+#### 项目初始化（7 步引导式创建）
+
+分步交互式创建项目，每步均支持 AI 辅助生成：
+
+1. **基础信息** — 书名、题材、目标字数
+2. **主角设定** — 性格、背景、说话风格
+3. **金手指设定** — 类型、风格、代价
+4. **世界观设定** — 地理、社会、资源、信仰
+5. **创意约束包** — AI 生成 3 个反套路规则方案供选择
+6. **确认执行** — 将所有设定写入数据库
+
+#### 卷纲规划
+
+完整的卷纲规划流程：补齐设定基线 → 选择目标卷 → 生成节拍表 → 生成时间线 → 生成骨架 → 批量生成章纲 → 验证保存。
+
+#### 质量保障
+
+- **剧情审查**：规划覆盖率、因果逻辑、冲突张力，2 轮自动修正
+- **草稿审查**：爽点呈现、设定一致性、节奏控制、叙事连贯、追读力，3 轮迭代修改
+- **独立审查**：8 维度全面质量审查（爽点/打脸/设定/节奏/OOC/连贯/追读/对话/描写）
+- **RAG 语义检索**：基于 Qwen3-Embedding 的向量存储，写作时自动检索相关前文，保持上下文连贯
+- **伏笔追踪**：自动提取并管理伏笔（open_loops），支持 urgency 状态更新
+- **爽点追踪**：15 种爽点类型自动识别与记录
+
+#### 辅助工具
+
+| 工具 | 说明 |
+|------|------|
+| 项目体检 | 检查项目数据完整性（表结构/角色卡/卷纲是否为空等） |
+| 状态查询 | 根据自然语言查询项目设定信息 |
+| 项目学习 | 从成功案例中提取可复用的写作模式 |
+
+### 有声书生成
+
+基于 CosyVoice3 的语音合成系统，支持从单句配音到整章有声书生成的完整链路。
+
+#### 整章配音
+
+```
+章节台词列表 → 逐句语音合成 → 音频拼接 → 完整 WAV + SRT 字幕 → 打包下载
+```
+
+- **整章合成**：自动遍历章节所有台词，逐句合成后拼接为完整音频文件，同时生成 SRT 字幕文稿
+- **整章导出**：合成并打包为 ZIP（audio.wav + subtitles.srt）直接下载
+- **配音历史**：保存每次合成的完整记录，支持回听和重新下载
+
+#### 单句配音
+
+- **流式合成**：NDJSON 流式输出 PCM 音频，边合成边播放
+- **台词配音**：根据台词 ID 自动获取文本、角色、语气参数，一键合成
+- **参数控制**：支持音量调节、变调、淡入淡出、区间裁剪
+
+#### 音频缓存
+
+相同文本 + 角色 + 语气的合成结果自动缓存，重复台词无需重新合成，大幅提升整章配音效率。
+
+---
+
+## 其他功能
 
 | 模块 | 说明 |
 |------|------|
-| **智能对话** | 基于 Qwen 等大模型的流式文本对话，支持多轮上下文 |
-| **AI 智能体** | 创建、编辑、管理个性化智能体，自定义人设与行为 |
-| **语音合成 (TTS)** | 基于 CosyVoice3 的本地语音合成，支持多种音色 |
-| **文生图** | 基于 DreamLite 的本地图像生成，支持自定义分辨率与步数 |
-| **语音识别 (ASR)** | 基于 Whisper 的语音转文字，支持繁简转换 |
-| **网文创作** | 完整的网文创作流水线：深度初始化 → 卷章规划 → AI 写作 → 审查润色 |
-| **电子书管理** | 上传/解析电子书，自动章节拆分，支持在线阅读 |
-| **模型管理** | 统一管理本地模型与云端 API（阿里云、智谱、火山引擎等），按需加载/卸载 |
-| **系统监控** | 实时 CPU / 内存 / 磁盘 / GPU 资源监控，WebSocket 日志推送 |
-
-## 技术栈
-
-### 后端
-- **Web 框架**: FastAPI + Uvicorn
-- **AI 模型**: PyTorch, Transformers, CosyVoice3, DreamLite, Qwen3.5, Qwen3-Embedding
-- **数据库**: SQLite (WAL 模式)
-- **模型调度**: ModelScope 模型下载与管理
-- **桌面 GUI**: Kivy (可选，服务端日志界面)
-
-### 前端
-- **UI 框架**: Bootstrap 5 + Font Awesome
-- **通信**: WebSocket + Fetch API
-- **页面**: 单页应用（主页 / 剧本编辑器 / 电子书阅读器）
+| **智能对话** | 基于 Qwen 的流式文本对话，支持多轮上下文 |
+| **AI 智能体** | 创建个性化智能体，自定义人设、音色与行为参数 |
+| **语音通话** | 语音输入 → ASR 转写 → LLM 回复 → TTS 语音输出全链路 |
+| **文生图** | 基于 DreamLite 的本地图像生成 |
+| **语音识别** | 基于 Whisper 的语音转文字，支持繁简转换 |
+| **电子书管理** | TXT/EPUB 上传、自动章节拆分、在线阅读 |
+| **剧本编辑器** | 网文创作核心工作台，集成初始化/卷纲/创作/审查全流程 |
+| **模型管理** | 统一管理本地模型与云端 API，按需加载/卸载 |
+| **系统监控** | 实时 CPU/内存/磁盘/GPU 资源监控，WebSocket 日志推送 |
 
 ### 支持的 AI 平台
 
-| 平台 | 能力 | 状态 |
-|------|------|------|
-| 本地模型 | 文本 / TTS / 文生图 / Embedding | ✅ |
-| 阿里云 (DashScope) | 文本 / TTS / 文生图 | ✅ |
-| 智谱 AI | 文本 | ✅ |
-| 火山引擎 (豆包) | 文本 | ✅ |
-| 百度文心 | 文本 | 可选 |
-| DeepSeek | 文本 | 可选 |
-| Google Gemini | 文本 | 可选 |
+| 平台 | 能力 |
+|------|------|
+| 本地模型 | 文本 / TTS / 文生图 / Embedding |
+| 阿里云 (DashScope) | 文本 / TTS / 文生图 |
+| 智谱 AI | 文本 |
+| 火山引擎 (豆包) | 文本 |
+| OpenRouter | 文本 |
+| DeepSeek / Google Gemini / 百度文心 | 文本（可选） |
+
+---
+
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| **后端框架** | FastAPI + Uvicorn，SQLite (WAL) 数据持久化 |
+| **AI 推理** | PyTorch 2.10 + CUDA，Transformers 5.13，CosyVoice3，DreamLite，Qwen3.5 |
+| **语音合成** | CosyVoice3-0.5B，支持多音色、流式输出 |
+| **语音识别** | OpenAI Whisper |
+| **图像生成** | DreamLite-mobile-4bit，基于 Diffusers |
+| **文本嵌入** | Qwen3-Embedding-0.6B，用于 RAG 语义检索 |
+| **前端** | 原生 HTML/JS，Bootstrap 5，WebSocket 实时通信 |
+| **桌面 GUI** | Kivy 2.3（可选，服务端日志界面） |
+
+---
 
 ## 项目结构
 
 ```
 CosyChat/
-├── backend/                 # 后端服务
-│   ├── api/                 #   REST API 路由层
-│   ├── agents/              #   智能体管理与数据
-│   ├── core/                #   核心模块（模型执行、配置管理、全局管理）
-│   ├── models/              #   模型封装（CosyVoice、DreamLite、Qwen 等）
-│   ├── repositories/        #   数据访问层（SQLite）
-│   ├── services/            #   业务逻辑层
-│   │   └── writing_pipeline/  # 网文写作流水线
-│   ├── utils/               #   工具类（日志、FFmpeg、代理等）
-│   ├── widgets/             #   Kivy GUI 组件
-│   ├── main.py              #   FastAPI 应用入口
-│   ├── start_server.py      #   服务启动脚本（含 Kivy GUI）
-│   └── kivy_app.py          #   Kivy 桌面应用
-├── frontend/                # 前端静态资源
-│   ├── index.html           #   主页面
-│   ├── script_editor.html   #   剧本编辑器
-│   ├── ebook_reader.html    #   电子书阅读器
-│   └── assets/              #   CSS / JS / 字体
-├── config/                  # 系统配置
-│   └── system_config.json   #   模型路径、平台密钥、能力配置
-├── pretrained_models/       # 本地预训练模型
-│   ├── cosyvoice/           #   CosyVoice3 语音合成
-│   ├── dreamlite/           #   DreamLite 文生图
-│   ├── qwen/                #   Qwen 文本生成
-│   └── qwen_embedding/      #   Qwen 文本向量化
-├── media/                   # 媒体资源（音频/图片/文档/视频）
-├── docs/                    # 项目文档
-└── version.json             # 版本号
+├── backend/                     # 后端服务
+│   ├── api/                     #   REST API 路由
+│   ├── agents/                  #   智能体管理
+│   ├── core/                    #   核心模块（模型调度、配置、路径）
+│   ├── models/                  #   模型封装
+│   │   ├── cosyvoice/           #     CosyVoice3 TTS 引擎
+│   │   ├── cosyvoice_model.py   #     TTS 模型接口
+│   │   ├── dreamlite_model.py   #     文生图模型接口
+│   │   ├── qwen_model.py        #     LLM 模型接口
+│   │   └── qwen_embedding_model.py  # Embedding 模型接口
+│   ├── repositories/            #   数据访问层（SQLite）
+│   ├── services/                #   业务逻辑层
+│   ├── webnovel/                #   网文创作模块
+│   │   ├── api/                 #     创作流程 API 路由
+│   │   ├── pipeline/            #     写作流水线执行器
+│   │   │   └── executors/       #       各步骤执行器
+│   │   ├── repositories/        #     网文专用数据访问层
+│   │   ├── prompts/             #     LLM Prompt 模板
+│   │   └── services/            #     网文业务服务
+│   ├── utils/                   #   工具类
+│   └── widgets/                 #   Kivy GUI 组件
+├── frontend/                    # 前端静态资源
+│   ├── index.html               #   主页（对话/模型管理/监控）
+│   ├── script_editor.html       #   剧本编辑器（创作工作台）
+│   ├── ebook_reader.html        #   电子书阅读器
+│   └── assets/                  #   CSS / JS / 字体
+├── config/                      # 系统配置
+├── pretrained_models/           # 本地预训练模型
+├── media/                       # 媒体资源
+├── bin/                         # 第三方二进制工具（ffmpeg/xray）
+└── data/                        # 运行时数据（缓存/日志/输出）
 ```
+
+---
 
 ## 架构设计
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   前端 (HTML/JS)                  │
-│   index.html │ script_editor.html │ ebook_reader  │
-└──────────────────────┬──────────────────────────┘
-                       │ HTTP / WebSocket
-┌──────────────────────▼──────────────────────────┐
-│                API 层 (FastAPI)                   │
-│  system │ agents │ text_chat │ audio │ books ...  │
-└──────────────────────┬──────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────┐
-│              Service 层 (业务逻辑)                │
-│  chat │ audio │ ebook_library │ webnovel_service  │
-│  script │ media_manager │ vector_store            │
-└──────────────────────┬──────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────┐
-│           Core 层 (模型统一调度)                   │
-│         ModelExecutor ← 全局管理器                │
-│  QwenModel │ CosyVoiceModel │ DreamLiteModel     │
-│  QwenEmbeddingModel                             │
-└──────────────────────┬──────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────┐
-│            Repository 层 (数据持久化)              │
-│              SQLite (cosychat.db)                 │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                    前端 (HTML/JS)                      │
+│   index.html  │  script_editor.html  │  ebook_reader  │
+└─────────────────────────┬────────────────────────────┘
+                          │ HTTP / WebSocket
+┌─────────────────────────▼────────────────────────────┐
+│                  API 层 (FastAPI)                      │
+│  webnovel/api │ audio │ books │ agents │ text_chat ... │
+└─────────────────────────┬────────────────────────────┘
+                          │
+┌─────────────────────────▼────────────────────────────┐
+│               Service 层 (业务逻辑)                    │
+│  webnovel_service │ audio_service │ script_service     │
+│  chat │ ebook_library │ media_manager │ vector_store   │
+└─────────────────────────┬────────────────────────────┘
+                          │
+┌─────────────────────────▼────────────────────────────┐
+│         Pipeline 层 (写作流水线编排)                    │
+│  PipelineOrchestrator → [Executor1 → Executor2 → ...] │
+│  进度广播 (WebSocket) │ 中断恢复 │ 多工作流模式         │
+└─────────────────────────┬────────────────────────────┘
+                          │
+┌─────────────────────────▼────────────────────────────┐
+│            Core 层 (模型统一调度)                       │
+│  ModelExecutor ← ConfigManager ← ModelManager         │
+│  QwenModel │ CosyVoiceModel │ DreamLiteModel          │
+│  QwenEmbeddingModel                                   │
+└─────────────────────────┬────────────────────────────┘
+                          │
+┌─────────────────────────▼────────────────────────────┐
+│             Repository 层 (数据持久化)                  │
+│  cosychat.db │ vector_store.db │ llm_logs.db          │
+└──────────────────────────────────────────────────────┘
 ```
+
+---
 
 ## 快速开始
 
 ### 环境要求
 
-- Python >= 3.13
-- CUDA 兼容的 GPU（推荐，用于本地模型推理）
-- FFmpeg（用于音频处理）
+- Python >= 3.10
+- NVIDIA GPU + CUDA（本地模型推理需要）
+- conda 环境（推荐）
 
 ### 安装
 
@@ -129,9 +225,9 @@ CosyChat/
 git clone <repo-url>
 cd CosyChat
 
-# 创建虚拟环境
-python -m venv .venv
-.venv\Scripts\activate     # Windows
+# 创建 conda 环境
+conda create -n cosy_chat python=3.10
+conda activate cosy_chat
 
 # 安装依赖
 pip install -r backend/requirements.txt
@@ -174,29 +270,53 @@ cd backend
 python start_server.py
 ```
 
-服务默认运行在 `http://localhost:8000`，可在 `config/system_config.json` 的 `system.port` 修改端口。
+服务默认运行在 `http://localhost:8080`，可在 `config/system_config.json` 的 `system.port` 修改端口。
+
+### 使用流程
+
+1. 打开浏览器访问 `http://localhost:8080/script_editor.html` 进入剧本编辑器
+2. 创建新项目，按 7 步引导完成初始化（每步可 AI 辅助生成）
+3. 进行卷纲规划，生成章节大纲
+4. 选择写作模式，开始 AI 创作，实时查看进度
+5. 创作完成后，使用整章配音功能生成有声书
+
+---
 
 ## 主要 API
 
+### 网文创作
+
 | 端点 | 说明 |
 |------|------|
-| `GET /api/system/status` | 系统状态与资源监控 |
+| `POST /webnovel/init` | 深度初始化项目 |
+| `POST /webnovel/plan` | 卷纲规划 |
+| `POST /webnovel/write` | 章节写作（支持 write/write_fast/write_minimal） |
+| `POST /webnovel/review` | 质量审查 |
+| `POST /chapters/continue` | 创作章节（核心入口） |
+| `GET /webnovel/dashboard` | 项目面板数据 |
+| `GET /webnovel/doctor` | 项目体检 |
+
+### 有声书
+
+| 端点 | 说明 |
+|------|------|
+| `POST /api/audio/synthesize` | 单句流式语音合成 |
+| `POST /api/audio/synthesize-chapter` | 整章配音合成 |
+| `POST /api/audio/export-chapter` | 整章导出 ZIP（WAV + SRT） |
+| `GET /api/audio/chapter-history` | 配音历史列表 |
+
+### 其他
+
+| 端点 | 说明 |
+|------|------|
 | `POST /api/chat/stream` | 流式文本对话 |
-| `POST /api/audio/synthesize` | 语音合成 |
 | `POST /api/image/generate` | 文生图 |
 | `POST /api/asr/transcribe` | 语音识别 |
 | `POST /api/books/library/upload` | 电子书上传入库 |
-| `GET /api/books/library` | 电子书列表 |
 | `GET/POST /api/agents` | 智能体管理 |
-| `GET/POST /api/books/scripts` | 网文写作相关接口 |
 | `WS /ws` | WebSocket 实时日志推送 |
 
-完整 API 调用链详见 [docs/api_call_chains.md](docs/api_call_chains.md)。
-
-## 文档
-
-- [API 调用链文档](docs/api_call_chains.md) — 前端页面与后端 API 的调用关系
-- [任务书](TASK_BOOK.md) — 网文写作功能开发计划
+---
 
 ## 许可证
 
