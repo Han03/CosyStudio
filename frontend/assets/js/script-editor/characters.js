@@ -12,6 +12,8 @@ async function loadCharacters() {
                     agent_id: ch.agent_id || '',
                     speed: ch.speed || 1.0,
                     seed: ch.seed || 0,
+                    tts_capability_id: ch.tts_capability_id || '',
+                    cloud_extra_params: ch.cloud_extra_params || '{}',
                 };
             }
             renderCharacters();
@@ -187,61 +189,118 @@ function renderCharacterSettings() {
         el.innerHTML = '<div class="settings-empty"><i class="fas fa-hand-pointer"></i><p>点击上方角色头像进行设置</p></div>';
         return;
     }
-    const config = state.characterVoiceMap[state.selectedRole] || { agent_id: '', speed: 1.0, seed: 0 };
-    const agentOptions = state.agents.map(a =>
-        `<option value="${a.id}" ${a.id === config.agent_id ? 'selected' : ''}>${escapeHtml(a.name)}</option>`
-    ).join('');
+    const config = state.characterVoiceMap[state.selectedRole] || {
+        agent_id: '', speed: 1.0, seed: 0, tts_capability_id: '', cloud_extra_params: '{}'
+    };
 
-    const selectedAgent = state.agents.find(a => a.id === config.agent_id);
-    const voiceTones = (selectedAgent && selectedAgent.voice_tones) || [];
-    const tonesListHtml = voiceTones.length > 0
-        ? voiceTones.map((vt, idx) => `
-            <div class="tone-preview-item">
-                <div class="tone-info">
-                    <div class="tone-name">${escapeHtml(vt.tone)}</div>
-                    ${vt.prompt_text ? `<div class="tone-prompt">${escapeHtml(vt.prompt_text)}</div>` : ''}
+    // 构建模型能力下拉选项（包含所有能力，不再过滤本地）
+    const allCaps = state.ttsCapabilities || [];
+    const hasMatch = allCaps.some(c => c.id === config.tts_capability_id);
+    const capOptions = allCaps.map((cap, idx) => {
+        const platformLabel = cap.platform_code === 'local' ? '本地' : (cap.platform_code || '');
+        const label = `${platformLabel} / ${cap.model_code}`;
+        const selected = (hasMatch ? cap.id === config.tts_capability_id : idx === 0) ? 'selected' : '';
+        return `<option value="${cap.id}" ${selected}>${escapeHtml(label)}</option>`;
+    }).join('');
+
+    // 若当前无匹配，默认选中第一个
+    if (!hasMatch && allCaps.length > 0) {
+        config.tts_capability_id = allCaps[0].id;
+    }
+
+    const isCloud = config.tts_capability_id && state.ttsCapabilities.some(
+        c => c.id === config.tts_capability_id && c.platform_code !== 'local'
+    );
+
+    // 解析云端额外参数
+    let cloudParams = {};
+    try {
+        cloudParams = JSON.parse(config.cloud_extra_params || '{}');
+    } catch (e) { cloudParams = {}; }
+    const cloudExtraJson = JSON.stringify(cloudParams, null, 2);
+
+    // 本地模式：智能体 + 语气
+    let localSectionHtml = '';
+    if (!isCloud) {
+        const selectedAgent = state.agents.find(a => a.id === config.agent_id);
+        const voiceTones = (selectedAgent && selectedAgent.voice_tones) || [];
+        const tonesListHtml = voiceTones.length > 0
+            ? voiceTones.map((vt, idx) => `
+                <div class="tone-preview-item">
+                    <div class="tone-info">
+                        <div class="tone-name">${escapeHtml(vt.tone)}</div>
+                        ${vt.prompt_text ? `<div class="tone-prompt">${escapeHtml(vt.prompt_text)}</div>` : ''}
+                    </div>
+                    <button class="tone-play-btn" data-tone-idx="${idx}" onclick="previewStoredTone(${idx}, this)" title="试听语气">
+                        <i class="fas fa-play"></i>
+                    </button>
                 </div>
-                <button class="tone-play-btn" data-tone-idx="${idx}" onclick="previewStoredTone(${idx}, this)" title="试听语气">
-                    <i class="fas fa-play"></i>
+            `).join('')
+            : '<div class="tone-empty">该智能体暂无可用语气</div>';
+
+        localSectionHtml = `
+            <div class="setting-group">
+                <label><i class="fas fa-microphone"></i> 配音智能体</label>
+                <button type="button" class="picker-select-btn ${!config.agent_id ? 'empty' : ''}" style="width: 100%; justify-content: flex-start;"
+                        onclick="openAgentPickerForCharacter()">
+                    <i class="fas fa-user-circle"></i>
+                    <span>${selectedAgent ? escapeHtml(selectedAgent.name) : '-- 点击选择配音智能体 --'}</span>
+                    <i class="fas fa-chevron-down" style="margin-left: auto; font-size: 11px; opacity: 0.5;"></i>
                 </button>
+                ${selectedAgent ? `<small style="display: block; margin-top: 6px; color: var(--neu-text-muted); font-size: 12px;">${escapeHtml(selectedAgent.description || '暂无描述')}</small>` : ''}
             </div>
-        `).join('')
-        : '<div class="tone-empty">该智能体暂无可用语气</div>';
+            <div class="setting-group">
+                <label><i class="fas fa-music"></i> 语气样例（点击试听）</label>
+                <div class="tone-list" id="toneListContainer">${tonesListHtml}</div>
+            </div>
+        `;
+    }
+
+    // 云端模式：额外参数
+    let cloudSectionHtml = '';
+    if (isCloud) {
+        cloudSectionHtml = `
+            <div class="setting-group">
+                <label><i class="fas fa-cogs"></i> 额外参数 <span style="font-size:12px;color:#999;">(JSON 格式)</span></label>
+                <textarea id="cloudExtraParamsInput" rows="5"
+                          placeholder='{"voice": "zh-CN-XiaoxiaoNeural", "speed": 1.0}'
+                          onchange="updateCloudExtraParams()">${escapeHtml(cloudExtraJson === '{}' ? '' : cloudExtraJson)}</textarea>
+                <small style="display: block; margin-top: 4px; color: var(--neu-text-muted); font-size: 11px;">
+                    不同平台参数规范不同，请根据所选模型的文档填写，如 voice、speed 等
+                </small>
+            </div>
+        `;
+    }
+
+    // 模型能力下拉区域
+    let capabilitySectionHtml = '';
+    if (allCaps.length === 0) {
+        capabilitySectionHtml = `
+            <div class="setting-group">
+                <label><i class="fas fa-sliders-h"></i> 模型能力</label>
+                <div style="color: var(--neu-danger, #e53e3e); font-size: 13px; padding: 8px 0;">
+                    <i class="fas fa-exclamation-triangle"></i> 未配置任何模型能力，请先在设置中启用
+                </div>
+            </div>
+        `;
+    } else {
+        capabilitySectionHtml = `
+            <div class="setting-group">
+                <label><i class="fas fa-sliders-h"></i> 模型能力</label>
+                <select id="ttsCapabilitySelect" onchange="updateCharacterVoice('tts_capability_id', this.value)">
+                    ${capOptions}
+                </select>
+            </div>
+        `;
+    }
 
     el.innerHTML = `
-        <div class="setting-group">
-            <label><i class="fas fa-microphone"></i> 配音智能体</label>
-            <button type="button" class="picker-select-btn ${!config.agent_id ? 'empty' : ''}" style="width: 100%; justify-content: flex-start;"
-                    onclick="openAgentPickerForCharacter()">
-                <i class="fas fa-user-circle"></i>
-                <span>${selectedAgent ? escapeHtml(selectedAgent.name) : '-- 点击选择配音智能体 --'}</span>
-                <i class="fas fa-chevron-down" style="margin-left: auto; font-size: 11px; opacity: 0.5;"></i>
-            </button>
-            ${selectedAgent ? `<small style="display: block; margin-top: 6px; color: var(--neu-text-muted); font-size: 12px;">${escapeHtml(selectedAgent.description || '暂无描述')}</small>` : ''}
-        </div>
-        <div class="setting-group">
-            <label><i class="fas fa-music"></i> 语气样例（点击试听）</label>
-            <div class="tone-list" id="toneListContainer">${tonesListHtml}</div>
-        </div>
-        <div class="setting-group">
-            <label>语速</label>
-            <input type="range" id="voiceSpeedRange" min="0.5" max="2.0" step="0.1"
-                   value="${config.speed}" oninput="updateCharacterVoice('speed', parseFloat(this.value))">
-            <div class="range-label">
-                <span>0.5x</span>
-                <span id="speedValue">${config.speed.toFixed(1)}x</span>
-                <span>2.0x</span>
-            </div>
-        </div>
-        <div class="setting-group">
-            <label>随机种子 <span style="font-size:12px;color:#999;">(0表示随机)</span></label>
-            <input type="number" id="voiceSeedInput" min="0" max="999999"
-                   value="${config.seed}" onchange="updateCharacterVoice('seed', parseInt(this.value) || 0)"
-                   placeholder="0">
-        </div>
+        ${capabilitySectionHtml}
+        ${localSectionHtml}
+        ${cloudSectionHtml}
         <div class="setting-group" style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--neu-border);">
             <button type="button" class="btn btn-sm btn-outline-danger" style="width: 100%;"
-                    onclick="deleteCurrentCharacter()" title="删除该角色">
+                    onclick="deleteCurrentCharacter()" title="删除角色">
                 <i class="fas fa-trash-alt"></i> 删除角色
             </button>
         </div>
@@ -251,14 +310,36 @@ function renderCharacterSettings() {
 function updateCharacterVoice(key, value) {
     if (!state.selectedRole) return;
     if (!state.characterVoiceMap[state.selectedRole]) {
-        state.characterVoiceMap[state.selectedRole] = { agent_id: '', speed: 1.0, seed: 0 };
+        state.characterVoiceMap[state.selectedRole] = {
+            agent_id: '', speed: 1.0, seed: 0, tts_capability_id: '', cloud_extra_params: '{}'
+        };
     }
     state.characterVoiceMap[state.selectedRole][key] = value;
-    if (key === 'speed') {
-        document.getElementById('speedValue').textContent = value.toFixed(1) + 'x';
+    // 切换模式时清除另一模式的参数，确保音频匹配使用正确的配置
+    if (key === 'tts_capability_id') {
+        // 切换到云端能力时清除本地智能体；切换到本地能力时保留 agent_id
+        const isCloudCap = state.ttsCapabilities.some(c => c.id === value && c.platform_code !== 'local');
+        if (isCloudCap) {
+            state.characterVoiceMap[state.selectedRole].agent_id = '';
+        }
     } else if (key === 'agent_id') {
+        // 切换智能体不影响已选的模型能力
+    }
+    if (key === 'agent_id' || key === 'tts_capability_id') {
         stopTonePreview();
         renderCharacterSettings();
+        // 切换智能体/能力时，重置所有台词的音频调整参数（旧参数是为旧音频调的，对新音频不适用）
+        // 如果匹配到历史音频，matchAudioHistoryForLines 会从历史记录中恢复正确的参数
+        for (const line of state.currentLines) {
+            line.audio_path = '';  // 先清除，由 match 决定是否恢复
+            line.audio_volume = 1;
+            line.audio_pitch = 0;
+            line.fade_in = 0;
+            line.fade_out = 0;
+            line.audio_adjust_enabled = 0;
+            line.range_start = 0;
+            line.range_end = 0;
+        }
     }
     scheduleSaveCharacterConfig();
     
@@ -267,6 +348,26 @@ function updateCharacterVoice(key, value) {
             updateLineAudioEditorDisplay(line.id);
         });
     });
+}
+
+function updateCloudExtraParams() {
+    if (!state.selectedRole) return;
+    const config = state.characterVoiceMap[state.selectedRole];
+    if (!config) return;
+
+    const textareaInput = document.getElementById('cloudExtraParamsInput');
+    if (!textareaInput) return;
+
+    if (textareaInput.value.trim()) {
+        try {
+            JSON.parse(textareaInput.value);
+        } catch (e) {
+            // JSON 格式错误，不保存
+            return;
+        }
+    }
+    config.cloud_extra_params = textareaInput.value.trim() || '{}';
+    scheduleSaveCharacterConfig();
 }
 
 function scheduleSaveCharacterConfig() {
@@ -285,9 +386,11 @@ async function saveCharacterConfig() {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                agent_id: config.agent_id,
+                agent_id: config.agent_id || '',
                 speed: config.speed,
                 seed: config.seed,
+                tts_capability_id: config.tts_capability_id || '',
+                cloud_extra_params: config.cloud_extra_params || '{}',
             }),
             silent: true
         });

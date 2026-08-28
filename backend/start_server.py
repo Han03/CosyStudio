@@ -6,6 +6,8 @@ import socket
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from core.paths import APP_NAME
+
 HOST = "0.0.0.0"
 
 
@@ -36,7 +38,7 @@ def start_uvicorn():
     local_ip = get_local_ip()
     
     print("=" * 60)
-    print("CosyChat 服务启动信息")
+    print(f"{APP_NAME} 服务启动信息")
     print("=" * 60)
     print(f"服务端口: {port}")
     print(f"本地访问: http://localhost:{port}")

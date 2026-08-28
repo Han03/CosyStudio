@@ -1773,6 +1773,40 @@
     opacity: 0.4;
 }
 
+/* ========== 状态查询分类分组 ========== */
+.query-category-group {
+    margin-bottom: 16px;
+}
+
+.query-category-group:last-child {
+    margin-bottom: 0;
+}
+
+.query-category-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--neu-text);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed rgba(108, 92, 231, 0.25);
+}
+
+.query-category-title i {
+    color: var(--neu-accent);
+    font-size: 12px;
+}
+
+.query-category-group .rag-result-card {
+    margin-bottom: 8px;
+}
+
+.query-category-group .rag-result-card:last-child {
+    margin-bottom: 0;
+}
+
 /* ========== 审查结果模态框 ========== */
 .review-modal .modal-dialog {
     max-width: 700px;

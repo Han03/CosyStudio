@@ -1246,39 +1246,25 @@
 
     <!-- 状态查询模态框 -->
     <div id="queryModal" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog" style="max-width: 600px;">
+        <div class="modal-dialog" style="max-width: 650px;">
             <div class="modal-header">
-                <h3><i class="fas fa-question-circle"></i> 状态查询</h3>
+                <h3><i class="fas fa-search"></i> 状态查询</h3>
                 <button class="modal-close" onclick="closeQueryModal()">×</button>
             </div>
             <div class="modal-body">
-                <div class="continue-section">
-                    <div class="continue-section-title">
-                        <i class="fas fa-search"></i> 查询类型
-                    </div>
-                    <div class="continue-options" style="margin-bottom: 12px;">
-                        <button class="continue-option-btn active" onclick="setQueryType(this, 'character')">角色状态</button>
-                        <button class="continue-option-btn" onclick="setQueryType(this, 'power')">能力体系</button>
-                        <button class="continue-option-btn" onclick="setQueryType(this, 'timeline')">时间线</button>
-                        <button class="continue-option-btn" onclick="setQueryType(this, 'plot')">剧情进展</button>
-                        <button class="continue-option-btn" onclick="setQueryType(this, 'custom')">自定义查询</button>
-                    </div>
-                    <textarea id="queryQuestion" class="form-control" rows="3" placeholder="输入查询问题，例如：主角当前的修为境界是多少？"></textarea>
+                <div class="rag-search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="queryQuestion" placeholder="输入问题，例如：主角当前的修为境界是多少？" onkeydown="if(event.key==='Enter')submitQuery()">
                 </div>
-
-                <div class="continue-progress-container" id="queryProgressContainer" style="display:none;">
-                    <div class="continue-progress-bar">
-                        <div class="continue-progress-fill" id="queryProgressFill" style="width: 0%"></div>
-                    </div>
-                    <div class="continue-progress-info">
-                        <span id="queryProgressText">0%</span>
-                        <span id="queryProgressMessage">查询中...</span>
-                    </div>
+                <div id="queryLoading" style="display:none; text-align:center; padding:20px; color:var(--neu-text-muted);">
+                    <i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>检索中...
                 </div>
-
-                <div id="queryResult" style="display:none; margin-top: 12px; padding: 12px; background: var(--neu-bg-secondary); border-radius: 8px;">
-                    <div style="font-weight: 600; margin-bottom: 8px;">查询结果</div>
+                <div id="queryResult" style="display:none; margin-top:12px;">
                     <div id="queryResultContent"></div>
+                </div>
+                <div id="queryEmpty" style="display:none; text-align:center; padding:30px; color:var(--neu-text-muted);">
+                    <i class="fas fa-inbox" style="font-size:24px; margin-bottom:8px; display:block;"></i>
+                    <span>未找到相关内容</span>
                 </div>
             </div>
             <div class="modal-footer">

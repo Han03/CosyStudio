@@ -13,6 +13,7 @@
 """
 
 import os
+import re
 import json
 from typing import Dict, Any, Optional
 from ..base_executor import BaseExecutor, ExecutorResult
@@ -713,6 +714,11 @@ class PlanExecutor(BaseExecutor):
         )
         return {"chapter_plans": all_plans}
 
+    # 匹配 "第X章" / "第X章：" / "第X章 " 等前缀（支持中文数字和阿拉伯数字）
+    _CHAPTER_TITLE_PREFIX_RE = re.compile(
+        r'^第\s*[一二三四五六七八九十百千万零〇两\d]+\s*[章回节]\s*[：:．\s]?\s*'
+    )
+
     def _save_chapter_plans(self, vo_id: int, chapter_data: Dict) -> int:
         """保存章纲到数据库。"""
         chapter_plans = chapter_data.get("chapter_plans", [])
@@ -722,10 +728,14 @@ class PlanExecutor(BaseExecutor):
             if not isinstance(plan, dict):
                 continue
 
+            # 清除 LLM 可能在标题中生成的 "第X章" 前缀，避免展示时拼接出两个章节号
+            raw_title = plan.get("chapter_title", "") or ""
+            clean_title = self._CHAPTER_TITLE_PREFIX_RE.sub('', raw_title).strip()
+
             add_chapter_plan(
                 vo_id,
                 chapter_index=plan.get("chapter_index", 0),
-                chapter_title=plan.get("chapter_title", ""),
+                chapter_title=clean_title,
                 summary=plan.get("summary", ""),
                 key_events=plan.get("key_events", []),
                 expected_cool_points=plan.get("expected_cool_points", ""),

@@ -309,6 +309,10 @@ function buildLineElement(line, idx) {
         const contentEl = div.querySelector('.line-content');
         if (contentEl) contentEl.setAttribute('contenteditable', 'true');
         expandLineAudioEditor(line.id);
+        // 根据台词行角色同步选中角色列表
+        if (line.role && state.selectedRole !== line.role) {
+            selectCharacter(line.role);
+        }
     });
 
     const roleColorIdx = !line.role ? -1 : (line.role === '旁白' ? -1 : Math.abs(hashString(line.role)) % AVATAR_COLORS.length);

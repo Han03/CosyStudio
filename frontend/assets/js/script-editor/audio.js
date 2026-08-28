@@ -1,10 +1,20 @@
+/** 检查角色是否已配置 TTS（本地智能体或云端能力） */
+function _hasTtsConfig(cfg) {
+    if (!cfg) return false;
+    if (cfg.agent_id) return true;
+    if (cfg.tts_capability_id) {
+        return state.ttsCapabilities.some(c => c.id === cfg.tts_capability_id);
+    }
+    return false;
+}
+
 async function synthesizeChapterAudio() {
     if (state.isSynthesizing || state.currentLines.length === 0 || state.scriptId === null || state.currentChapterIndex < 0) return;
 
     for (const line of state.currentLines) {
         const cfg = state.characterVoiceMap[line.role];
-        if (!cfg || !cfg.agent_id) {
-            showToast(`角色「${line.role}」尚未配置配音智能体，无法配音`, 'warning');
+        if (!_hasTtsConfig(cfg)) {
+            showToast(`角色「${line.role}」尚未配置配音，无法配音`, 'warning');
             return;
         }
     }
@@ -115,9 +125,9 @@ async function playFromIndex(index) {
     updatePlayingHighlight(index);
 
     const line = state.currentLines[index];
-    const config = state.characterVoiceMap[line.role] || { agent_id: '', speed: 1.0, seed: 0 };
-    if (!config.agent_id) {
-        showToast(`角色「${line.role}」尚未配置配音智能体`, 'warning');
+    const config = state.characterVoiceMap[line.role] || { agent_id: '', speed: 1.0, seed: 0, tts_capability_id: '', cloud_extra_params: '{}' };
+    if (!_hasTtsConfig(config)) {
+        showToast(`角色「${line.role}」尚未配置配音`, 'warning');
         state.isPlaying = false;
         updatePlayButton();
         state.currentPlayingIndex = -1;
@@ -217,9 +227,9 @@ async function playSingleLine(index) {
     updatePlayButton();
     updatePlayingHighlight(index);
     const line = state.currentLines[index];
-    const config = state.characterVoiceMap[line.role] || { agent_id: '', speed: 1.0, seed: 0 };
-    if (!config.agent_id) {
-        showToast(`角色「${line.role}」尚未配置配音智能体`, 'warning');
+    const config = state.characterVoiceMap[line.role] || { agent_id: '', speed: 1.0, seed: 0, tts_capability_id: '', cloud_extra_params: '{}' };
+    if (!_hasTtsConfig(config)) {
+        showToast(`角色「${line.role}」尚未配置配音`, 'warning');
         state.isPlaying = false;
         updatePlayButton();
         state.currentPlayingIndex = -1;
@@ -396,29 +406,78 @@ function updateLineAudioEditorDisplay(lineId) {
         }
 
         const audioUrl = AudioEditor.getAudioUrl(line.audio_path);
-        if (editor.loaded && editor.audioPath && editor.audioPath !== audioUrl) {
+        if (editor.audioPath !== audioUrl) {
+            // 音频源已变更：停止当前播放并清除旧路径，防止 editor.play() 使用过期音频
+            if (editor._lineStopFn) { editor._lineStopFn(); editor._lineStopFn = null; }
+            editor.stop();
+            editor.audioPath = '';
             editor.loaded = false;
         }
+        // 始终从 DB（line 对象）恢复调整参数
+        // 此函数只在匹配/生成后调用，line 中的参数始终是最新的
+        const savedAdjust = !!line.audio_adjust_enabled;
+        const savedVolume = Math.round((line.audio_volume || 1) * 100);
+        const savedPitch = line.audio_pitch || 0;
+        const savedFadeIn = line.fade_in || 0;
+        const savedFadeOut = line.fade_out || 0;
+
+        editor.adjustEnabled = savedAdjust;
+        editor.volume = savedVolume;
+        editor.pitch = savedPitch;
+        editor.fadeIn = savedFadeIn;
+        editor.fadeOut = savedFadeOut;
+
+        const uiValues = [
+            { id: 'volume', val: savedVolume, suffix: '%' },
+            { id: 'pitch', val: savedPitch, suffix: '' },
+            { id: 'fadeIn', val: savedFadeIn, suffix: 's' },
+            { id: 'fadeOut', val: savedFadeOut, suffix: 's' },
+        ];
+        for (const { id, val, suffix } of uiValues) {
+            const el = document.getElementById(`${id}Value-${lineId}`);
+            if (el) el.textContent = suffix ? val + suffix : val;
+            const slider = document.getElementById(`${id}Slider-${lineId}`);
+            if (slider) slider.value = val;
+        }
+
+        if (toggle) { toggle.checked = savedAdjust; toggle.disabled = false; }
+        sliders.forEach(s => { s.disabled = !savedAdjust; });
+        if (resetBtn) resetBtn.disabled = !savedAdjust;
         if (!editor.loaded) {
             loadLineWaveform(lineId);
         }
     } else {
+        // 无音频：重置编辑器所有视觉状态（使用 AudioEditor 缓存的 DOM 引用）
+        if (editor._lineStopFn) {
+            editor._lineStopFn();
+            editor._lineStopFn = null;
+        }
+        editor.resetVisual();
+
+        // 重置外层容器样式
         if (wrapper) wrapper.classList.add('no-audio');
         if (timebar) timebar.classList.add('no-audio');
         if (params) params.classList.add('no-audio');
         if (overlay) overlay.style.display = 'flex';
         if (lineEl) lineEl.classList.remove('has-audio');
 
-        if (toggle) toggle.disabled = true;
+        // 重置滑杆 UI 值（ID 使用驼峰命名：fadeIn/fadeOut）
+        const sliderDefaults = [
+            { id: 'volume', val: 100, suffix: '%' },
+            { id: 'pitch', val: 0, suffix: '' },
+            { id: 'fadeIn', val: 0, suffix: 's' },
+            { id: 'fadeOut', val: 0, suffix: 's' },
+        ];
+        for (const { id, val, suffix } of sliderDefaults) {
+            const valueEl = document.getElementById(`${id}Value-${lineId}`);
+            if (valueEl) valueEl.textContent = suffix ? val + suffix : val;
+            const sliderEl = document.getElementById(`${id}Slider-${lineId}`);
+            if (sliderEl) sliderEl.value = val;
+        }
+        // 重置调整开关和控件
+        if (toggle) { toggle.checked = false; toggle.disabled = true; }
         sliders.forEach(slider => { slider.disabled = true; });
         if (resetBtn) resetBtn.disabled = true;
-
-        editor.hasAudio = false;
-        editor.loaded = false;
-        editor.audioPath = '';
-        if (editor.canvas && editor.ctx) {
-            editor.ctx.clearRect(0, 0, editor.canvas.width, editor.canvas.height);
-        }
 
         // 同步播放按钮：无音频时禁用
         const playBtnContainer = document.querySelector(`#audioEditor-${lineId} .line-param-play-btn`);
@@ -860,14 +919,14 @@ async function matchAudioHistoryForLines(lines) {
 
     const batchData = [];
     for (const line of lines) {
-        const config = state.characterVoiceMap[line.role] || { agent_id: '', speed: 1.0, seed: 0 };
-        const agent_id = config.agent_id;
+        const config = state.characterVoiceMap[line.role] || { agent_id: '', speed: 1.0, seed: 0, tts_capability_id: '', cloud_extra_params: '{}' };
         
-        if (!agent_id) {
+        if (!_hasTtsConfig(config)) {
             line.audio_path = '';
             continue;
         }
 
+        // 使用当前角色配置进行匹配（切换智能体/能力后 config 已是新值）
         const effectiveSeed = (line.seed || 0) !== 0 ? line.seed : (config.seed || 0);
         batchData.push({
             line_id: line.id,
@@ -875,7 +934,8 @@ async function matchAudioHistoryForLines(lines) {
             role: line.role || '',
             tone: line.tone || '',
             instruction: line.instruction || '',
-            agent_id: agent_id,
+            agent_id: config.agent_id || '',
+            tts_capability_id: config.tts_capability_id || '',
             seed: effectiveSeed,
         });
     }
@@ -891,9 +951,22 @@ async function matchAudioHistoryForLines(lines) {
         });
         if (data.success && data.matches) {
             for (const line of lines) {
-                const audioPath = data.matches[line.id] || '';
-                line.audio_path = audioPath;
-                updateAudioStatusDot(line.id, audioPath ? 'generated' : 'none');
+                const match = data.matches[line.id];
+                if (match && match.audio_path) {
+                    line.audio_path = match.audio_path;
+                    // 从音频历史恢复该音频的调整参数（参数绑定在音频上）
+                    line.audio_volume = match.audio_volume != null ? match.audio_volume : 1;
+                    line.audio_pitch = match.audio_pitch || 0;
+                    line.fade_in = match.fade_in || 0;
+                    line.fade_out = match.fade_out || 0;
+                    line.audio_adjust_enabled = match.audio_adjust_enabled || 0;
+                    line.range_start = match.range_start || 0;
+                    line.range_end = match.range_end || 0;
+                    updateAudioStatusDot(line.id, 'generated');
+                } else {
+                    line.audio_path = '';
+                    updateAudioStatusDot(line.id, 'none');
+                }
             }
         } else {
             for (const line of lines) {

@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from utils.logger import log_manager
 from core.global_manager import global_manager
+from core.paths import APP_NAME
 
 _main_logger = log_manager.get_logger("system")
 
@@ -147,7 +148,7 @@ def register_startup_hooks(app: FastAPI):
     @app.on_event("startup")
     async def startup_event():
         add_log("========================================")
-        add_log(f"CosyChat 服务启动 v{get_version()}")
+        add_log(f"{APP_NAME} 服务启动 v{get_version()}")
         add_log("========================================")
 
         add_log("正在检查系统资源占用...")

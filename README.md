@@ -1,4 +1,4 @@
-# CosyChat
+# CosyWritter
 
 > 一站式本地 AI 网文创作与有声书生成平台 —— 从大纲构建到章节写作、从语音合成到整章配音，全流程本地化运行。
 
@@ -134,7 +134,7 @@
 ## 项目结构
 
 ```
-CosyChat/
+CosyWritter/
 ├── backend/                     # 后端服务
 │   ├── api/                     #   REST API 路由
 │   ├── agents/                  #   智能体管理
@@ -204,7 +204,7 @@ CosyChat/
                           │
 ┌─────────────────────────▼────────────────────────────┐
 │             Repository 层 (数据持久化)                  │
-│  cosychat.db │ vector_store.db │ llm_logs.db          │
+│  app.db │ vector_store.db │ llm_logs.db          │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -223,11 +223,11 @@ CosyChat/
 ```bash
 # 克隆项目
 git clone <repo-url>
-cd CosyChat
+cd CosyWritter
 
 # 创建 conda 环境
-conda create -n cosy_chat python=3.10
-conda activate cosy_chat
+conda create -n cosy_writter python=3.10
+conda activate cosy_writter
 
 # 安装依赖
 pip install -r backend/requirements.txt

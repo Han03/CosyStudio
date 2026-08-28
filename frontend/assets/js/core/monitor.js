@@ -4,10 +4,6 @@ function toggleSidebarCollapse() {
     if (!sidebar || !btn) return;
 
     const isCollapsed = sidebar.classList.toggle('collapsed');
-    const icon = btn.querySelector('i');
-    if (icon) {
-        icon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
-    }
     btn.title = isCollapsed ? '展开侧栏' : '收起侧栏';
 }
 
@@ -138,6 +134,36 @@ function updateHeaderStatus(dotId, statusId, loaded) {
     }
 }
 
+const MODEL_STATUS_MAP = [
+    { dotId: 'headerQwenDot', name: 'Qwen', key: 'qwen_loaded' },
+    { dotId: 'headerCosyvoiceDot', name: 'CosyVoice', key: 'cosyvoice_loaded' },
+    { dotId: 'headerDreamliteDot', name: 'DreamLite', key: 'dreamlite_loaded' },
+    { dotId: 'headerEmbeddingDot', name: 'Embedding', key: 'qwen_embedding_loaded' }
+];
+
+function updateModelsCombinedStatus(data) {
+    let loadedCount = 0;
+    MODEL_STATUS_MAP.forEach(m => {
+        const dot = document.getElementById(m.dotId);
+        const loaded = !!data[m.key];
+        if (dot) {
+            dot.className = 'status-dot ' + (loaded ? 'available' : 'unavailable');
+        }
+        const item = dot ? dot.closest('.model-dot-item') : null;
+        if (item) {
+            item.title = m.name + ': ' + (loaded ? '已加载' : '未加载');
+        }
+        if (loaded) loadedCount++;
+    });
+    const summary = document.getElementById('headerModelsSummary');
+    if (summary) {
+        summary.textContent = loadedCount + '/' + MODEL_STATUS_MAP.length;
+        summary.style.color = loadedCount === MODEL_STATUS_MAP.length
+            ? 'var(--neu-success)'
+            : loadedCount > 0 ? 'var(--neu-warning)' : 'var(--neu-text-muted)';
+    }
+}
+
 async function fetchStatus() {
     try {
         const data = await apiRequest(`${API_BASE_URL}/api/status`, { silent: true });
@@ -168,10 +194,7 @@ async function fetchStatus() {
             qwenEmbeddingStatusEl.style.color = data.qwen_embedding_loaded ? '#155724' : '#721c24';
         }
 
-        updateHeaderStatus('headerQwenDot', 'headerQwenStatus', data.qwen_loaded);
-        updateHeaderStatus('headerCosyvoiceDot', 'headerCosyvoiceStatus', data.cosyvoice_loaded);
-        updateHeaderStatus('headerDreamliteDot', 'headerDreamliteStatus', data.dreamlite_loaded);
-        updateHeaderStatus('headerEmbeddingDot', 'headerEmbeddingStatus', data.qwen_embedding_loaded);
+        updateModelsCombinedStatus(data);
 
         const gpuAvailable = data.resources && data.resources.gpu && data.resources.gpu.available;
         const gpuDot = document.getElementById('headerGpuDot');
@@ -184,6 +207,13 @@ async function fetchStatus() {
 
         if (data.version) {
             document.getElementById('versionBadge').textContent = 'v' + data.version;
+        }
+
+        if (data.app_name) {
+            var appTitleEl = document.getElementById('appTitle');
+            if (appTitleEl) {
+                appTitleEl.textContent = data.app_name;
+            }
         }
 
         if (data.resources) {

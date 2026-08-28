@@ -29,6 +29,8 @@ def upsert_character_config(
     agent_id: str = '',
     speed: float = 1.0,
     seed: int = 0,
+    tts_capability_id: str = '',
+    cloud_extra_params: str = '{}',
 ) -> bool:
     import time
     conn = _get_conn()
@@ -41,16 +43,16 @@ def upsert_character_config(
         if existing:
             conn.execute(
                 """UPDATE script_character_configs
-                   SET agent_id=?, speed=?, seed=?, updated_at=?
+                   SET agent_id=?, speed=?, seed=?, tts_capability_id=?, cloud_extra_params=?, updated_at=?
                    WHERE script_id=? AND role=?""",
-                (agent_id, speed, seed, now, script_id, role),
+                (agent_id, speed, seed, tts_capability_id, cloud_extra_params, now, script_id, role),
             )
         else:
             conn.execute(
                 """INSERT INTO script_character_configs
-                   (script_id, role, agent_id, speed, seed, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (script_id, role, agent_id, speed, seed, now, now),
+                   (script_id, role, agent_id, speed, seed, tts_capability_id, cloud_extra_params, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (script_id, role, agent_id, speed, seed, tts_capability_id, cloud_extra_params, now, now),
             )
         conn.commit()
     return True

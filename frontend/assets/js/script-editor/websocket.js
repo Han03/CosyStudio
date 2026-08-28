@@ -203,7 +203,10 @@ async function handleAudioGeneratedMessage(msg) {
         return;
     }
 
-    await matchAudioHistoryForLines([line]);
+    // 如果流式响应已经设置了 audio_path，跳过重新匹配（避免竞态覆盖）
+    if (!line.audio_path) {
+        await matchAudioHistoryForLines([line]);
+    }
     updateLineAudioEditorDisplay(lineId);
     updateAudioStatusDot(lineId, 'generated');
 }

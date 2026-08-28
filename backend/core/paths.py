@@ -5,7 +5,10 @@
 """
 import os
 
-# 项目根目录（CosyChat/）
+# 项目品牌名称（集中管理，所有运行时引用从此处获取）
+APP_NAME = "CosyWritter"
+
+# 项目根目录（CosyWritter/）
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 运行时数据目录

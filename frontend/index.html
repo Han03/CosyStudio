@@ -13,15 +13,12 @@
     <div class="app-container">
         <!-- 左侧面板：系统日志和资源监控 -->
         <aside class="sidebar-left" id="sidebarLeft">
-            <button class="sidebar-collapse-toggle" id="sidebarCollapseBtn" onclick="toggleSidebarCollapse()" title="收起侧栏">
-                <i class="fas fa-chevron-left"></i>
-            </button>
             <div class="sidebar-header">
                 <div class="header-logo">
                     <i class="fas fa-comments"></i>
                 </div>
                 <div class="header-title">
-                    <h1>CosyChat</h1>
+                    <h1 id="appTitle">CosyWritter</h1>
                     <small>智能对话系统</small>
                 </div>
             </div>
@@ -84,6 +81,9 @@
 
         <!-- 右侧：主内容区域 -->
         <div class="main-area">
+            <button class="sidebar-collapse-toggle" id="sidebarCollapseBtn" onclick="toggleSidebarCollapse()" title="收起侧栏">
+                <i class="fas fa-chevron-left"></i>
+            </button>
             <!-- 页头 -->
             <header class="app-header">
                 <div class="header-center">
@@ -93,25 +93,27 @@
                         <span id="gpuName" class="resource-name" style="font-size: 12px; color: var(--neu-text-muted);"></span>
                         <span class="header-status-value" id="headerGpuStatus">未检测</span>
                     </div>
-                    <div class="header-status-item">
-                        <span class="status-dot" id="headerQwenDot"></span>
-                        <span class="header-status-label">Qwen:</span>
-                        <span class="header-status-value" id="headerQwenStatus">未加载</span>
-                    </div>
-                    <div class="header-status-item">
-                        <span class="status-dot" id="headerCosyvoiceDot"></span>
-                        <span class="header-status-label">CosyVoice:</span>
-                        <span class="header-status-value" id="headerCosyvoiceStatus">未加载</span>
-                    </div>
-                    <div class="header-status-item">
-                        <span class="status-dot" id="headerDreamliteDot"></span>
-                        <span class="header-status-label">DreamLite:</span>
-                        <span class="header-status-value" id="headerDreamliteStatus">未加载</span>
-                    </div>
-                    <div class="header-status-item">
-                        <span class="status-dot" id="headerEmbeddingDot"></span>
-                        <span class="header-status-label">Embedding:</span>
-                        <span class="header-status-value" id="headerEmbeddingStatus">未加载</span>
+                    <div class="header-models-status">
+                        <span class="models-label"><i class="fas fa-cubes"></i> 模型</span>
+                        <div class="models-dots">
+                            <span class="model-dot-item" title="Qwen: 未加载">
+                                <span class="status-dot unavailable" id="headerQwenDot"></span>
+                                <span class="model-dot-name">Qwen</span>
+                            </span>
+                            <span class="model-dot-item" title="CosyVoice: 未加载">
+                                <span class="status-dot unavailable" id="headerCosyvoiceDot"></span>
+                                <span class="model-dot-name">CosyVoice</span>
+                            </span>
+                            <span class="model-dot-item" title="DreamLite: 未加载">
+                                <span class="status-dot unavailable" id="headerDreamliteDot"></span>
+                                <span class="model-dot-name">DreamLite</span>
+                            </span>
+                            <span class="model-dot-item" title="Embedding: 未加载">
+                                <span class="status-dot unavailable" id="headerEmbeddingDot"></span>
+                                <span class="model-dot-name">Embedding</span>
+                            </span>
+                        </div>
+                        <span class="models-summary" id="headerModelsSummary">0/4</span>
                     </div>
                 </div>
                 <div class="header-right">

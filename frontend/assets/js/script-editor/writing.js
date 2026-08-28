@@ -602,13 +602,23 @@ function renderRagResults(chunks) {
         return;
     }
 
-    container.innerHTML = chunks.map(chunk => `
+    const typeLabels = {
+        'character': '角色', 'worldview': '世界观', 'power_system': '力量体系',
+        'golden_finger': '金手指', 'volume_outline': '卷纲', 'foreshadow': '伏笔',
+        'villain': '反派', 'chapter': '章节', 'chapter_paragraph': '章节原文'
+    };
+
+    container.innerHTML = chunks.map(chunk => {
+        const typeLabel = typeLabels[chunk.chunk_type] || chunk.chunk_type || '未知';
+        const chapterInfo = chunk.chapter_number ? ` · 第${chunk.chapter_number}章` : '';
+        return `
         <div class="rag-result-card">
             <div class="rag-result-header">
-                <span class="rag-result-source">${chunk.source || '未知来源'}</span>
-                <span class="rag-result-score">相似度: ${(chunk.score || 0) * 100}%</span>
+                <span class="rag-result-source">${typeLabel}${chapterInfo}</span>
+                <span class="rag-result-score">相似度: ${((chunk.score || 0) * 100).toFixed(1)}%</span>
             </div>
-            <div class="rag-result-content">${chunk.content || ''}</div>
+            <div class="rag-result-content">${escapeHtml(chunk.content || '')}</div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }

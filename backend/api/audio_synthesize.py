@@ -23,6 +23,52 @@ router = APIRouter()
 from core.paths import AGENTS_DATA_DIR
 
 
+def _resolve_tts_params(config: dict, line_seed: int = 0) -> dict:
+    """从角色配置中解析 TTS 参数。
+    
+    返回 dict:
+    - is_cloud: bool
+    - agent_id: str
+    - seed: int
+    - capability_id: str | None
+    - extra_params: dict | None
+    """
+    tts_cap_id = config.get("tts_capability_id", "")
+    cloud_extra_raw = config.get("cloud_extra_params", "{}")
+    agent_id = config.get("agent_id", "")
+    seed = int(config.get("seed", 0))
+
+    # 解析云端额外参数
+    extra_params = None
+    if cloud_extra_raw:
+        try:
+            extra_params = json.loads(cloud_extra_raw) if isinstance(cloud_extra_raw, str) else cloud_extra_raw
+        except (json.JSONDecodeError, TypeError):
+            extra_params = None
+
+    # 判断是否使用云端能力
+    is_cloud = False
+    capability_id = None
+    if tts_cap_id:
+        from core.model_executor import model_executor
+        if model_executor.is_cloud_capability(tts_cap_id):
+            is_cloud = True
+            capability_id = tts_cap_id
+
+    if not is_cloud:
+        # 本地模式：使用 agent_id
+        capability_id = None
+        extra_params = None
+        seed = line_seed if line_seed != 0 else seed
+
+    return {
+        "is_cloud": is_cloud,
+        "agent_id": agent_id,
+        "seed": seed,
+        "capability_id": capability_id,
+        "extra_params": extra_params,
+    }
+
 @router.post("/api/audio/synthesize")
 async def synthesize_audio(request: Request):
     """文本合成语音 - 流式输出 PCM 音频
@@ -113,7 +159,7 @@ async def generate_and_save_audio(line_id: int):
         raise HTTPException(status_code=400, detail="系统繁忙，请稍后再试")
 
     try:
-        from repositories import get_script_line_by_id, get_character_config, update_script_line
+        from repositories import get_script_line_by_id, get_character_config
         from services.media_manager import get_media_manager
 
         line = get_script_line_by_id(line_id)
@@ -136,19 +182,22 @@ async def generate_and_save_audio(line_id: int):
         if not config:
             config = {"agent_id": "", "speed": 1.0, "seed": 0}
 
-        agent_id = config.get("agent_id", "")
-        seed = line_seed if line_seed != 0 else int(config.get("seed", 0))
+        tts = _resolve_tts_params(config, line_seed)
+        agent_id = tts["agent_id"]
+        seed = tts["seed"]
+        # config 中的原始 tts_capability_id（保留本地能力的实际 ID），用于保存和匹配音频历史
+        config_tts_cap_id = config.get("tts_capability_id", "") or ""
 
-        if not agent_id:
+        if not tts["is_cloud"] and not agent_id:
             global_manager.release_model()
             raise HTTPException(
                 status_code=400,
-                detail=f"角色「{role}」尚未配置配音智能体，请先在角色设置中选择音色",
+                detail=f"角色「{role}」尚未配置配音智能体或云端能力，请先在角色设置中选择",
             )
 
         add_log(
             f"[语音生成保存] line_id={line_id}, role='{role}', tone='{tone}', instruction='{instruction}', "
-            f"agent={agent_id}, text='{text[:30]}...'"
+            f"agent={tts['agent_id']}, cloud={tts['is_cloud']}, cap={tts['capability_id']}, text='{text[:30]}...'"
         )
 
         try:
@@ -174,7 +223,9 @@ async def generate_and_save_audio(line_id: int):
                 }) + "\n").encode("utf-8")
 
                 async for audio_chunk in executor.execute_text_to_speech(
-                    text, stream=True, agent_id=agent_id, tone=tone, instruction=instruction, seed=seed
+                    text, stream=True, capability_id=tts["capability_id"],
+                    agent_id=tts["agent_id"], tone=tone, instruction=instruction,
+                    seed=tts["seed"], extra_params=tts["extra_params"]
                 ):
                     if audio_chunk.get("type") == "pcm_chunk":
                         sample_rate = audio_chunk["sample_rate"]
@@ -217,7 +268,7 @@ async def generate_and_save_audio(line_id: int):
                             )
                             
                             from repositories import save_audio_history, get_script_line_by_id
-                            save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, audio_path)
+                            save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, audio_path, tts_capability_id=config_tts_cap_id)
                             
                             add_log(f"[语音生成保存] 音频已保存: {audio_path}")
 
@@ -281,8 +332,8 @@ async def get_audio_history(line_id: int):
 async def batch_match_audio_history(request: Request):
     """批量匹配多条语句的音频历史记录。
     
-    请求体: {"lines": [{"line_id": int, "content": str, "role": str, "tone": str, "instruction": str, "agent_id": str, "seed": int}, ...]}
-    返回: {"success": True, "matches": {"line_id": "audio_path" | ""}}
+    请求体: {"lines": [{"line_id": int, "content": str, "role": str, "tone": str, "instruction": str, "agent_id": str, "tts_capability_id": str, "seed": int}, ...]}
+    返回: {"success": True, "matches": {"line_id": {"audio_path": str, "audio_volume": float, "audio_pitch": int, "fade_in": float, "fade_out": float, "audio_adjust_enabled": int, "range_start": float, "range_end": float} | null}}
     """
     from repositories import get_matching_audio_history
 
@@ -303,10 +354,23 @@ async def batch_match_audio_history(request: Request):
         tone = item.get("tone", "")
         instruction = item.get("instruction", "")
         agent_id = item.get("agent_id", "")
+        tts_capability_id = item.get("tts_capability_id", "")
         seed = int(item.get("seed", 0))
 
-        matched = get_matching_audio_history(line_id, content, role, tone, instruction, agent_id, seed)
-        matches[line_id] = matched["audio_path"] if matched else ""
+        matched = get_matching_audio_history(line_id, content, role, tone, instruction, agent_id, seed, tts_capability_id=tts_capability_id)
+        if matched:
+            matches[line_id] = {
+                "audio_path": matched.get("audio_path", ""),
+                "audio_volume": matched.get("audio_volume", 1.0),
+                "audio_pitch": matched.get("audio_pitch", 0),
+                "fade_in": matched.get("fade_in", 0.0),
+                "fade_out": matched.get("fade_out", 0.0),
+                "audio_adjust_enabled": matched.get("audio_adjust_enabled", 0),
+                "range_start": matched.get("range_start", 0.0),
+                "range_end": matched.get("range_end", 0.0),
+            }
+        else:
+            matches[line_id] = None
 
     return {"success": True, "matches": matches}
 
@@ -337,10 +401,12 @@ async def reload_audio_history(history_id: int):
 
 
 @router.post("/api/audio/save-audio-settings")
-async def save_audio_settings(line_id: int, settings: dict):
-    """保存语句的音频编辑参数。"""
-    from repositories import update_script_line
-
+async def save_audio_settings(line_id: int, request: Request):
+    """保存语句的音频编辑参数（参数绑定到当前匹配的音频历史记录）。"""
+    try:
+        settings = await request.json()
+    except Exception:
+        settings = {}
     volume = float(settings.get("volume", 100)) / 100.0
     pitch = int(settings.get("pitch", 0))
     fade_in = float(settings.get("fade_in", 0.0))
@@ -349,15 +415,30 @@ async def save_audio_settings(line_id: int, settings: dict):
     range_start = float(settings.get("range_start", 0.0))
     range_end = float(settings.get("range_end", 0.0))
 
-    update_script_line(
-        line_id,
-        audio_volume=volume,
-        audio_pitch=pitch,
-        fade_in=fade_in,
-        fade_out=fade_out,
-        audio_adjust_enabled=audio_adjust_enabled,
-        range_start=range_start,
-        range_end=range_end,
+    # 查询台词数据，计算 8 字段匹配条件，确保更新的是前端当前使用的音频记录
+    from repositories import get_script_line_by_id, get_character_config
+    line = get_script_line_by_id(line_id)
+    if not line:
+        raise HTTPException(status_code=404, detail=f"台词 {line_id} 不存在")
+
+    content = line.get("content", "")
+    role = line.get("role", "")
+    tone = line.get("tone", "")
+    instruction = line.get("instruction", "")
+    script_id = line.get("script_id")
+
+    config = get_character_config(script_id, role) if script_id and role else {}
+    agent_id = config.get("agent_id", "") or ""
+    tts_capability_id = config.get("tts_capability_id", "") or ""
+
+    # effective_seed 与前端 batch-match 及 play-line 保持一致
+    line_seed = int(line.get("seed", 0))
+    effective_seed = line_seed if line_seed != 0 else int(config.get("seed", 0))
+
+    from repositories.audio_history_repository import update_matching_audio_history_params
+    update_matching_audio_history_params(
+        line_id, content, role, tone, instruction, agent_id, effective_seed, tts_capability_id,
+        volume, pitch, fade_in, fade_out, audio_adjust_enabled, range_start, range_end
     )
 
     add_log(f"[音频设置保存] line_id={line_id}, volume={volume}, pitch={pitch}, fade_in={fade_in}, fade_out={fade_out}, audio_adjust_enabled={audio_adjust_enabled}, range_start={range_start}, range_end={range_end}")
@@ -395,17 +476,23 @@ async def play_with_settings(line_id: int, request: Request):
     if not config:
         config = {"agent_id": "", "speed": 1.0, "seed": 0}
 
-    agent_id = config.get("agent_id", "")
-    seed = line_seed if line_seed != 0 else int(config.get("seed", 0))
+    tts = _resolve_tts_params(config, line_seed)
+    agent_id = tts["agent_id"]
+    seed = tts["seed"]
+    config_tts_cap_id = config.get("tts_capability_id", "") or ""
+    tts_capability_id = config_tts_cap_id
 
-    matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, seed)
+    # 使用当前角色配置匹配音频历史（与前端 batch-match 一致）
+    effective_seed = line_seed if line_seed != 0 else int(config.get("seed", 0))
+    matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, effective_seed, tts_capability_id=tts_capability_id)
     audio_path = matched_history["audio_path"] if matched_history else ""
 
-    volume = float(line.get("audio_volume", 1.0))
-    pitch = int(line.get("audio_pitch", 0))
-    fade_in = float(line.get("fade_in", 0.0))
-    fade_out = float(line.get("fade_out", 0.0))
-    audio_adjust_enabled = int(line.get("audio_adjust_enabled", 0))
+    # 从音频历史读取调整参数（参数绑定在音频上，script_line_audio_history 是权威数据源）
+    volume = float(matched_history.get("audio_volume", 1.0)) if matched_history else 1.0
+    pitch = int(matched_history.get("audio_pitch", 0)) if matched_history else 0
+    fade_in = float(matched_history.get("fade_in", 0.0)) if matched_history else 0.0
+    fade_out = float(matched_history.get("fade_out", 0.0)) if matched_history else 0.0
+    audio_adjust_enabled = int(matched_history.get("audio_adjust_enabled", 0)) if matched_history else 0
 
     range_start = 0.0
     range_end = 0.0
@@ -451,21 +538,21 @@ async def play_with_settings(line_id: int, request: Request):
             global_manager.release_model()
             raise HTTPException(status_code=400, detail="语句内容为空")
 
-        if not agent_id:
+        if not tts["is_cloud"] and not agent_id:
             global_manager.release_model()
             raise HTTPException(
                 status_code=400,
-                detail=f"角色「{role}」尚未配置配音智能体，请先在角色设置中选择音色",
+                detail=f"角色「{role}」尚未配置配音智能体或云端能力，请先在角色设置中选择",
             )
-
+        
         executor = ModelExecutor()
-
+        
         async def generate():
             sample_rate = None
             chunk_count = 0
             audio_data_list = []
             saved_audio_path = ""
-
+        
             try:
                 yield (json.dumps({
                     "type": "start",
@@ -473,9 +560,11 @@ async def play_with_settings(line_id: int, request: Request):
                     "role": role,
                     "text": text[:200],
                 }) + "\n").encode("utf-8")
-
+        
                 async for audio_chunk in executor.execute_text_to_speech(
-                    text, stream=True, agent_id=agent_id, tone=tone, instruction=instruction, seed=seed
+                    text, stream=True, capability_id=tts["capability_id"],
+                    agent_id=tts["agent_id"], tone=tone, instruction=instruction,
+                    seed=tts["seed"], extra_params=tts["extra_params"]
                 ):
                     if audio_chunk.get("type") == "pcm_chunk":
                         sample_rate = audio_chunk["sample_rate"]
@@ -532,7 +621,7 @@ async def play_with_settings(line_id: int, request: Request):
                             )
 
                             from repositories import save_audio_history
-                            save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, saved_audio_path)
+                            save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, saved_audio_path, tts_capability_id=config_tts_cap_id)
 
                         msg = {
                             "type": "finish",
@@ -603,12 +692,19 @@ async def play_script_line(line_id: int):
         if not config:
             config = {"agent_id": "", "speed": 1.0, "seed": 0}
 
-        agent_id = config.get("agent_id", "")
+        tts = _resolve_tts_params(config, int(line.get("seed", 0)))
+        agent_id = tts["agent_id"]
         speed = float(config.get("speed", 1.0))
-        line_seed = int(line.get("seed", 0))
-        seed = line_seed if line_seed != 0 else int(config.get("seed", 0))
+        seed = tts["seed"]
 
-        matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, seed)
+        config_tts_cap_id = config.get("tts_capability_id", "") or ""
+        tts_capability_id = config_tts_cap_id
+
+        # 使用当前角色配置匹配音频历史（与前端 batch-match 一致）
+        effective_seed = int(line.get("seed", 0))
+        if effective_seed == 0:
+            effective_seed = int(config.get("seed", 0))
+        matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, effective_seed, tts_capability_id=tts_capability_id)
         audio_path = matched_history["audio_path"] if matched_history else ""
 
         # 分支1：匹配到历史音频文件，直接从文件流式返回
@@ -619,14 +715,14 @@ async def play_script_line(line_id: int):
             full_path = file_info["absolute_path"] if file_info else ""
 
             if full_path and os.path.exists(full_path):
-                # 读取音频调整参数
-                volume = float(line.get("audio_volume", 1.0))
-                pitch = int(line.get("audio_pitch", 0))
-                fade_in = float(line.get("fade_in", 0.0))
-                fade_out = float(line.get("fade_out", 0.0))
-                audio_adjust_enabled = int(line.get("audio_adjust_enabled", 0))
-                range_start = float(line.get("range_start", 0.0))
-                range_end = float(line.get("range_end", 0.0))
+                # 从音频历史读取调整参数（参数绑定在音频上，script_line_audio_history 是权威数据源）
+                volume = float(matched_history.get("audio_volume", 1.0)) if matched_history else 1.0
+                pitch = int(matched_history.get("audio_pitch", 0)) if matched_history else 0
+                fade_in = float(matched_history.get("fade_in", 0.0)) if matched_history else 0.0
+                fade_out = float(matched_history.get("fade_out", 0.0)) if matched_history else 0.0
+                audio_adjust_enabled = int(matched_history.get("audio_adjust_enabled", 0)) if matched_history else 0
+                range_start = float(matched_history.get("range_start", 0.0)) if matched_history else 0.0
+                range_end = float(matched_history.get("range_end", 0.0)) if matched_history else 0.0
 
                 add_log(f"[剧本播放] line_id={line_id} 从匹配的历史文件播放: {audio_path}, adjust={audio_adjust_enabled}, volume={volume}, pitch={pitch}")
 
@@ -658,16 +754,16 @@ async def play_script_line(line_id: int):
             global_manager.release_model()
             raise HTTPException(status_code=400, detail="语句内容为空")
 
-        if not agent_id:
+        if not tts["is_cloud"] and not agent_id:
             global_manager.release_model()
             raise HTTPException(
                 status_code=400,
-                detail=f"角色「{role}」尚未配置配音智能体，请先在角色设置中选择音色",
+                detail=f"角色「{role}」尚未配置配音智能体或云端能力，请先在角色设置中选择",
             )
 
         add_log(
             f"[剧本播放] line_id={line_id} 未匹配到历史音频，开始合成, role='{role}', tone='{tone}', "
-            f"instruction='{instruction}', agent={agent_id}, speed={speed}, seed={seed}, text='{text[:30]}...'"
+            f"instruction='{instruction}', agent={agent_id}, cloud={tts['is_cloud']}, speed={speed}, seed={seed}, text='{text[:30]}...'"
         )
 
         try:
@@ -693,7 +789,9 @@ async def play_script_line(line_id: int):
                 }) + "\n").encode("utf-8")
 
                 async for audio_chunk in executor.execute_text_to_speech(
-                    text, stream=True, agent_id=agent_id, tone=tone, instruction=instruction, seed=seed
+                    text, stream=True, capability_id=tts["capability_id"],
+                    agent_id=tts["agent_id"], tone=tone, instruction=instruction,
+                    seed=tts["seed"], extra_params=tts["extra_params"]
                 ):
                     if audio_chunk.get("type") == "pcm_chunk":
                         sample_rate = audio_chunk["sample_rate"]
@@ -732,7 +830,7 @@ async def play_script_line(line_id: int):
                                 content=wav_data,
                                 category="audio"
                             )
-                            save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, saved_audio_path)
+                            save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, saved_audio_path, tts_capability_id=config_tts_cap_id)
 
                             try:
                                 from infrastructure.websocket_broadcast import ws_broadcast_manager
@@ -796,7 +894,7 @@ async def export_chapter_audio(script_id: int, chapter_index: int):
     try:
         from repositories import (
             get_script, get_script_lines, get_character_config,
-            get_chapters, get_ebook, get_matching_audio_history, save_audio_history
+            get_chapters, get_ebook, get_matching_audio_history, save_audio_history,
         )
         from services.media_manager import get_media_manager
 
@@ -860,7 +958,10 @@ async def export_chapter_audio(script_id: int, chapter_index: int):
             line_seed = int(line.get("seed", 0))
             seed = line_seed if line_seed != 0 else int(config.get("seed", 0))
 
-            matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, seed)
+            tts_cap_id = config.get("tts_capability_id", "")
+
+            # 使用当前角色配置匹配音频历史（与前端 batch-match 一致）
+            matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, seed, tts_capability_id=tts_cap_id)
             audio_path = matched_history["audio_path"] if matched_history else ""
 
             wav_bytes = None
@@ -901,7 +1002,7 @@ async def export_chapter_audio(script_id: int, chapter_index: int):
                     content=wav_bytes,
                     category="audio"
                 )
-                save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, new_audio_path)
+                save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, new_audio_path, tts_capability_id=tts_cap_id)
                 audio_path = new_audio_path
                 generated_count += 1
 
@@ -1013,15 +1114,22 @@ async def synthesize_chapter_audio(script_id: int, chapter_index: int):
             global_manager.release_model()
             raise HTTPException(status_code=400, detail="本章暂无台词")
 
-        # 检查所有角色是否已配置智能体
+        # 检查所有角色是否已配置智能体或云端能力
         for line in lines:
             role = line.get("role", "")
             config = get_character_config(script_id, role) if role else None
-            if not config or not config.get("agent_id"):
+            if not config:
                 global_manager.release_model()
                 raise HTTPException(
                     status_code=400,
-                    detail=f"角色「{role}」尚未配置配音智能体，无法配音"
+                    detail=f"角色「{role}」尚未配置配音，无法配音"
+                )
+            tts_check = _resolve_tts_params(config, int(line.get("seed", 0)))
+            if not tts_check["is_cloud"] and not tts_check["agent_id"]:
+                global_manager.release_model()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"角色「{role}」尚未配置配音智能体或云端能力，无法配音"
                 )
 
         from core.model_executor import ModelExecutor
@@ -1042,11 +1150,13 @@ async def synthesize_chapter_audio(script_id: int, chapter_index: int):
             tone = line.get("tone", "")
 
             config = get_character_config(script_id, role)
-            agent_id = config.get("agent_id", "")
-            line_seed = int(line.get("seed", 0))
-            seed = line_seed if line_seed != 0 else int(config.get("seed", 0))
+            tts = _resolve_tts_params(config, int(line.get("seed", 0)))
+            agent_id = tts["agent_id"]
+            seed = tts["seed"]
 
-            matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, seed)
+            config_tts_cap_id = config.get("tts_capability_id", "") or ""
+            tts_cap_id = config_tts_cap_id
+            matched_history = get_matching_audio_history(line_id, text, role, tone, instruction, agent_id, seed, tts_capability_id=tts_cap_id)
             audio_path = matched_history["audio_path"] if matched_history else ""
 
             wav_bytes = None
@@ -1071,14 +1181,16 @@ async def synthesize_chapter_audio(script_id: int, chapter_index: int):
                     add_log(f"[整章配音] WebSocket通知失败: {e}", "WARNING")
 
                 wav_bytes, sample_rate = await executor.execute_text_to_speech_wav(
-                    text, agent_id=agent_id, tone=tone, instruction=instruction, seed=seed
+                    text, capability_id=tts["capability_id"],
+                    agent_id=tts["agent_id"], tone=tone, instruction=instruction,
+                    seed=tts["seed"], extra_params=tts["extra_params"]
                 )
 
                 filename = f"script_line_{line_id}_{int(time.time())}.wav"
                 new_audio_path = media_mgr.save_file(
                     module="tts", filename=filename, content=wav_bytes, category="audio"
                 )
-                save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, new_audio_path)
+                save_audio_history(line_id, text, role, tone, instruction, agent_id, seed, new_audio_path, tts_capability_id=tts_cap_id)
                 audio_path = new_audio_path
                 generated_count += 1
 

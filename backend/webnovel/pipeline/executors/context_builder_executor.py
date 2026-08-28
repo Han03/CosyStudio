@@ -25,7 +25,6 @@ from webnovel.repositories import (
     get_character_cards_by_project, get_timeline_by_project,
     get_idea_bank_by_project, get_chapter_plans_by_volume,
     get_active_open_loops,
-    search_rag_chunks, add_rag_chunk, update_rag_embedding,
     get_character_group_by_project, get_character_group_members,
     get_active_character_ids,
     get_worldview_factions, get_worldview_history
@@ -237,7 +236,8 @@ class ContextBuilderExecutor(BaseExecutor):
                         if query_text:
                             embeddings = embedding_model.encode([query_text])
                             if embeddings and len(embeddings) > 0:
-                                rag_results = search_rag_chunks(project_id, embeddings[0].tolist(), limit=5)
+                                from services.vector_store import get_rag_service
+                                rag_results = get_rag_service().search(project_id, embeddings[0].tolist(), limit=5)
                                 built_context["rag_context"] = [r["content"] for r in rag_results]
                 except Exception:
                     pass

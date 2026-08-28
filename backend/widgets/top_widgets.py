@@ -1,4 +1,4 @@
-"""CosyChat Kivy 桌面端基础组件。
+"""CosyWritter Kivy 桌面端基础组件。
 
 提供全局主题 COLORS、字体注册、图标 Image 工厂 _icon_image,
 以及 TopBar 等基础容器组件。
@@ -12,6 +12,7 @@ from kivy.uix.widget import Widget
 from kivy.core.text import LabelBase
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.label import Label
+from core.paths import APP_NAME
 
 _ICONS_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -122,7 +123,7 @@ class TopBar(BoxLayout):
         home_container.add_widget(home_icon)
 
         title_label = Label(
-            text="CosyChat",
+            text=APP_NAME,
             font_name=_FONT_NAME,
             font_size=18,
             color=COLORS["text_primary"],

@@ -1,4 +1,6 @@
 let _currentHistoryLineId = null;
+let _historyPreviewAudio = null;   // 当前试听中的 Audio 对象
+let _historyPreviewBtn = null;     // 当前试听按钮（用于切换图标）
 
 function showAudioHistory(lineId) {
     _currentHistoryLineId = lineId;
@@ -28,7 +30,7 @@ function showAudioHistory(lineId) {
                                 </div>
                                 <div class="history-content">${escapeHtml(h.content)}</div>
                                 <div class="history-actions">
-                                    <button class="btn btn-sm btn-primary" data-action="preview" data-path="${h.audio_path}">
+                                    <button class="btn btn-sm btn-primary" data-action="preview" data-path="${h.audio_path}" data-history-id="${h.id}">
                                         <i class="fas fa-play"></i> 试听
                                     </button>
                                     <button class="btn btn-sm btn-outline-primary" data-action="reload" data-history-id="${h.id}">
@@ -50,6 +52,17 @@ function showAudioHistory(lineId) {
     })();
 }
 
+function _stopHistoryPreview() {
+    if (_historyPreviewAudio) {
+        try { _historyPreviewAudio.pause(); _historyPreviewAudio.currentTime = 0; } catch (e) {}
+        _historyPreviewAudio = null;
+    }
+    if (_historyPreviewBtn) {
+        _historyPreviewBtn.innerHTML = '<i class="fas fa-play"></i> 试听';
+        _historyPreviewBtn = null;
+    }
+}
+
 function _handleHistoryAction(e) {
     const btn = e.target.closest('button');
     if (!btn) return;
@@ -57,12 +70,37 @@ function _handleHistoryAction(e) {
     const action = btn.dataset.action;
     if (action === 'preview') {
         const audioPath = btn.dataset.path;
-        if (audioPath) {
-            const audio = new Audio(audioPath);
-            audio.play().catch(err => {
-                showToast('播放失败: ' + err.message, 'error');
-            });
+        if (!audioPath) {
+            showToast('音频文件路径无效', 'error');
+            return;
         }
+
+        // 如果当前正在播放同一个音频，停止它
+        if (_historyPreviewBtn === btn) {
+            _stopHistoryPreview();
+            return;
+        }
+
+        // 停止之前的试听
+        _stopHistoryPreview();
+
+        const audioUrl = AudioEditor.getAudioUrl(audioPath);
+        const audio = new Audio(audioUrl);
+        _historyPreviewAudio = audio;
+        _historyPreviewBtn = btn;
+        btn.innerHTML = '<i class="fas fa-stop"></i> 停止';
+
+        audio.addEventListener('ended', () => {
+            _stopHistoryPreview();
+        });
+        audio.addEventListener('error', () => {
+            showToast('音频加载失败', 'error');
+            _stopHistoryPreview();
+        });
+        audio.play().catch(err => {
+            showToast('播放失败: ' + err.message, 'error');
+            _stopHistoryPreview();
+        });
     } else if (action === 'reload') {
         const historyId = parseInt(btn.dataset.historyId);
         if (historyId && _currentHistoryLineId) {
@@ -92,6 +130,7 @@ function _handleHistoryAction(e) {
 function hideAudioHistoryModal() {
     const body = document.getElementById('audioHistoryBody');
     body.removeEventListener('click', _handleHistoryAction);
+    _stopHistoryPreview();
     document.getElementById('audioHistoryModal').style.display = 'none';
 }
 

@@ -58,6 +58,7 @@ const state = {
     characters: [],
     selectedRole: null,
     agents: [],
+    ttsCapabilities: [],
     characterVoiceMap: {},
     isPlaying: false,
     currentPlayingIndex: -1,
@@ -200,6 +201,7 @@ async function init() {
     }
 
     await loadAgents();
+    await loadTtsCapabilities();
     const ok = await loadScriptInfo();
     if (!ok) return;
     await loadCharacters();
@@ -276,6 +278,17 @@ async function loadAgents() {
         }
     } catch (e) {
         console.error('加载智能体列表失败:', e);
+    }
+}
+
+async function loadTtsCapabilities() {
+    try {
+        const data = await apiRequest('/api/capabilities/type?capability_type=text_to_speech', { silent: true });
+        if (data && Array.isArray(data.capabilities)) {
+            state.ttsCapabilities = data.capabilities;
+        }
+    } catch (e) {
+        console.error('加载TTS能力列表失败:', e);
     }
 }
 

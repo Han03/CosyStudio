@@ -259,6 +259,7 @@ DEFAULT_CONFIG = {
     },
     "call_point_models": {},
     "system": {
+        "app_name": "CosyWritter",
         "max_workers": 4,
         "log_level": "INFO",
         "port": 8000
@@ -485,6 +486,10 @@ def update_qwen_embedding_config_params(batch_size=None, max_length=None):
         _save_config()
 
     return _current_config
+
+def get_app_name() -> str:
+    config = get_config()
+    return config.get("system", {}).get("app_name", "CosyWritter")
 
 def get_server_port():
     config = get_config()

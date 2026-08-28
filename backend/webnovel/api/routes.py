@@ -22,7 +22,6 @@ from webnovel.repositories import (
     get_timeline_chapters, get_timeline_countdowns,
     get_open_loops_by_project, get_active_open_loops, get_cool_points_by_project,
     get_cool_points_by_chapter, get_cool_points_count_by_type,
-    get_rag_chunks_by_project, delete_rag_chunks_by_project,
     get_master_setting, get_anti_patterns,
     get_all_chapter_plans_for_project,
     get_chapter_plan, delete_chapter_plan, get_chapter_plans_by_volume,
@@ -988,8 +987,8 @@ def search_rag(script_id: int, query: str = Query(""), limit: int = Query(10)):
         if embedding_model and embedding_model.is_loaded() and query:
             embeddings = embedding_model.encode([query])
             if embeddings and len(embeddings) > 0:
-                from webnovel.repositories import search_rag_chunks
-                chunks = search_rag_chunks(project["id"], embeddings[0].tolist(), limit=limit)
+                from services.vector_store import get_rag_service
+                chunks = get_rag_service().search(project["id"], embeddings[0].tolist(), limit=limit)
     except Exception:
         pass
     return {"success": True, "chunks": chunks}
@@ -1001,7 +1000,8 @@ def list_rag_chunks(script_id: int, chunk_type: str = Query("")):
     project = get_webnovel_project_by_script(script_id)
     if not project:
         return {"success": True, "chunks": [], "count": 0}
-    chunks = get_rag_chunks_by_project(project["id"], chunk_type)
+    from services.vector_store import get_rag_service
+    chunks = get_rag_service().get_chunks(project["id"], chunk_type)
     return {"success": True, "chunks": chunks, "count": len(chunks)}
 
 
@@ -1011,8 +1011,9 @@ def clear_rag_chunks(script_id: int):
     project = get_webnovel_project_by_script(script_id)
     if not project:
         return {"success": False, "error": "项目不存在"}
-    ok = delete_rag_chunks_by_project(project["id"])
-    return {"success": ok}
+    from services.vector_store import get_rag_service
+    deleted = get_rag_service().clear_project(project["id"])
+    return {"success": deleted > 0}
 
 
 # ========== 伏笔和爽点 ==========

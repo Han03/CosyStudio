@@ -108,17 +108,11 @@ def _init_schema(conn: sqlite3.Connection):
             type TEXT DEFAULT 'narration',
             prev_id INTEGER DEFAULT NULL,
             next_id INTEGER DEFAULT NULL,
-            audio_speed REAL DEFAULT 1.0,
-            audio_volume REAL DEFAULT 1.0,
-            audio_pitch INTEGER DEFAULT 0,
-            fade_in REAL DEFAULT 0.0,
-            fade_out REAL DEFAULT 0.0,
-            audio_adjust_enabled INTEGER DEFAULT 0,
             tone TEXT DEFAULT '',
-            range_start REAL DEFAULT 0.0,
-            range_end REAL DEFAULT 0.0,
             FOREIGN KEY (script_id) REFERENCES scripts(id) ON DELETE CASCADE
         );
+        -- 音频调整参数已迁移到 script_line_audio_history 表（每份音频独立保存）。
+        -- 加载台词时通过 LEFT JOIN 关联最新音频历史的参数，不再存储在 script_lines 中。
 
         CREATE INDEX IF NOT EXISTS idx_script_lines_script ON script_lines(script_id);
         CREATE INDEX IF NOT EXISTS idx_script_lines_chapter ON script_lines(script_id, chapter_index);
@@ -144,6 +138,8 @@ def _init_schema(conn: sqlite3.Connection):
             agent_id TEXT DEFAULT '',
             speed REAL DEFAULT 1.0,
             seed INTEGER DEFAULT 0,
+            tts_capability_id TEXT DEFAULT '',
+            cloud_extra_params TEXT DEFAULT '{}',
             created_at REAL,
             updated_at REAL,
             FOREIGN KEY (script_id) REFERENCES scripts(id) ON DELETE CASCADE
@@ -160,8 +156,16 @@ def _init_schema(conn: sqlite3.Connection):
             tone TEXT DEFAULT '',
             instruction TEXT DEFAULT '',
             agent_id TEXT DEFAULT '',
+            tts_capability_id TEXT DEFAULT '',
             seed INTEGER DEFAULT 0,
             audio_path TEXT DEFAULT '',
+            audio_volume REAL DEFAULT 1.0,
+            audio_pitch INTEGER DEFAULT 0,
+            fade_in REAL DEFAULT 0.0,
+            fade_out REAL DEFAULT 0.0,
+            audio_adjust_enabled INTEGER DEFAULT 0,
+            range_start REAL DEFAULT 0.0,
+            range_end REAL DEFAULT 0.0,
             created_at REAL,
             FOREIGN KEY (line_id) REFERENCES script_lines(id) ON DELETE CASCADE
         );
@@ -1243,21 +1247,6 @@ def _init_schema(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_webnovel_cool_points_chapter ON webnovel_cool_points(project_id, chapter_number);
         CREATE INDEX IF NOT EXISTS idx_webnovel_cool_points_type ON webnovel_cool_points(project_id, cool_point_type);
 
-        CREATE TABLE IF NOT EXISTS webnovel_rag_chunks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_id INTEGER NOT NULL,
-            chunk_type TEXT DEFAULT 'chapter',
-            chapter_number INTEGER DEFAULT 0,
-            content TEXT DEFAULT '',
-            embedding TEXT DEFAULT '',
-            metadata TEXT DEFAULT '',
-            created_at REAL,
-            FOREIGN KEY (project_id) REFERENCES webnovel_project(id) ON DELETE CASCADE
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_webnovel_rag_project ON webnovel_rag_chunks(project_id);
-        CREATE INDEX IF NOT EXISTS idx_webnovel_rag_type ON webnovel_rag_chunks(project_id, chunk_type);
-
         CREATE TABLE IF NOT EXISTS webnovel_master_setting (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL,
@@ -1283,7 +1272,7 @@ def _init_schema(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_webnovel_anti_pattern_project ON webnovel_anti_pattern(project_id);
         """
     )
-    # 迁移：llm_call_logs 已迁移到独立数据库文件 (cosychat_llm_logs.db)，
+    # 迁移：llm_call_logs 已迁移到独立数据库文件 (app_llm_logs.db)，
     # 清理旧数据库中的残留表（如果存在）
     try:
         conn.execute("DROP TABLE IF EXISTS llm_call_logs")
@@ -1550,3 +1539,42 @@ def _init_schema(conn: sqlite3.Connection):
         logger.info("[Database] Created unique index on webnovel_character_card(project_id, name)")
     except Exception as e:
         logger.warning(f"[Database] Failed to create unique index on character_card: {e}")
+
+    # 迁移：script_character_configs 增加云端 TTS 支持字段
+    for col_name, col_def in [("tts_capability_id", "TEXT DEFAULT ''"), ("cloud_extra_params", "TEXT DEFAULT '{}'")]:
+        try:
+            conn.execute(f"ALTER TABLE script_character_configs ADD COLUMN {col_name} {col_def}")
+            logger.info(f"[Database] Added {col_name} column to script_character_configs")
+        except Exception as e:
+            pass  # 列已存在则忽略
+
+    # 迁移：script_line_audio_history 增加 tts_capability_id 字段
+    try:
+        conn.execute("ALTER TABLE script_line_audio_history ADD COLUMN tts_capability_id TEXT DEFAULT ''")
+        logger.info("[Database] Added tts_capability_id column to script_line_audio_history")
+    except Exception as e:
+        pass  # 列已存在则忽略
+
+    # 迁移：script_line_audio_history 增加音频调整参数字段（参数绑定到音频）
+    for col_name, col_def in [
+        ('audio_volume', 'REAL DEFAULT 1.0'),
+        ('audio_pitch', 'INTEGER DEFAULT 0'),
+        ('fade_in', 'REAL DEFAULT 0.0'),
+        ('fade_out', 'REAL DEFAULT 0.0'),
+        ('audio_adjust_enabled', 'INTEGER DEFAULT 0'),
+        ('range_start', 'REAL DEFAULT 0.0'),
+        ('range_end', 'REAL DEFAULT 0.0'),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE script_line_audio_history ADD COLUMN {col_name} {col_def}")
+            logger.info(f"[Database] Added {col_name} column to script_line_audio_history")
+        except Exception:
+            pass
+
+
+    # 迁移：script_line_audio_history 增加 agent_id 字段（兼容旧数据库）
+    try:
+        conn.execute("ALTER TABLE script_line_audio_history ADD COLUMN agent_id TEXT DEFAULT ''")
+        logger.info("[Database] Added agent_id column to script_line_audio_history")
+    except Exception:
+        pass

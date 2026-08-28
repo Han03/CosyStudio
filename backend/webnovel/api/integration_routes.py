@@ -84,7 +84,6 @@ class PlanRequest(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    query_type: str = ""
     query_question: str = ""
 
 
@@ -141,6 +140,16 @@ async def _execute_init_workflow(task_id: int, script_id: int, project_data: dic
 
         if result["success"]:
             update_writing_task(task_id, status="completed", progress=100, progress_message="深度初始化完成")
+            # 初始化完成后，将项目设定数据索引到 RAG 向量库
+            try:
+                from webnovel.services.webnovel_service import WebnovelService
+                service = WebnovelService()
+                project = get_webnovel_project_by_script(script_id)
+                if project:
+                    await service._index_project_settings(project["id"])
+            except Exception as e:
+                from utils.logger import log_manager
+                log_manager.get_logger("webnovel_init").warning(f"RAG索引失败: {e}")
         else:
             update_writing_task(task_id, status="failed", progress=0, progress_message=f"初始化失败: {result.get('failed_steps', 0)}个步骤出错")
 
@@ -235,7 +244,11 @@ async def _execute_review_workflow(task_id: int, script_id: int, chapter_index: 
 
 @router.post("/query")
 async def webnovel_query(script_id: int, data: QueryRequest):
-    """状态查询。"""
+    """状态查询（基于RAG语义检索）。
+
+    按分类返回相似度超过95%的内容，每种分类最多返回5条。
+    若检测到项目设定未索引到 RAG 向量库，自动触发索引重建。
+    """
     script = get_script(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="剧本不存在")
@@ -244,36 +257,58 @@ async def webnovel_query(script_id: int, data: QueryRequest):
     if not project:
         raise HTTPException(status_code=400, detail="项目未初始化")
 
-    task = add_writing_task(script_id, 0, "query")
-    task_id = task["id"]
+    query = data.query_question.strip()
+    if not query:
+        return {"success": False, "chunks": [], "error": "请输入查询问题"}
 
-    asyncio.create_task(_execute_query_workflow(task_id, script_id, data.query_type, data.query_question))
+    project_id = project["id"]
 
-    return {"success": True, "task_id": task_id, "message": "查询任务已创建"}
-
-
-async def _execute_query_workflow(task_id: int, script_id: int, query_type: str, query_question: str):
-    """执行查询工作流。"""
+    # 兜底：检查项目设定是否已索引到 RAG 向量库，若缺失则自动触发索引重建
     try:
-        update_writing_task(task_id, status="running", progress=10, progress_message=f"开始查询: {query_type}")
+        from services.vector_store import get_rag_service
+        if not get_rag_service().has_settings_chunks(project_id):
+            from webnovel.services.webnovel_service import WebnovelService
+            service = WebnovelService()
+            await service._index_project_settings(project_id)
+    except Exception:
+        pass  # 索引重建失败不阻断查询，继续用已有数据检索
 
-        orchestrator = PipelineOrchestrator(script_id, 0, task_id)
-        result = await orchestrator.execute_workflow("query", {"query_type": query_type, "query_question": query_question})
+    chunks = []
+    try:
+        from core.model_executor import get_model_executor
+        executor = get_model_executor()
+        result = await executor.execute_text_to_vector([query])
+        embeddings = result.get("embeddings", [])
+        if embeddings:
+            from services.vector_store import get_rag_service
+            # 获取足够多的候选结果，以便按分类过滤后仍有充足数据
+            all_results = get_rag_service().search(project_id, embeddings[0], limit=50)
 
-        if result["success"]:
-            query_result = result.get("context", {}).get("query_result", {})
-            update_writing_task(
-                task_id,
-                status="completed",
-                progress=100,
-                progress_message="查询完成",
-                context=json.dumps(query_result)
-            )
+            # 按相似度 > 0.95 过滤，再按 chunk_type 分组，每组最多 5 条
+            # 注：Qwen3-Embedding 在高维空间中所有文档对的余弦相似度普遍偏高（0.90~1.0），
+            # 因此阈值需设为 0.95 才能有效区分相关与无关内容
+            SCORE_THRESHOLD = 0.95
+            MAX_PER_CATEGORY = 5
+            grouped: Dict[str, list] = {}
+            for chunk in all_results:
+                if chunk.get("score", 0) <= SCORE_THRESHOLD:
+                    continue
+                cat = chunk.get("chunk_type", "unknown")
+                if cat not in grouped:
+                    grouped[cat] = []
+                if len(grouped[cat]) < MAX_PER_CATEGORY:
+                    grouped[cat].append(chunk)
+
+            # 转为有序列表返回（按每组首条的相似度降序排列分类）
+            chunks = []
+            for cat in sorted(grouped, key=lambda c: grouped[c][0]["score"], reverse=True):
+                chunks.extend(grouped[cat])
         else:
-            update_writing_task(task_id, status="failed", progress=0, progress_message=f"查询失败")
-
+            return {"success": False, "chunks": [], "error": "Embedding计算失败"}
     except Exception as e:
-        update_writing_task(task_id, status="failed", error_message=str(e), progress_message=f"执行失败: {str(e)[:100]}")
+        return {"success": False, "chunks": [], "error": f"检索失败: {str(e)}"}
+
+    return {"success": True, "chunks": chunks}
 
 
 @router.get("/doctor")

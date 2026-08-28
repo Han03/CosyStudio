@@ -128,7 +128,7 @@ function closeInstructionQuickMenus() {
 
 function handleGlobalEvents() {
     document.addEventListener('keydown', (e) => {
-        if (e.target.contentEditable === 'true' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if (e.target.contentEditable === 'true' || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
         if (e.key === ' ') { e.preventDefault(); togglePlay(); }
         else if (e.key === 'ArrowLeft') playPrevLine();
         else if (e.key === 'ArrowRight') playNextLine();

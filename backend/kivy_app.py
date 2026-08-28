@@ -1,4 +1,4 @@
-"""CosyChat Kivy 服务端日志界面。
+"""CosyWritter Kivy 服务端日志界面。
 
 布局(水平):
   - 右侧:ScreenManager 内容区域
@@ -20,6 +20,7 @@ from kivy.graphics import Color, Rectangle
 from kivy.uix.floatlayout import FloatLayout
 
 from widgets.top_widgets import COLORS
+from core.paths import APP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +90,8 @@ class HomePage(Screen):
         self._bg_rect.size = instance.size
 
 
-class CosyChatApp(App):
-    """CosyChat 服务端日志界面 - 暗色系界面。
+class CosyWritterApp(App):
+    """CosyWritter 服务端日志界面 - 暗色系界面。
     """
 
     def __init__(self, server_thread=None, **kwargs):
@@ -100,7 +101,7 @@ class CosyChatApp(App):
 
     def build(self):
         try:
-            self.title = "CosyChat 服务端"
+            self.title = f"{APP_NAME} 服务端"
             root = BoxLayout(orientation="horizontal", size_hint=(1, 1))
             self.screen_manager = ScreenManager(size_hint=(1, 1))
             self.home_page = HomePage()
@@ -134,5 +135,5 @@ class CosyChatApp(App):
 
 def run_kivy_app(server_thread=None):
     """启动 Kivy 应用。"""
-    app = CosyChatApp(server_thread=server_thread)
+    app = CosyWritterApp(server_thread=server_thread)
     app.run()

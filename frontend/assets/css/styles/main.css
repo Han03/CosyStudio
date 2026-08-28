@@ -1097,6 +1097,64 @@ a:hover {
     color: var(--neu-text);
 }
 
+/* ========== 模型状态合并控件 ========== */
+.header-models-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    border-radius: 10px;
+    background: var(--neu-bg);
+    box-shadow: var(--neu-shadow-inset);
+    font-size: 13px;
+    color: var(--neu-text);
+}
+
+.models-label {
+    color: var(--neu-text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.models-dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.model-dot-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+}
+
+.model-dot-item .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.model-dot-name {
+    font-size: 11px;
+    color: var(--neu-text-muted);
+    font-weight: 500;
+}
+
+.models-summary {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--neu-text-muted);
+    white-space: nowrap;
+    min-width: 28px;
+    text-align: center;
+}
+
 .header-status-item .status-dot {
     width: 8px;
     height: 8px;
@@ -1167,7 +1225,7 @@ body {
     border-right: 1px solid rgba(0, 0, 0, 0.05);
     position: relative;
     z-index: 20;
-    transition: width 0.3s ease, margin-left 0.3s ease;
+    transition: margin-left 0.3s ease;
     overflow: hidden;
 }
 
@@ -1175,39 +1233,44 @@ body {
     margin-left: -500px;
 }
 
-/* 收起切换按钮 */
+/* 收起切换按钮 — 圆形新拟态浮动按钮 */
 .sidebar-collapse-toggle {
     position: absolute;
-    top: 50%;
-    right: -16px;
-    transform: translateY(-50%);
-    width: 32px;
-    height: 56px;
+    top: 18px;
+    left: -18px;
+    width: 36px;
+    height: 36px;
     border: none;
-    border-radius: 0 10px 10px 0;
+    border-radius: 50%;
     background: var(--neu-bg);
     color: var(--neu-text-muted);
-    box-shadow: 3px 2px 8px rgba(163, 177, 198, 0.4), -1px -1px 4px rgba(255, 255, 255, 0.7);
+    box-shadow: 2px 2px 6px rgba(163, 177, 198, 0.45), -2px -2px 6px rgba(255, 255, 255, 0.9);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 12px;
     z-index: 25;
-    transition: all 0.2s ease;
+    transition: all 0.25s ease;
 }
 
 .sidebar-collapse-toggle:hover {
     color: var(--neu-accent);
-    box-shadow: 4px 3px 10px rgba(163, 177, 198, 0.5), -1px -1px 4px rgba(255, 255, 255, 0.8);
+    box-shadow: 3px 3px 8px rgba(163, 177, 198, 0.55), -2px -2px 6px rgba(255, 255, 255, 0.95);
+    transform: scale(1.1);
 }
 
-.sidebar-left.collapsed .sidebar-collapse-toggle {
-    right: -32px;
+.sidebar-collapse-toggle:active {
+    box-shadow: inset 2px 2px 4px rgba(163, 177, 198, 0.35), inset -1px -1px 3px rgba(255, 255, 255, 0.8);
+    transform: scale(0.95);
 }
 
-.sidebar-left.collapsed .sidebar-collapse-toggle i {
+.sidebar-left.collapsed ~ .main-area .sidebar-collapse-toggle i {
     transform: rotate(180deg);
+}
+
+.sidebar-collapse-toggle i {
+    transition: transform 0.3s ease;
 }
 
 .sidebar-header {

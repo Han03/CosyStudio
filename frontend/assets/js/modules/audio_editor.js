@@ -637,6 +637,54 @@ class AudioEditor {
     }
     
     /**
+     * 重置所有视觉状态（无音频/切换能力时调用）
+     * 使用缓存的 DOM 引用，确保所有元素正确重置
+     */
+    resetVisual() {
+        // 重置状态
+        this.hasAudio = false;
+        this.loaded = false;
+        this.audioPath = '';
+        this.adjustEnabled = false;
+        this.volume = 100;
+        this.pitch = 0;
+        this.fadeIn = 0;
+        this.fadeOut = 0;
+        this.rangeStart = 0;
+        this.rangeEnd = 0;
+        this.currentTime = 0;
+        this.duration = 0;
+        this.data = [];
+
+        // 停止播放
+        if (this.audio) {
+            try { this.audio.pause(); } catch(e) {}
+            this.audio = null;
+        }
+        this.isPlaying = false;
+
+        // 清空 canvas
+        if (this.canvas && this.ctx) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        // 隐藏范围手柄、播放头、范围高亮
+        if (this.startHandleEl) this.startHandleEl.style.display = 'none';
+        if (this.endHandleEl) this.endHandleEl.style.display = 'none';
+        if (this.playheadEl) this.playheadEl.style.display = 'none';
+        if (this.rangeEl) this.rangeEl.style.display = 'none';
+
+        // 重置进度条
+        if (this.progressEl) this.progressEl.style.width = '0';
+
+        // 重置时间显示
+        if (this.currentTimeEl) this.currentTimeEl.textContent = '00:00';
+        if (this.totalTimeEl) this.totalTimeEl.textContent = '00:00';
+        if (this.rangeStartTimeEl) this.rangeStartTimeEl.textContent = '00:00';
+        if (this.rangeEndTimeEl) this.rangeEndTimeEl.textContent = '00:00';
+    }
+
+    /**
      * 获取音频 URL
      */
     static getAudioUrl(audioPath) {

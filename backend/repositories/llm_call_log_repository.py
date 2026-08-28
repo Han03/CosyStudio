@@ -3,7 +3,7 @@
 重要设计约束（问题分析日志不可丢失）：
   - 无论深度初始化/LLM调用/任何业务流程是否报错，LLM调用日志都必须**成功落盘并永久保留**，
     用于事后排查失败原因、分析LLM输出质量、复现问题。
-  - 🔴 日志使用**独立的 SQLite 数据库文件**（llm_call_logs.db），与主业务数据库（cosychat.db）
+  - 🔴 日志使用**独立的 SQLite 数据库文件**（llm_call_logs.db），与主业务数据库（app.db）
     物理隔离。同一 db 文件的多连接在 SQLite 中只允许一个写者，当主业务连接持有写事务时，
     日志连接的 commit 会因 database is locked 而失败。
     独立文件彻底消除了锁竞争，保证日志写入不受任何业务事务影响。
@@ -24,7 +24,7 @@ from .base_repository import _DB_PATH
 # ==============================================================================
 
 # 🔴 关键：日志使用独立的 db 文件，避免与主业务连接竞争写锁
-# cosychat.db → llm_call_logs.db
+# app.db → llm_call_logs.db
 _LOG_DB_PATH = os.path.splitext(_DB_PATH)[0] + "_llm_logs.db"
 
 _log_conn: Optional[sqlite3.Connection] = None
@@ -34,7 +34,7 @@ _log_conn_lock = threading.RLock()
 def _get_log_conn() -> sqlite3.Connection:
     """获取日志专用的独立 SQLite 连接。
 
-    使用独立的数据库文件（llm_call_logs.db），与主业务数据库（cosychat.db）
+    使用独立的数据库文件（llm_call_logs.db），与主业务数据库（app.db）
     物理隔离，彻底消除 SQLite 单文件多连接的写锁竞争问题。
     """
     global _log_conn

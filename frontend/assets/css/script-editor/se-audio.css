@@ -800,7 +800,9 @@
 
 .setting-group select,
 .setting-group input[type="range"],
-.setting-group input[type="number"] {
+.setting-group input[type="number"],
+.setting-group input[type="text"],
+.setting-group textarea {
     width: 100%;
     padding: 6px 10px;
     border: none;
@@ -812,8 +814,17 @@
     outline: none;
 }
 
+.setting-group textarea {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
 .setting-group select:focus,
-.setting-group input[type="number"]:focus {
+.setting-group input[type="number"]:focus,
+.setting-group input[type="text"]:focus,
+.setting-group textarea:focus {
     box-shadow: var(--neu-shadow-inset), 0 0 0 2px var(--neu-accent);
 }
 

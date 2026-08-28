@@ -226,14 +226,20 @@ def get_script_lines(script_id: int,
     with _lock:
         if chapter_index is not None:
             rows = conn.execute(
-                """SELECT * FROM script_lines
-                   WHERE script_id=? AND chapter_index=?""",
+                """SELECT sl.id, sl.script_id, sl.chapter_index, sl.line_no, sl.role,
+                          sl.instruction, sl.content, sl.seed, sl.created_at, sl.type,
+                          sl.prev_id, sl.next_id, sl.tone
+                   FROM script_lines sl
+                   WHERE sl.script_id=? AND sl.chapter_index=?""",
                 (script_id, chapter_index),
             ).fetchall()
         else:
             rows = conn.execute(
-                """SELECT * FROM script_lines
-                   WHERE script_id=?""",
+                """SELECT sl.id, sl.script_id, sl.chapter_index, sl.line_no, sl.role,
+                          sl.instruction, sl.content, sl.seed, sl.created_at, sl.type,
+                          sl.prev_id, sl.next_id, sl.tone
+                   FROM script_lines sl
+                   WHERE sl.script_id=?""",
                 (script_id,),
             ).fetchall()
     
@@ -292,6 +298,9 @@ def get_script_lines_paged(
     page_size: int = 50,
     chapter_index: Optional[int] = None,
 ) -> Dict[str, Any]:
+    _sl_select = """SELECT sl.id, sl.script_id, sl.chapter_index, sl.line_no, sl.role,
+                           sl.instruction, sl.content, sl.seed, sl.created_at, sl.type,
+                           sl.prev_id, sl.next_id, sl.tone"""
     conn = _get_conn()
     with _lock:
         if chapter_index is not None:
@@ -300,9 +309,9 @@ def get_script_lines_paged(
                 (script_id, chapter_index),
             ).fetchone()
             rows = conn.execute(
-                """SELECT * FROM script_lines
-                   WHERE script_id=? AND chapter_index=?
-                   ORDER BY line_no ASC LIMIT ? OFFSET ?""",
+                f"""{_sl_select} FROM script_lines sl
+                    WHERE sl.script_id=? AND sl.chapter_index=?
+                    ORDER BY sl.line_no ASC LIMIT ? OFFSET ?""",
                 (script_id, chapter_index, page_size, (page - 1) * page_size),
             ).fetchall()
         else:
@@ -311,9 +320,9 @@ def get_script_lines_paged(
                 (script_id,),
             ).fetchone()
             rows = conn.execute(
-                """SELECT * FROM script_lines
-                   WHERE script_id=?
-                   ORDER BY chapter_index ASC, line_no ASC LIMIT ? OFFSET ?""",
+                f"""{_sl_select} FROM script_lines sl
+                    WHERE sl.script_id=?
+                    ORDER BY sl.chapter_index ASC, sl.line_no ASC LIMIT ? OFFSET ?""",
                 (script_id, page_size, (page - 1) * page_size),
             ).fetchall()
     total = count_row[0] if count_row else 0
@@ -422,7 +431,12 @@ def get_script_line_by_id(line_id: int) -> Optional[Dict[str, Any]]:
     conn = _get_conn()
     with _lock:
         row = conn.execute(
-            "SELECT * FROM script_lines WHERE id=?", (line_id,)
+            """SELECT sl.id, sl.script_id, sl.chapter_index, sl.line_no, sl.role,
+                      sl.instruction, sl.content, sl.seed, sl.created_at, sl.type,
+                      sl.prev_id, sl.next_id, sl.tone
+               FROM script_lines sl
+               WHERE sl.id=?""",
+            (line_id,)
         ).fetchone()
     return dict(row) if row else None
 

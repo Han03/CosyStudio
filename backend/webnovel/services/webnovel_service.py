@@ -31,8 +31,9 @@ from webnovel.repositories import (
     add_review_record, get_review_records, get_chapter_review_summary,
     get_worldview_by_project, get_timelines_by_project, add_timeline, add_timeline_chapter,
     get_webnovel_state_by_project, update_webnovel_state, add_webnovel_state,
-    add_rag_chunk, update_rag_embedding, search_rag_chunks,
-    get_chapter_plans_by_volume
+    get_chapter_plans_by_volume,
+    get_character_cards_by_project, get_golden_finger_by_project,
+    get_power_system_by_project, get_foreshadows_by_project, get_villains_by_project,
 )
 from core.model_executor import get_model_executor
 from infrastructure.websocket_broadcast import ws_broadcast_manager
@@ -512,12 +513,11 @@ class WebnovelService:
         rag_chunks = []
         if context.get("current_content") and project:
             try:
-                from core.global_manager import global_manager
-                embedding_model = getattr(global_manager, 'qwen_embedding_model', None)
-                if embedding_model and embedding_model.is_loaded():
-                    embeddings = embedding_model.encode([context["current_content"][:300]])
-                    if embeddings and len(embeddings) > 0:
-                        rag_chunks = search_rag_chunks(project["id"], embeddings[0].tolist(), limit=5)
+                result = await self._model_executor.execute_text_to_vector([context["current_content"][:300]])
+                embeddings = result.get("embeddings", [])
+                if embeddings:
+                    from services.vector_store import get_rag_service
+                    rag_chunks = get_rag_service().search(project["id"], embeddings[0], limit=5)
             except Exception:
                 pass
         context["rag_context"] = [chunk["content"] for chunk in rag_chunks]
@@ -946,6 +946,12 @@ class WebnovelService:
                     for plan in vol.get("chapter_plans", []):
                         if plan.get("chapter_index") == chapter_index:
                             plan_title = (plan.get("chapter_title") or "").strip()
+                            # 防御性清除标题中可能残留的 "第X章" 前缀，避免拼接后出现两个章节号
+                            if plan_title:
+                                plan_title = re.sub(
+                                    r'^第\s*[一二三四五六七八九十百千万零〇两\d]+\s*[章回节]\s*[：:．\s]?\s*',
+                                    '', plan_title
+                                ).strip()
                             if plan_title:
                                 return f"第{chapter_index}章 {plan_title}"
         except Exception:
@@ -1146,27 +1152,243 @@ class WebnovelService:
             self._logger.error(f"[WebnovelService] 提取追读钩子失败: {e}")
 
     async def _store_rag_chunk(self, project_id: int, chapter_index: int, content: str):
-        """将章节摘要存储为 RAG 片段并计算 embedding。"""
-        try:
-            # 提取章节摘要作为 RAG 片段
-            summary = content[:500]
-            chunk = add_rag_chunk(
-                project_id=project_id,
-                content=summary,
-                chunk_type="chapter",
-                chapter_number=chapter_index,
-                metadata=json.dumps({"chapter_index": chapter_index, "word_count": len(content)})
-            )
+        """将章节结构化摘要存储为 RAG 片段，同时将章节原文做段落切片索引。
 
-            # 计算 embedding
-            from core.global_manager import global_manager
-            embedding_model = getattr(global_manager, 'qwen_embedding_model', None)
-            if embedding_model and embedding_model.is_loaded():
-                embeddings = embedding_model.encode([summary])
-                if embeddings and len(embeddings) > 0:
-                    update_rag_embedding(chunk["id"], embeddings[0].tolist())
+        段落切片采用滑动窗口：每个 chunk 包含 [前一段, 当前段, 后一段]，
+        首段无前段、末段无后段，以此保证检索时上下文连贯。
+        """
+        try:
+            from services.vector_store import get_rag_service
+            rag = get_rag_service()
+
+            # === 1. 章节摘要（chunk_type=chapter）===
+            lines = [f"第{chapter_index}章"]
+            lines.append(f"内容概要: {content[:300]}...")
+            if len(content) > 500:
+                lines.append(f"章尾: {content[-200:]}")
+            summary = "\n".join(lines)
+
+            # 清理旧数据
+            rag.delete_by_type(project_id, "chapter")
+
+            # === 2. 章节原文段落切片（chunk_type=chapter_paragraph）===
+            paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+            para_chunks_data = []
+            if len(paragraphs) >= 2:
+                rag.delete_by_type(project_id, "chapter_paragraph")
+                for i in range(len(paragraphs)):
+                    prev_p = paragraphs[i - 1] if i > 0 else ""
+                    curr_p = paragraphs[i]
+                    next_p = paragraphs[i + 1] if i < len(paragraphs) - 1 else ""
+                    parts = [p for p in [prev_p, curr_p, next_p] if p]
+                    para_chunks_data.append({
+                        "content": "\n".join(parts),
+                        "para_start": i,
+                        "para_end": i + 2 if i < len(paragraphs) - 1 else i + 1,
+                    })
+
+            # === 3. 构建 chunks 列表，批量计算 embedding 后一次写入 ===
+            all_chunks = [{
+                "content": summary,
+                "chunk_type": "chapter",
+                "chapter_number": chapter_index,
+                "metadata": {"chapter_index": chapter_index, "word_count": len(content)},
+            }]
+            for pc in para_chunks_data:
+                all_chunks.append({
+                    "content": pc["content"],
+                    "chunk_type": "chapter_paragraph",
+                    "chapter_number": chapter_index,
+                    "metadata": {
+                        "chapter_index": chapter_index,
+                        "para_start": pc["para_start"],
+                        "para_end": pc["para_end"],
+                        "total_paragraphs": len(paragraphs),
+                    },
+                })
+
+            all_texts = [c["content"] for c in all_chunks]
+            result = await self._model_executor.execute_text_to_vector(all_texts)
+            all_embeddings = result.get("embeddings", [])
+
+            if all_embeddings:
+                rag.add_chunks(project_id, all_chunks, all_embeddings)
+
+            if para_chunks_data:
+                self._logger.info(
+                    f"[WebnovelService] 第{chapter_index}章段落切片完成，"
+                    f"共 {len(para_chunks_data)} 个片段（{len(paragraphs)} 段）"
+                )
         except Exception as e:
             self._logger.error(f"[WebnovelService] 存储 RAG 片段失败: {e}")
+
+    async def _index_project_settings(self, project_id: int):
+        """将项目设定数据全量索引到 RAG 向量库。
+
+        在深度初始化完成后调用，将角色、世界观、力量体系、金手指、卷纲、伏笔、反派等
+        设定数据格式化后写入 webnovel_rag_chunks 表并计算 embedding。
+        """
+        indexed_count = 0
+        # 收集所有待索引的文本，最后批量编码
+        pending_items = []  # [(chunk_type, content, chapter_number, metadata)]
+
+        def _collect_one(chunk_type: str, content: str, chapter_number: int = 0, metadata: str = ""):
+            """收集单条数据到待索引列表。"""
+            if not content or not content.strip():
+                return
+            pending_items.append((chunk_type, content, chapter_number, metadata))
+
+        try:
+            # 1. 角色卡
+            characters = get_character_cards_by_project(project_id)
+            for char in characters:
+                parts = [f"角色[{char.get('name', '')}]({char.get('character_type', '')})"]
+                fields = {
+                    'personality': '性格', 'background': '背景',
+                    'voice_style': '说话风格', 'core_desire': '核心欲望',
+                    'core_flaw': '核心缺陷', 'signature_skills': '标志技能',
+                    'tags': '标签'
+                }
+                for key, label in fields.items():
+                    val = char.get(key, '')
+                    if val:
+                        parts.append(f"{label}={val}")
+                _collect_one("character", "\n".join(parts), metadata=json.dumps({"source": "character_card", "char_id": char.get("id")}))
+
+            # 2. 世界观
+            worldview = get_worldview_by_project(project_id)
+            if worldview:
+                parts = ["世界观设定:"]
+                fields = {
+                    'world_scale': '规模', 'world_summary': '概述',
+                    'core_regions': '核心区域', 'important_locations': '重要地点',
+                    'social_hierarchy': '社会阶层', 'hard_constraints': '硬约束',
+                    'energy_cycle': '能量循环', 'technology_basis': '技术基础',
+                    'currency_system': '货币体系'
+                }
+                for key, label in fields.items():
+                    val = worldview.get(key, '')
+                    if val:
+                        parts.append(f"{label}: {val}")
+                _collect_one("worldview", "\n".join(parts), metadata=json.dumps({"source": "worldview"}))
+
+            # 3. 力量体系
+            power_system = get_power_system_by_project(project_id)
+            if power_system:
+                parts = [f"力量体系({power_system.get('system_type', '')}):"]
+                fields = {
+                    'core_rules': '核心规则', 'upgrade_conditions': '升级条件',
+                    'battle_style': '战斗风格', 'hard_limits': '硬性上限',
+                    'cost_mechanism': '代价机制'
+                }
+                for key, label in fields.items():
+                    val = power_system.get(key, '')
+                    if val:
+                        parts.append(f"{label}: {val}")
+                _collect_one("power_system", "\n".join(parts), metadata=json.dumps({"source": "power_system"}))
+
+            # 4. 金手指
+            golden_finger = get_golden_finger_by_project(project_id)
+            if golden_finger:
+                parts = [f"金手指[{golden_finger.get('name', '')}]({golden_finger.get('gf_type', '')}):"]
+                fields = {
+                    'style': '风格', 'visibility': '可见度',
+                    'irreversible_cost': '不可逆代价', 'fulfillment_mechanism': '兑现机制',
+                    'cooldown_limit': '冷却限制'
+                }
+                for key, label in fields.items():
+                    val = golden_finger.get(key, '')
+                    if val:
+                        parts.append(f"{label}: {val}")
+                _collect_one("golden_finger", "\n".join(parts), metadata=json.dumps({"source": "golden_finger"}))
+
+            # 5. 卷纲
+            volumes = get_volume_outlines_by_project(project_id)
+            for vol in volumes:
+                parts = [f"第{vol.get('volume_number', '?')}卷[{vol.get('title', '')}]:"]
+                fields = {
+                    'core_conflict': '核心冲突', 'expected_chapters': '预期章节',
+                    'summary': '概要'
+                }
+                for key, label in fields.items():
+                    val = vol.get(key, '')
+                    if val:
+                        parts.append(f"{label}: {val}")
+                _collect_one("volume_outline", "\n".join(parts), chapter_number=vol.get('volume_number', 0),
+                           metadata=json.dumps({"source": "volume_outline", "volume_id": vol.get("id")}))
+
+            # 6. 伏笔
+            foreshadows = get_foreshadows_by_project(project_id)
+            for fs in foreshadows:
+                content = fs.get('content', '')
+                if not content:
+                    continue
+                parts = [f"伏笔: {content}"]
+                planted = fs.get('buried_chapter', 0)
+                payoff = fs.get('payoff_chapter', 0)
+                if planted:
+                    parts.append(f"埋入第{planted}章")
+                if payoff:
+                    parts.append(f"预计回收第{payoff}章")
+                level = fs.get('level', '')
+                if level:
+                    parts.append(f"级别: {level}")
+                _collect_one("foreshadow", "\n".join(parts), chapter_number=planted,
+                           metadata=json.dumps({"source": "foreshadow", "foreshadow_id": fs.get("id")}))
+
+            # 7. 反派
+            villains = get_villains_by_project(project_id)
+            for v in villains:
+                parts = [f"反派[{v.get('name', '')}]({v.get('tier', '')}):"]
+                fields = {
+                    'goal': '目标', 'mirror_traits': '镜像特质',
+                    'relationship_with_protagonist': '与主角关系',
+                    'counter_method': '对抗方式', 'level_order': '层级'
+                }
+                for key, label in fields.items():
+                    val = v.get(key, '')
+                    if val:
+                        parts.append(f"{label}: {val}")
+                _collect_one("villain", "\n".join(parts), metadata=json.dumps({"source": "villain", "villain_id": v.get("id")}))
+
+            # 批量编码并写入向量库
+            if pending_items:
+                from services.vector_store import get_rag_service
+                rag = get_rag_service()
+
+                # 按类型清理旧数据
+                types_to_delete = set(item[0] for item in pending_items)
+                for ct in types_to_delete:
+                    rag.delete_by_type(project_id, ct)
+
+                # 批量调用 ModelExecutor 编码
+                texts = [item[1] for item in pending_items]
+                result = await self._model_executor.execute_text_to_vector(texts)
+                all_embeddings = result.get("embeddings", [])
+
+                # 构建 chunks 列表并通过 RAGService 批量写入
+                if all_embeddings:
+                    chunks_to_add = []
+                    for chunk_type, content, chapter_number, metadata in pending_items:
+                        meta_dict = {}
+                        if metadata:
+                            try:
+                                meta_dict = json.loads(metadata) if isinstance(metadata, str) else metadata
+                            except Exception:
+                                meta_dict = {}
+                        chunks_to_add.append({
+                            "content": content,
+                            "chunk_type": chunk_type,
+                            "chapter_number": chapter_number,
+                            "metadata": meta_dict,
+                        })
+                    ids = rag.add_chunks(project_id, chunks_to_add, all_embeddings)
+                    indexed_count = len([i for i in ids if i > 0])
+
+            self._logger.info(f"[WebnovelService] 项目设定索引完成，project_id={project_id}，共索引 {indexed_count} 条")
+
+        except Exception as e:
+            self._logger.error(f"[WebnovelService] 项目设定索引失败: {e}")
 
     async def get_task_status(self, script_id: int, task_id: int) -> Optional[Dict[str, Any]]:
         """获取写作任务状态。"""

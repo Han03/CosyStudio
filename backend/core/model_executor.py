@@ -251,6 +251,16 @@ class ModelExecutor:
         
         yield {"type": "error", "message": "没有可用的文本预测能力"}
 
+    def is_cloud_capability(self, capability_id: str) -> bool:
+        """判断指定能力是否为云端能力"""
+        if not capability_id:
+            return False
+        all_capabilities = get_model_capabilities().get("text_to_speech", [])
+        capability = next((c for c in all_capabilities if c.get("id") == capability_id), None)
+        if not capability:
+            return False
+        return capability.get("platform_code", "local") != "local"
+
     async def execute_text_to_speech(
         self,
         text: str,
@@ -259,7 +269,8 @@ class ModelExecutor:
         agent_id: str = None,
         tone: str = "",
         instruction: str = "",
-        seed: int = 0
+        seed: int = 0,
+        extra_params: dict = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """执行语音合成能力"""
         capabilities = capability_manager.get_capabilities_by_type("text_to_speech")
@@ -269,18 +280,26 @@ class ModelExecutor:
             capability = next((c for c in all_capabilities if c.get("id") == capability_id), None)
             if capability:
                 capabilities = [capability]
+        elif agent_id:
+            # 本地模式（指定 agent_id 但无 capability_id）：只尝试本地 TTS 能力，避免误调用云端
+            capabilities = [c for c in capabilities if c.get("platform_code") == "local"]
         
+        last_error = None
         for capability in capabilities:
             try:
                 _logger.info(f"尝试使用语音合成能力: {capability.get('id')}")
-                async for chunk in self._execute_tts_capability(capability, text, stream, capability_id is not None, agent_id, tone, instruction, seed):
+                async for chunk in self._execute_tts_capability(capability, text, stream, capability_id is not None, agent_id, tone, instruction, seed, extra_params):
                     yield chunk
                 return
             except Exception as e:
+                last_error = str(e)
                 _logger.error(f"语音合成能力 {capability.get('id')} 执行失败: {e}")
                 continue
         
-        yield {"type": "error", "message": "没有可用的语音合成能力"}
+        error_msg = f"没有可用的语音合成能力"
+        if last_error:
+            error_msg += f": {last_error}"
+        yield {"type": "error", "message": error_msg}
 
     async def execute_text_to_speech_wav(
         self,
@@ -289,7 +308,8 @@ class ModelExecutor:
         agent_id: str = None,
         tone: str = "",
         instruction: str = "",
-        seed: int = 0
+        seed: int = 0,
+        extra_params: dict = None
     ) -> tuple:
         """执行语音合成能力并返回完整WAV音频数据"""
         import base64
@@ -301,7 +321,8 @@ class ModelExecutor:
         
         async for chunk in self.execute_text_to_speech(
             text, stream=True, capability_id=capability_id,
-            agent_id=agent_id, tone=tone, instruction=instruction, seed=seed
+            agent_id=agent_id, tone=tone, instruction=instruction, seed=seed,
+            extra_params=extra_params
         ):
             if chunk.get("type") == "pcm_chunk":
                 pcm_data = base64.b64decode(chunk.get("data", ""))
@@ -403,7 +424,8 @@ class ModelExecutor:
         agent_id: str = None,
         tone: str = "",
         instruction: str = "",
-        seed: int = 0
+        seed: int = 0,
+        extra_params: dict = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """执行具体的语音合成能力"""
         platform_code = capability.get("platform_code")
@@ -413,7 +435,7 @@ class ModelExecutor:
             async for chunk in self._call_local_tts(model_code, text, stream, agent_id, tone, instruction, seed):
                 yield chunk
         else:
-            async for chunk in self._call_cloud_tts(platform_code, model_code, text, stream, skip_enabled_check, agent_id, tone, instruction, seed):
+            async for chunk in self._call_cloud_tts(platform_code, model_code, text, stream, skip_enabled_check, extra_params):
                 yield chunk
 
     async def _execute_t2i_capability(
@@ -551,23 +573,35 @@ class ModelExecutor:
         max_retries: int = 3,
         **kwargs,
     ) -> 'httpx.Response':
-        """带重试的HTTP请求，处理 getaddrinfo failed 等瞬时网络错误。"""
+        """带重试的HTTP请求，处理网络错误和服务端瞬时错误（429/5xx）。"""
         import httpx
+        import socket
         last_error = None
         for attempt in range(max_retries):
             try:
-                return await client.request(method, url, **kwargs)
+                response = await client.request(method, url, **kwargs)
+                # 对 429(限流) 和 5xx(服务端错误) 进行重试
+                if response.status_code in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
+                    wait = 2 ** attempt
+                    _logger.warning(
+                        f"HTTP请求返回{response.status_code}(第{attempt + 1}/{max_retries}次)，{wait}秒后重试: {url}"
+                    )
+                    await response.aclose()
+                    await asyncio.sleep(wait)
+                    continue
+                return response
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout,
-                    httpx.WriteTimeout, httpx.NetworkError) as e:
+                    httpx.WriteTimeout, httpx.NetworkError,
+                    socket.gaierror, OSError) as e:
                 last_error = e
                 if attempt < max_retries - 1:
                     wait = 2 ** attempt
                     _logger.warning(
-                        f"HTTP请求网络错误(第{attempt + 1}/{max_retries}次): {e}，{wait}秒后重试"
+                        f"HTTP请求网络错误(第{attempt + 1}/{max_retries}次): {type(e).__name__}: {e}，{wait}秒后重试"
                     )
                     await asyncio.sleep(wait)
                 else:
-                    _logger.error(f"HTTP请求网络错误，已重试{max_retries}次仍失败: {e}")
+                    _logger.error(f"HTTP请求网络错误，已重试{max_retries}次仍失败: {type(e).__name__}: {e}")
         raise last_error
 
     async def _call_cloud_text_predict(
@@ -825,17 +859,120 @@ class ModelExecutor:
         first_vt = voice_tones[0]
         return first_vt.get("speaker_id", "")
 
+    async def _call_dashscope_tts(
+        self,
+        api_key: str,
+        model_code: str,
+        text: str,
+        extra_params: dict = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """调用阿里云 DashScope 非实时语音合成 API（支持 cosyvoice-v3.5-flash 等模型）
+        
+        DashScope 原生 API 格式:
+        - endpoint: /api/v1/services/audio/tts/SpeechSynthesizer
+        - 请求体: {model, input: {text, voice, format, sample_rate, ...}}
+        - 响应: JSON {output: {audio: {url, data}}}
+        """
+        import httpx
+        import base64
+
+        url = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        extra = extra_params or {}
+        # 所有参数都在 input 对象内
+        input_obj = {
+            "text": text,
+            "voice": extra.get("voice", "longxiaochun"),
+            "format": extra.get("format", "wav"),
+            "sample_rate": extra.get("sample_rate", 22050),
+        }
+        # 合并用户自定义的其他参数（排除已设置的）
+        _reserved = {"voice", "format", "sample_rate", "text"}
+        for k, v in extra.items():
+            if k not in _reserved:
+                input_obj[k] = v
+
+        payload = {
+            "model": model_code,
+            "input": input_obj,
+        }
+
+        _logger.info(f"[DashScope TTS] model={model_code}, voice={input_obj['voice']}, "
+                     f"format={input_obj['format']}, sample_rate={input_obj['sample_rate']}")
+
+        client = httpx.AsyncClient(timeout=120.0)
+        try:
+            response = await self._request_with_retry(client, "POST", url, json=payload, headers=headers)
+            if response.status_code != 200:
+                try:
+                    result = response.json()
+                    error_msg = (result.get("message") or result.get("error", {}).get("message")
+                                 or str(result))
+                except Exception:
+                    error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                _logger.error(f"[DashScope TTS] API调用失败: status={response.status_code}, body={error_msg}")
+                raise ValueError(f"DashScope TTS调用失败(HTTP {response.status_code}): {error_msg}")
+
+            # 响应为 JSON: {output: {audio: {url, data}}, usage: {...}}
+            result = response.json()
+            audio_info = result.get("output", {}).get("audio", {})
+            audio_url = audio_info.get("url")
+            audio_b64 = audio_info.get("data")
+            sample_rate = input_obj.get("sample_rate", 22050)
+
+            if audio_url:
+                # 从 URL 下载音频文件（带重试）
+                dl_client = httpx.AsyncClient(timeout=60.0)
+                try:
+                    audio_resp = await self._request_with_retry(dl_client, "GET", audio_url)
+                    if audio_resp.status_code == 200:
+                        audio_b64 = base64.b64encode(audio_resp.content).decode("ascii")
+                    else:
+                        raise ValueError(f"下载DashScope音频失败: HTTP {audio_resp.status_code}")
+                finally:
+                    await dl_client.aclose()
+            
+            if not audio_b64:
+                raise ValueError(f"DashScope TTS返回中未找到音频数据: {str(result)[:300]}")
+
+            _logger.info(f"[DashScope TTS] 合成成功, request_id={result.get('request_id', 'N/A')}")
+            yield {
+                "type": "pcm_chunk",
+                "sample_rate": sample_rate,
+                "chunk_index": 0,
+                "data": audio_b64,
+            }
+            yield {
+                "type": "finish",
+                "sample_rate": sample_rate,
+                "chunk_count": 1,
+            }
+        finally:
+            await client.aclose()
+
     async def _call_cloud_tts(
         self,
         platform_code: str,
         model_code: str,
         text: str,
         stream: bool,
-        skip_enabled_check: bool = False
+        skip_enabled_check: bool = False,
+        extra_params: dict = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """调用云端语音合成API"""
-        import httpx
+        """调用云端语音合成API
         
+        路由逻辑:
+        - aliyun 平台 → DashScope 原生 TTS API（支持 cosyvoice-v3.5-flash 等新模型）
+        - 其他平台 → OpenAI 兼容格式 {base_url}/audio/speech
+        
+        extra_params 中可包含:
+        - voice: 云端声音标识
+        - 其他平台特定参数会合并到请求 payload 中
+        """
         config = get_config()
         platform_keys = config.get("platform_keys", {})
         platform_config = platform_keys.get(platform_code, {})
@@ -849,24 +986,42 @@ class ModelExecutor:
         if not api_key or not base_url:
             raise ValueError(f"平台{platform_code}配置不完整")
         
+        # aliyun 平台使用 DashScope 原生 TTS API
+        if platform_code == "aliyun":
+            async for chunk in self._call_dashscope_tts(api_key, model_code, text, extra_params):
+                yield chunk
+            return
+        
+        # 其他平台使用 OpenAI 兼容格式
+        import httpx
+        
         url = f"{base_url}/audio/speech"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         
+        extra = extra_params or {}
         payload = {
             "model": model_code,
             "input": text,
-            "voice": "zh-CN-XiaoxiaoNeural",
+            "voice": extra.get("voice", "zh-CN-XiaoxiaoNeural"),
         }
+        for k, v in extra.items():
+            if k != "voice" and k not in payload:
+                payload[k] = v
         
         client = httpx.AsyncClient(timeout=60.0)
         try:
             response = await self._request_with_retry(client, "POST", url, json=payload, headers=headers)
             if response.status_code != 200:
-                result = response.json()
-                raise ValueError(result.get("message", "API调用失败"))
+                try:
+                    result = response.json()
+                    error_msg = result.get("message") or result.get("error") or str(result)
+                except Exception:
+                    error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                _logger.error(f"[云端TTS] API调用失败: status={response.status_code}, body={error_msg}")
+                raise ValueError(f"云端TTS调用失败(HTTP {response.status_code}): {error_msg}")
             
             import base64
             audio_b64 = base64.b64encode(response.content).decode("ascii")

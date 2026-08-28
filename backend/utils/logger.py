@@ -95,7 +95,7 @@ class LogManager:
             CategoryLogger 实例，支持 info/warning/error/debug 等方法
         """
         if category not in self._loggers:
-            logger = logging.getLogger(f"cosychat.{category}")
+            logger = logging.getLogger(f"app.{category}")
             logger.setLevel(logging.INFO)
             self._loggers[category] = logger
 

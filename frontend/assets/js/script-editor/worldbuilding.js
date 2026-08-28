@@ -1657,7 +1657,7 @@ async function saveChapterPlan() {
 
     try {
         const url = id
-                ? `/api/books/scripts/chapter-plans/detail?script_id=${state.scriptId}&outline_id=${outlineId}&plan_id=${id}`
+                ? `/api/books/scripts/chapter-plans?script_id=${state.scriptId}&outline_id=${outlineId}&plan_id=${id}`
                 : `/api/books/scripts/chapter-plans?script_id=${state.scriptId}&outline_id=${outlineId}`;
         const method = id ? 'PUT' : 'POST';
         const body = JSON.stringify({

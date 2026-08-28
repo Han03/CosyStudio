@@ -17,7 +17,7 @@ sys.path.insert(1, os.path.join(_current_dir, 'models'))
 # ============================================================
 from middleware import setup_middleware
 from core.lifecycle import register_startup_hooks
-from core.paths import OUTPUT_DIR, AGENTS_DATA_DIR, FRONTEND_DIR
+from core.paths import OUTPUT_DIR, AGENTS_DATA_DIR, FRONTEND_DIR, APP_NAME
 from core.global_manager import global_manager
 
 from api.system import router as system_router
@@ -38,7 +38,7 @@ from webnovel.api.init_routes import router as webnovel_init_router
 # ============================================================
 # FastAPI 应用创建
 # ============================================================
-app = FastAPI(title="CosyChat", description="模型服务")
+app = FastAPI(title=APP_NAME, description="模型服务")
 
 setup_middleware(app)
 

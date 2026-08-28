@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from utils.logger import log_manager
 from core.global_manager import global_manager
+from core.config_manager import get_app_name as _get_app_name
 
 router = APIRouter()
 
@@ -78,6 +79,7 @@ async def get_status():
             pass
 
     status.update({
+        "app_name": _get_app_name(),
         "current_operation": system_status["current_operation"],
         "logs": system_status["logs"][-20:],
         "version": get_version(),

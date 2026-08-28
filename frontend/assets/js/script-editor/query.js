@@ -1,32 +1,17 @@
-// ========== 状态查询 ==========
-
-let currentQueryType = 'character';
+// ========== 状态查询（基于RAG语义检索） ==========
 
 function showQueryModal() {
     document.getElementById('queryModal').style.display = 'flex';
-    document.getElementById('queryProgressContainer').style.display = 'none';
-    document.getElementById('queryResult').style.display = 'none';
     document.getElementById('queryQuestion').value = '';
-    currentQueryType = 'character';
+    document.getElementById('queryResult').style.display = 'none';
+    document.getElementById('queryLoading').style.display = 'none';
+    document.getElementById('queryEmpty').style.display = 'none';
+    document.getElementById('querySubmitBtn').disabled = false;
+    document.getElementById('queryQuestion').focus();
 }
 
 function closeQueryModal() {
     document.getElementById('queryModal').style.display = 'none';
-}
-
-function setQueryType(btn, type) {
-    document.querySelectorAll('.continue-option-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentQueryType = type;
-    
-    const prompts = {
-        'character': '查询角色相关信息，例如：主角的核心性格是什么？',
-        'power': '查询能力体系相关信息，例如：当前最高境界是什么？',
-        'timeline': '查询时间线相关信息，例如：故事已过去多久？',
-        'plot': '查询剧情进展相关信息，例如：当前剧情处于什么阶段？',
-        'custom': '输入自定义查询问题...'
-    };
-    document.getElementById('queryQuestion').placeholder = prompts[type];
 }
 
 async function submitQuery() {
@@ -37,84 +22,78 @@ async function submitQuery() {
     }
 
     document.getElementById('querySubmitBtn').disabled = true;
-    document.getElementById('queryProgressContainer').style.display = 'block';
     document.getElementById('queryResult').style.display = 'none';
-    updateQueryProgress(30, '查询中...');
+    document.getElementById('queryEmpty').style.display = 'none';
+    document.getElementById('queryLoading').style.display = 'block';
 
     try {
         const data = await apiRequest(`/api/books/scripts/webnovel/query?script_id=${state.scriptId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query_type: currentQueryType, query_question: question }),
-            errorPrefix: '提交查询失败'
+            body: JSON.stringify({ query_question: question }),
+            errorPrefix: '查询失败'
         });
-        if (data.success && data.task_id) {
-            pollQueryStatus(data.task_id);
-        } else {
-            showToast(data.error || '查询任务创建失败', 'error');
-            resetQueryModal();
-        }
-    } catch (e) {
-        resetQueryModal();
-    }
-}
 
-async function pollQueryStatus(taskId) {
-    try {
-        const data = await apiRequest(`/api/books/scripts/webnovel/init/status?script_id=${state.scriptId}&task_id=${taskId}`, { silent: true });
-        if (data.success && data.task) {
-            const task = data.task;
-            
-            if (task.status === 'completed') {
-                updateQueryProgress(100, '查询完成');
-                let resultContent = '';
-                if (task.context) {
-                    try {
-                        const context = JSON.parse(task.context);
-                        if (typeof context === 'object') {
-                            resultContent = formatQueryResult(context);
-                        } else {
-                            resultContent = escapeHtml(context);
-                        }
-                    } catch {
-                        resultContent = escapeHtml(task.context);
-                    }
-                } else {
-                    resultContent = '<div style="color: var(--neu-text-muted);">暂无查询结果</div>';
-                }
-                document.getElementById('queryResultContent').innerHTML = resultContent;
+        document.getElementById('queryLoading').style.display = 'none';
+
+        if (data.success) {
+            const chunks = data.chunks || [];
+            if (chunks.length > 0) {
+                renderQueryResults(chunks);
                 document.getElementById('queryResult').style.display = 'block';
-                document.getElementById('querySubmitBtn').disabled = false;
-            } else if (task.status === 'failed') {
-                updateQueryProgress(0, '查询失败');
-                document.getElementById('queryResultContent').innerHTML = `<span style="color: #ef4444;">${task.error_message || '查询失败'}</span>`;
-                document.getElementById('queryResult').style.display = 'block';
-                document.getElementById('querySubmitBtn').disabled = false;
-            } else if (task.status === 'running') {
-                setTimeout(() => pollQueryStatus(taskId), 2000);
+            } else {
+                document.getElementById('queryEmpty').style.display = 'block';
             }
+        } else {
+            showToast(data.error || '查询失败', 'error');
         }
     } catch (e) {
-        console.error('轮询查询状态失败:', e);
-        setTimeout(() => pollQueryStatus(taskId), 3000);
+        document.getElementById('queryLoading').style.display = 'none';
+        showToast('查询请求失败', 'error');
+    } finally {
+        document.getElementById('querySubmitBtn').disabled = false;
     }
 }
 
-function formatQueryResult(result) {
-    if (Array.isArray(result)) {
-        return result.map((item, idx) => `<div style="margin-bottom: 8px;"><strong>${idx + 1}.</strong> ${escapeHtml(typeof item === 'object' ? JSON.stringify(item, null, 2) : item)}</div>`).join('');
+function renderQueryResults(chunks) {
+    const typeLabels = {
+        'character': '角色', 'worldview': '世界观', 'power_system': '力量体系',
+        'golden_finger': '金手指', 'volume_outline': '卷纲', 'foreshadow': '伏笔',
+        'villain': '反派', 'chapter': '章节', 'chapter_paragraph': '章节原文'
+    };
+
+    // 按 chunk_type 分组，保持后端返回的顺序（分类已按首条相似度降序排列）
+    const grouped = {};
+    const categoryOrder = [];
+    for (const chunk of chunks) {
+        const cat = chunk.chunk_type || 'unknown';
+        if (!grouped[cat]) {
+            grouped[cat] = [];
+            categoryOrder.push(cat);
+        }
+        grouped[cat].push(chunk);
     }
-    return '<pre style="white-space: pre-wrap; font-family: inherit;">' + escapeHtml(JSON.stringify(result, null, 2)) + '</pre>';
-}
 
-function updateQueryProgress(progress, message) {
-    document.getElementById('queryProgressFill').style.width = `${progress}%`;
-    document.getElementById('queryProgressText').textContent = `${progress}%`;
-    document.getElementById('queryProgressMessage').textContent = message;
+    const container = document.getElementById('queryResultContent');
+    let html = '';
+    for (const cat of categoryOrder) {
+        const items = grouped[cat];
+        const typeLabel = typeLabels[cat] || cat || '未知';
+        html += `<div class="query-category-group">`;
+        html += `<div class="query-category-title"><i class="fas fa-tag"></i> ${typeLabel}（${items.length}）</div>`;
+        html += items.map(chunk => {
+            const chapterInfo = chunk.chapter_number ? ` · 第${chunk.chapter_number}章` : '';
+            return `
+            <div class="rag-result-card">
+                <div class="rag-result-header">
+                    <span class="rag-result-source">${typeLabel}${chapterInfo}</span>
+                    <span class="rag-result-score">相似度: ${((chunk.score || 0) * 100).toFixed(1)}%</span>
+                </div>
+                <div class="rag-result-content">${escapeHtml(chunk.content || '')}</div>
+            </div>
+            `;
+        }).join('');
+        html += `</div>`;
+    }
+    container.innerHTML = html;
 }
-
-function resetQueryModal() {
-    document.getElementById('querySubmitBtn').disabled = false;
-    document.getElementById('queryProgressContainer').style.display = 'none';
-}
-

@@ -494,6 +494,8 @@ async def get_script_characters(script_id: int):
         ch["agent_id"] = cfg.get("agent_id", "")
         ch["speed"] = cfg.get("speed", 1.0)
         ch["seed"] = cfg.get("seed", 0)
+        ch["tts_capability_id"] = cfg.get("tts_capability_id", "")
+        ch["cloud_extra_params"] = cfg.get("cloud_extra_params", "{}")
     return {"success": True, "characters": characters, "count": len(characters)}
 
 
@@ -527,14 +529,23 @@ async def delete_script_character(script_id: int, role: str):
 async def update_character_config(script_id: int, role: str, request: Request):
     """更新角色配音配置。
 
-    请求体: {"agent_id": "xxx", "speed": 1.0, "seed": 0}
+    请求体: {"agent_id": "xxx", "speed": 1.0, "seed": 0,
+              "tts_capability_id": "...", "cloud_extra_params": "{...}"}
     """
     body = await request.json()
     agent_id = body.get("agent_id", "")
     speed = float(body.get("speed", 1.0))
     seed = int(body.get("seed", 0))
+    tts_capability_id = body.get("tts_capability_id", "")
+    cloud_extra_params = body.get("cloud_extra_params", "{}")
+    if not isinstance(cloud_extra_params, str):
+        import json
+        cloud_extra_params = json.dumps(cloud_extra_params, ensure_ascii=False)
     from repositories import upsert_character_config
-    upsert_character_config(script_id, role, agent_id=agent_id, speed=speed, seed=seed)
+    upsert_character_config(
+        script_id, role, agent_id=agent_id, speed=speed, seed=seed,
+        tts_capability_id=tts_capability_id, cloud_extra_params=cloud_extra_params,
+    )
     return {"success": True, "message": "角色配置已更新"}
 
 
