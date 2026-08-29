@@ -764,7 +764,7 @@
             await loadBookInfo();
             await loadChapters();
             if (chapters.length > 0) {
-                await goToChapter(0);
+                await goToChapter(chapters[0].chapter_index);
             }
         }
 
@@ -827,25 +827,27 @@
             });
         }
 
-        async function goToChapter(index) {
-            if (index < 0 || index >= chapters.length) return;
+        async function goToChapter(chapterIndex) {
+            // 按 chapter_index 查找章节在数组中的位置
+            const arrayIndex = chapters.findIndex(c => c.chapter_index === chapterIndex);
+            if (arrayIndex === -1) return;
 
-            currentChapterIndex = index;
-            const chapter = chapters[index];
+            currentChapterIndex = chapterIndex;
+            const chapter = chapters[arrayIndex];
 
             // 更新目录高亮
             document.querySelectorAll('.chapter-item').forEach(el => {
-                el.classList.toggle('active', parseInt(el.dataset.index) === index);
+                el.classList.toggle('active', parseInt(el.dataset.index) === chapterIndex);
             });
 
             // 更新指示器
-            const indicator = `${index + 1} / ${chapters.length}`;
+            const indicator = `${arrayIndex + 1} / ${chapters.length}`;
             document.getElementById('chapterIndicator').textContent = indicator;
             document.getElementById('footerChapterIndicator').textContent = indicator;
 
             // 更新上下章按钮
-            document.getElementById('prevBtn').disabled = index <= 0;
-            document.getElementById('nextBtn').disabled = index >= chapters.length - 1;
+            document.getElementById('prevBtn').disabled = arrayIndex <= 0;
+            document.getElementById('nextBtn').disabled = arrayIndex >= chapters.length - 1;
 
             // 显示加载状态
             const contentEl = document.getElementById('readerContent');
@@ -853,7 +855,7 @@
 
             // 加载章节内容
             try {
-                const response = await fetch(`/api/books/library/chapters/content?book_id=${bookId}&chapter_index=${index}`);
+                const response = await fetch(`/api/books/library/chapters/content?book_id=${bookId}&chapter_index=${chapterIndex}`);
                 if (!response.ok) {
                     contentEl.innerHTML = `<div class="loading-state"><i class="fas fa-exclamation-circle"></i><p>加载章节内容失败</p></div>`;
                     return;

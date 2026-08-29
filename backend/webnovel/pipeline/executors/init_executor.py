@@ -472,7 +472,7 @@ class InitExecutor(BaseExecutor):
                 "cultivation_chain": project_data.get("cultivation_chain", ""),
             })
 
-            # ============== 金手指设定：始终调用 LLM 获取完整数据（含子表），用户基本字段覆盖 ==============
+            # ============== 金手指详细设定：基于用户选择的方向调用专用 prompt 生成完整设定（含升级路线/爽点/反馈节奏子表），用户基本字段覆盖 ==============
             gf_user_flat = {
                 "type": project_data.get("golden_finger_type", ""),
                 "name": project_data.get("golden_finger_name", ""),
@@ -483,8 +483,8 @@ class InitExecutor(BaseExecutor):
             }
             user_has_basic_gf = bool(gf_user_flat["type"] or gf_user_flat["name"])
 
-            _logger.info(f"[init_executor] 调用 LLM 生成金手指完整数据（用户基本字段: {'有' if user_has_basic_gf else '无'}）")
-            golden_finger_data = await self._call_llm("init_golden_finger", llm_context)
+            _logger.info(f"[init_executor] 调用 LLM 生成金手指详细设定（用户基本字段: {'有' if user_has_basic_gf else '无'}）")
+            golden_finger_data = await self._call_llm("init_golden_finger_detail", llm_context)
 
             if not golden_finger_data or "error" in golden_finger_data:
                 error_msg = golden_finger_data.get("error", "LLM返回空内容") if golden_finger_data else "LLM返回空内容"
@@ -504,10 +504,14 @@ class InitExecutor(BaseExecutor):
 
             gf_data["irreversible_cost"] = gf_data.pop("irre_cost", gf_data.get("irreversible_cost", ""))
 
+            # 字段映射：name→main_role（金手指名称存主要作用列）；
+            # style 仅在 LLM 未生成 visual_expression 时兜底；growth_rhythm→cost_limitation
             if "name" in gf_data:
                 gf_data["main_role"] = gf_data.pop("name")
             if "style" in gf_data:
-                gf_data["visual_expression"] = gf_data.pop("style")
+                style_val = gf_data.pop("style")
+                if not gf_data.get("visual_expression"):
+                    gf_data["visual_expression"] = style_val
             if "growth_rhythm" in gf_data:
                 gf_data["cost_limitation"] = gf_data.pop("growth_rhythm")
 
@@ -529,6 +533,12 @@ class InitExecutor(BaseExecutor):
 
             for feedback in _safe_items(feedback_nodes):
                 add_golden_finger_feedback(gf_id, feedback.get("type", ""), feedback.get("chapter_interval", 0), feedback.get("description", ""))
+
+            if not (_safe_items(upgrade_path) or _safe_items(payoff_points) or _safe_items(feedback_nodes)):
+                _logger.warning(
+                    f"[init_executor] 金手指子表数据为空（升级路线/爽点/反馈节奏均未生成），"
+                    f"LLM返回键: {list(golden_finger_data.keys()) if golden_finger_data else 'None'}"
+                )
 
             llm_context["golden_finger"] = DictObj(gf_data)
 
@@ -842,7 +852,10 @@ class InitExecutor(BaseExecutor):
             await self._notify_progress("character_group", "正在生成角色组...", 85)
             # 构建已有角色名单，注入 llm_context 供 init_character_group prompt 引用
             all_cards = get_character_cards_by_project(project_id)
-            _type_label = {"protagonist": "主角", "heroine": "女主", "villain": "反派", "supporting": "配角"}
+            _type_label = {
+                "protagonist": "主角", "co_protagonist": "主角团核心", "heroine": "女主",
+                "villain": "反派", "supporting": "配角", "minor": "龙套",
+            }
             _char_lines = []
             for card in all_cards:
                 cname = card.get("name", "")

@@ -314,6 +314,63 @@ class SQLiteVectorStore(VectorStoreBase):
             logger.error(f"[VectorStore] 统计失败: {e}")
             return 0
 
+    def list_documents(self, namespace: str, collection: str,
+                       page: int = 1, page_size: int = 20,
+                       chunk_type: str = "") -> dict:
+        """分页列出文档（不含 embedding），可按 chunk_type 过滤。"""
+        conn = _get_conn()
+        try:
+            with _lock:
+                # 构建 WHERE 条件
+                where = "namespace = ? AND collection = ?"
+                params: list = [namespace, collection]
+
+                if chunk_type:
+                    # metadata 是 JSON 字符串（以 { 开头），用 LIKE 匹配 chunk_type
+                    # 前后加 % 通配符：前导 % 匹配 {" 等前缀，中间 % 兼容冒号后有无空格
+                    where += " AND metadata LIKE ?"
+                    params.append(f'{{"chunk_type": "{chunk_type}"%')
+
+                # 先查总数
+                count_row = conn.execute(
+                    f"SELECT COUNT(*) FROM documents WHERE {where}", params
+                ).fetchone()
+                total = count_row[0] if count_row else 0
+
+                # 分页查询（按 id 倒序，最新的在前）
+                offset = (max(1, page) - 1) * page_size
+                cursor = conn.execute(
+                    f"""SELECT id, content, metadata, created_at
+                        FROM documents
+                        WHERE {where}
+                        ORDER BY id DESC
+                        LIMIT ? OFFSET ?""",
+                    params + [page_size, offset],
+                )
+                rows = cursor.fetchall()
+
+            items = []
+            for row in rows:
+                meta = json.loads(row["metadata"]) if row["metadata"] else {}
+                items.append({
+                    "id": row["id"],
+                    "content": row["content"],
+                    "metadata": meta,
+                    "chunk_type": meta.get("chunk_type", ""),
+                    "chapter_number": meta.get("chapter_number", 0),
+                    "created_at": row["created_at"],
+                })
+
+            return {
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "items": items,
+            }
+        except Exception as e:
+            logger.error(f"[VectorStore] 分页列出文档失败: {e}")
+            return {"total": 0, "page": page, "page_size": page_size, "items": []}
+
 
 def get_vector_store() -> SQLiteVectorStore:
     """获取向量存储单例。"""

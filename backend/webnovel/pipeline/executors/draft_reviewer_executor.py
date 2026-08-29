@@ -8,6 +8,7 @@ import json
 from typing import Dict, Any, List
 from ..base_executor import BaseExecutor, ExecutorResult
 from utils.llm_json_parser import parse_llm_json
+from utils.logger import log_manager
 from webnovel.repositories import get_webnovel_project_by_script
 
 
@@ -23,10 +24,18 @@ class DraftReviewerExecutor(BaseExecutor):
         {"key": "consistency", "name": "设定一致", "description": "人物性格、能力、世界观设定在正文中是否保持一致，角色行为是否符合性格"},
         {"key": "rhythm", "name": "节奏控制", "description": "文字节奏是否合理，场景详略是否得当"},
         {"key": "coherence", "name": "叙事连贯", "description": "叙事是否连贯流畅，有无突兀跳跃或断裂"},
-        {"key": "retention", "name": "追读力", "description": "章节结尾是否能吸引读者继续阅读下一章"},
+        {"key": "retention", "name": "结尾自然度", "description": "章节是否收尾于自然节拍，让读者无感知地滑入下一章；设问收束、旁白预告、总结预言、公式化追加悬念应扣分；不要因缺少显式钩子扣分"},
     ]
 
     MAX_REVISIONS = 3
+
+    def __init__(self, script_id: int, chapter_index: int, task_id: int):
+        super().__init__(script_id, chapter_index, task_id)
+        self._logger = log_manager.get_logger("draft_reviewer_executor")
+
+    # 审查通过均分阈值：白描草稿不包含文笔细节，审查聚焦剧情/设定/结构，
+    # 达标线相应提高，推动多轮修改直到骨架质量足够高再交给润色。
+    PASS_AVG_SCORE = 8
 
     async def execute(self, context: Dict[str, Any]) -> ExecutorResult:
         """执行草稿审查，支持最多3次修改。"""
@@ -46,6 +55,13 @@ class DraftReviewerExecutor(BaseExecutor):
             current_draft = draft_content
             revision_count = 0
 
+            # 最优版本保护：每轮审查后记录最高分版本，避免多轮修改后
+            # 草稿反而退化（如修改环节压缩内容导致分数逐轮下降）时，
+            # 最终采用的却是得分最低的最后版本。
+            best_draft = draft_content
+            best_avg_score = -1.0
+            best_review_result = []
+
             while revision_count < self.MAX_REVISIONS:
                 review_result = await self._review_draft(current_draft, writing_context)
                 review_history.append({
@@ -61,7 +77,19 @@ class DraftReviewerExecutor(BaseExecutor):
                     for issue in r.get("issues", [])
                 )
 
-                if avg_score >= 7 and not has_critical_issues:
+                if avg_score > best_avg_score:
+                    best_avg_score = avg_score
+                    best_draft = current_draft
+                    best_review_result = review_result
+
+                if avg_score >= self.PASS_AVG_SCORE and not has_critical_issues:
+                    break
+
+                # 分数相对最优版本下降，继续修改难以收敛，回退到最优版本停止
+                if revision_count > 0 and avg_score < best_avg_score:
+                    self._logger.info(
+                        f"第{revision_count + 1}轮审查均分{avg_score:.2f}低于最优{best_avg_score:.2f}，回退最优版本"
+                    )
                     break
 
                 revision_count += 1
@@ -70,20 +98,20 @@ class DraftReviewerExecutor(BaseExecutor):
                 if not current_draft.strip():
                     break
 
-            final_avg_score = sum(r["score"] for r in review_history[-1]["review_result"]) / len(review_history[-1]["review_result"])
+            final_avg_score = best_avg_score if best_avg_score >= 0 else 0
             
             summary = (
                 f"草稿审查完成：经过{revision_count}次修改，"
-                f"最终平均评分{final_avg_score:.1f}/10"
+                f"最优平均评分{final_avg_score:.1f}/10"
             )
             
             return ExecutorResult(
                 success=True,
                 step_summary=summary,
                 output_data={
-                    "review_result": review_history[-1]["review_result"] if review_history else [],
+                    "review_result": best_review_result or (review_history[-1]["review_result"] if review_history else []),
                     "review_history": review_history,
-                    "revised_draft": current_draft,
+                    "revised_draft": best_draft,
                     "revision_count": revision_count,
                     "final_avg_score": final_avg_score
                 }
@@ -243,11 +271,11 @@ class DraftReviewerExecutor(BaseExecutor):
         result = await executor.execute_text_chat(
             prompt=prompt,
             system_prompt=system_prompt,
-            max_tokens=1500,
+            max_tokens=3000,
             script_id=self.script_id,
             project_id=project_id,
             executor_name="draft_reviewer_executor",
-            prompt_name="cool_point_extract",
+            prompt_name="revise_draft",
         )
 
         raw_content = result.get("content", "") if result else ""

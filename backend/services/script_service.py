@@ -1176,6 +1176,14 @@ class ScriptService:
         # 使用数据库中的进度信息（即使任务信息丢失也能显示）
         if script.get("progress_message"):
             script["task_message"] = script["progress_message"]
+
+        # 附加书本的作者信息（author 存储在 ebook_library 表）
+        book_id = script.get("book_id")
+        if book_id:
+            book = get_ebook(book_id)
+            if book:
+                script["author"] = book.get("author", "")
+
         return script
 
     def get_script_lines(self, script_id: int,

@@ -42,6 +42,13 @@ class TextToVectorRequest(BaseModel):
     capability_id: Optional[str] = None
 
 
+class TextRerankRequest(BaseModel):
+    query: str
+    documents: List[str]
+    top_k: int = 5
+    capability_id: Optional[str] = None
+
+
 class CapabilityConfigRequest(BaseModel):
     model_config = {"protected_namespaces": ()}
     
@@ -284,6 +291,24 @@ async def text_to_vector(request: TextToVectorRequest):
         raise HTTPException(status_code=500, detail=f"文本转向量失败: {e}")
 
 
+@router.post("/api/capabilities/text-rerank")
+async def text_rerank(request: TextRerankRequest):
+    """执行片段重排序"""
+    try:
+        result = await model_executor.execute_rerank(
+            query=request.query,
+            documents=request.documents,
+            top_k=request.top_k,
+            capability_id=request.capability_id
+        )
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+    except Exception as e:
+        _logger.error(f"片段重排序失败: {e}")
+        raise HTTPException(status_code=500, detail=f"片段重排序失败: {e}")
+
+
 # ===================== 测试历史 API =====================
 
 class TestRequest(BaseModel):
@@ -383,6 +408,21 @@ async def test_capability(request: TestRequest):
                 error_message = result["error"]
             else:
                 output_data = str(len(result.get("vectors", [])) if result else 0) + " vectors"
+        elif capability_type == "text_rerank":
+            query = input_data.get("query", "")
+            documents = input_data.get("documents", [])
+            top_k = int(input_data.get("top_k", 5) or 5)
+            result = await model_executor.execute_rerank(
+                query=query,
+                documents=documents,
+                top_k=top_k,
+                capability_id=capability_id
+            )
+            if "error" in result:
+                status = "failed"
+                error_message = result["error"]
+            else:
+                output_data = str(len(result.get("results", []) if result else 0)) + " reranked"
         else:
             raise HTTPException(status_code=400, detail=f"未知的能力类型: {capability_type}")
 
@@ -452,10 +492,8 @@ CALL_POINT_DETAILS = {
     "draft_reviewer": {"name": "质量审查", "description": "草稿多维度质量审查"},
     "fact_recorder": {"name": "事实记录", "description": "剧情事实提取与记录"},
     "setting_recorder": {"name": "设定记录", "description": "世界观设定提取与记录"},
-    "review_executor": {"name": "章节评审", "description": "章节内容评审"},
     "context_builder": {"name": "上下文构建", "description": "写作上下文构建"},
     "query_executor": {"name": "查询执行", "description": "信息查询"},
-    "learn_executor": {"name": "学习执行", "description": "知识学习"},
     "story_system": {"name": "故事系统", "description": "故事系统生成"},
     "chapter_plot_reviewer": {"name": "剧情审查", "description": "章节剧情审查"},
     "foreshadow_cool_point_extractor": {"name": "伏笔爽点提取", "description": "伏笔和爽点提取"},

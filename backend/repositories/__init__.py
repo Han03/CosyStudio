@@ -37,7 +37,7 @@ from .capability_test_repository import (
 
 from .writing_tasks_repository import (
     add_writing_task, get_writing_tasks, get_writing_task, update_writing_task,
-    delete_writing_task, get_running_tasks
+    delete_writing_task, get_running_tasks, get_active_writing_tasks
 )
 from .chapter_versions_repository import (
     add_chapter_version, get_chapter_versions, get_chapter_version_detail,

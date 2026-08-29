@@ -3,7 +3,15 @@ import torch
 import logging
 from typing import List, Optional
 
+import numpy as np
+
 logger = logging.getLogger(__name__)
+
+# Qwen3-Embedding 官方 instruction prefix（来自 config_sentence_transformers.json）
+_QUERY_INSTRUCTION = (
+    "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
+)
+_DOCUMENT_INSTRUCTION = ""
 
 
 class QwenEmbeddingModel:
@@ -56,20 +64,30 @@ class QwenEmbeddingModel:
     def is_loaded(self):
         return self._loaded and self.model is not None
 
-    def encode(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def encode(self, texts: List[str], batch_size: int = 32,
+               is_query: bool = False) -> List[List[float]]:
         """
         对文本列表进行编码，返回嵌入向量列表。
+
+        使用 last-token pooling（Qwen3-Embedding 官方推荐）+ L2 归一化。
+        query 文本会自动添加 instruction prefix 以提升检索效果。
 
         Args:
             texts: 文本列表
             batch_size: 批处理大小
+            is_query: 是否为查询文本（True 时添加 instruction prefix）
 
         Returns:
-            嵌入向量列表，每个向量是float列表
+            嵌入向量列表，每个向量是已归一化的 float 列表
         """
         if not self.is_loaded():
             logger.error("[QwenEmbedding] 模型未加载，无法编码")
             return []
+
+        # 为 query 添加 instruction prefix，document 不添加
+        instruction = _QUERY_INSTRUCTION if is_query else _DOCUMENT_INSTRUCTION
+        if instruction:
+            texts = [f"{instruction}{t}" for t in texts]
 
         all_embeddings = []
         for i in range(0, len(texts), batch_size):
@@ -85,8 +103,21 @@ class QwenEmbeddingModel:
                     ).to(self.device)
 
                     outputs = self.model(**inputs)
-                    embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy().tolist()
-                    all_embeddings.extend(embeddings)
+                    hidden_states = outputs.last_hidden_state
+
+                    # Last-token pooling：取每个序列最后一个有效 token 的隐藏状态
+                    # （Qwen3-Embedding 为 decoder-only 架构，官方配置 pooling_mode_lasttoken=true）
+                    attention_mask = inputs["attention_mask"]
+                    # 找到每个序列最后一个非 padding token 的位置
+                    seq_lengths = attention_mask.sum(dim=1) - 1  # (batch_size,)
+                    batch_indices = torch.arange(hidden_states.size(0), device=hidden_states.device)
+                    last_token_embeddings = hidden_states[batch_indices, seq_lengths, :]
+
+                    # L2 归一化（模型 pipeline 包含 Normalize 层）
+                    normalized = torch.nn.functional.normalize(
+                        last_token_embeddings, p=2, dim=1
+                    )
+                    all_embeddings.extend(normalized.cpu().numpy().tolist())
             except Exception as e:
                 logger.error(f"[QwenEmbedding] 编码失败: {e}")
                 all_embeddings.extend([[]] * len(batch_texts))
@@ -96,6 +127,8 @@ class QwenEmbeddingModel:
     def similarity(self, text1: str, text2: str) -> float:
         """
         计算两个文本的相似度（余弦相似度）。
+
+        由于 encode 已做 L2 归一化，相似度直接用点积即可。
 
         Args:
             text1: 第一个文本
@@ -113,11 +146,11 @@ class QwenEmbeddingModel:
             if len(embeddings) < 2 or not embeddings[0] or not embeddings[1]:
                 return 0.0
 
-            import numpy as np
             vec1 = np.array(embeddings[0])
             vec2 = np.array(embeddings[1])
-            similarity = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-            return float(similarity)
+            # 已归一化的向量，点积即余弦相似度
+            similarity = float(np.dot(vec1, vec2))
+            return max(0.0, similarity)
         except Exception as e:
             logger.error(f"[QwenEmbedding] 计算相似度失败: {e}")
             return 0.0
@@ -139,26 +172,24 @@ class QwenEmbeddingModel:
             return []
 
         try:
-            all_texts = [query] + documents
-            embeddings = self.encode(all_texts)
+            # query 用 is_query=True，documents 用默认 is_query=False
+            query_embeddings = self.encode([query], is_query=True)
+            doc_embeddings = self.encode(documents)
 
-            if len(embeddings) < len(all_texts):
+            if not query_embeddings or not query_embeddings[0]:
                 return []
 
-            query_embedding = embeddings[0]
-            doc_embeddings = embeddings[1:]
-
-            import numpy as np
-            query_vec = np.array(query_embedding)
+            query_vec = np.array(query_embeddings[0])
             similarities = []
 
-            for i, doc_embedding in enumerate(doc_embeddings):
-                if not doc_embedding:
+            for i, doc_emb in enumerate(doc_embeddings):
+                if not doc_emb:
                     similarities.append((i, 0.0))
                     continue
-                doc_vec = np.array(doc_embedding)
-                similarity = np.dot(query_vec, doc_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(doc_vec))
-                similarities.append((i, float(similarity)))
+                doc_vec = np.array(doc_emb)
+                # 已归一化，点积即余弦相似度
+                similarity = float(np.dot(query_vec, doc_vec))
+                similarities.append((i, max(0.0, similarity)))
 
             similarities.sort(key=lambda x: x[1], reverse=True)
 

@@ -23,6 +23,8 @@ scripts/
 voice_example/
 logs/
 data/cache/
+data/logs/
+data/output/
 
 #test
 test/

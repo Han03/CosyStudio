@@ -57,3 +57,19 @@ class VectorStoreBase(ABC):
     def count(self, namespace: Optional[str] = None,
               collection: Optional[str] = None) -> int:
         """统计文档数量。可按 namespace / collection 过滤。"""
+
+    def list_documents(self, namespace: str, collection: str,
+                       page: int = 1, page_size: int = 20,
+                       chunk_type: str = "") -> dict:
+        """分页列出文档（不含 embedding）。
+
+        Args:
+            namespace: 命名空间
+            collection: 集合名
+            page: 页码（从 1 开始）
+            page_size: 每页条数
+            chunk_type: 可选，按 chunk_type 过滤（空字符串表示不过滤）
+
+        Returns:
+            包含 total、page、page_size、items 的字典
+        """

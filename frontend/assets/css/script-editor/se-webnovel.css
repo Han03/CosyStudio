@@ -1113,6 +1113,7 @@
 }
 
 .cc-type-protagonist { background: rgba(52, 152, 219, 0.15); color: #2980b9; }
+.cc-type-co_protagonist { background: rgba(41, 128, 185, 0.10); color: #3498db; }
 .cc-type-heroine { background: rgba(233, 30, 99, 0.12); color: #c2185b; }
 .cc-type-villain { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
 .cc-type-mentor { background: rgba(156, 39, 176, 0.12); color: #9c27b0; }
@@ -1121,6 +1122,7 @@
 .cc-type-love_interest { background: rgba(255, 105, 180, 0.12); color: #e91e63; }
 .cc-type-sidekick { background: rgba(0, 188, 212, 0.12); color: #0097a7; }
 .cc-type-comic_relief { background: rgba(255, 193, 7, 0.15); color: #f9a825; }
+.cc-type-minor { background: rgba(120, 144, 156, 0.12); color: #90a4ae; }
 .cc-type-other { background: rgba(158, 158, 158, 0.15); color: #757575; }
 
 /* 信息格 */
@@ -1177,6 +1179,29 @@
     font-size: 11px;
     color: var(--neu-text-muted);
     line-height: 1.5;
+}
+
+/* 随身物品（只读展示，持有中为高亮徽章，已失去置灰） */
+.cc-items-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.cc-item-chip {
+    background: rgba(108, 92, 231, 0.08);
+    border: 1px solid rgba(108, 92, 231, 0.22);
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: var(--neu-text);
+    cursor: default;
+}
+
+.cc-item-chip.cc-item-lost {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: var(--neu-text-muted);
 }
 
 /* 角色组信息 */

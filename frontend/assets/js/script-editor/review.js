@@ -18,26 +18,6 @@ async function loadChapterReview() {
     }
 }
 
-async function manualReviewChapter() {
-    const content = document.querySelector('.chapter-textarea')?.value || '';
-    if (!content || !state.scriptId || state.currentChapterIndex < 0) {
-        alert('请先选择章节并输入内容');
-        return;
-    }
-
-    try {
-        const data = await apiRequest(`/api/books/scripts/chapters/review?script_id=${state.scriptId}&chapter_index=${state.currentChapterIndex}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content }),
-            errorPrefix: '审查失败'
-        });
-        renderReviewResults(data.review);
-    } catch (e) {
-        console.error('审查失败:', e);
-    }
-}
-
 function renderReviewResults(review) {
     const grid = document.getElementById('reviewScoresGrid');
     const summary = document.getElementById('reviewSummary');

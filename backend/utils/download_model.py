@@ -5,11 +5,14 @@ import time
 import threading
 import logging
 import traceback
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 作为独立子进程运行时，需将 backend 目录加入路径以便导入 utils./core. 模块
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils.common_utils import get_directory_size
 
 from core.paths import LOG_DIR
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -118,6 +121,8 @@ def download_model(model_name, save_dir, status_file_path, source="modelscope", 
         logger.info("进度更新线程启动")
         last_update_time = time.time()
         last_size = 0
+        last_prepare_write_time = 0
+        last_progress = 0
         while not progress_stop_event.is_set():
             try:
                 current_size = get_directory_size(save_dir)
@@ -175,9 +180,25 @@ def download_model(model_name, save_dir, status_file_path, source="modelscope", 
                         "eta_str": eta_str,
                         "path": save_dir
                     }
+                    last_progress = progress
                     try:
                         update_status(status_data)
                         logger.info("进度更新: %d%% (%d bytes, %s)", progress, current_size, speed_str)
+                    except Exception as e:
+                        logger.error("写入状态文件失败: %s", e)
+                elif current_time - last_prepare_write_time >= 5:
+                    # 文件大小未增长（准备阶段），低频写入状态避免前端长时间无反馈
+                    last_prepare_write_time = current_time
+                    try:
+                        update_status({
+                            "status": "downloading",
+                            "progress": last_progress,
+                            "message": "正在准备下载...",
+                            "model_name": model_name,
+                            "downloaded_bytes": current_size,
+                            "total_bytes": total_size_estimate,
+                            "path": save_dir
+                        })
                     except Exception as e:
                         logger.error("写入状态文件失败: %s", e)
             except Exception as e:

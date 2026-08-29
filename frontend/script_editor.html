@@ -46,12 +46,6 @@
             <button class="neu-btn-lg" onclick="showQueryModal()" title="状态查询">
                 <i class="fas fa-question-circle"></i> 查询
             </button>
-            <button class="neu-btn-lg" onclick="showDoctorModal()" title="项目体检">
-                <i class="fas fa-heartbeat"></i> 体检
-            </button>
-            <button class="neu-btn-lg" onclick="showLearnModal()" title="项目学习">
-                <i class="fas fa-book-reader"></i> 学习
-            </button>
             <button class="neu-btn-lg" onclick="showDashboardModal()" title="可视化面板">
                 <i class="fas fa-chart-pie"></i> 面板
             </button>
@@ -194,7 +188,7 @@
             <!-- 角色选择区域 -->
             <div class="audio-section" style="flex: 1; display: flex; flex-direction: column;">
                 <div class="audio-section-title">
-                    <span><i class="fas fa-users"></i> 角色</span>
+                    <span><i class="fas fa-users"></i> 配音角色 </span>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <span class="badge bg-secondary" id="characterCountBadge">0</span>
                         <button class="character-add-btn" onclick="addNewCharacter()" title="新增配音角色">
@@ -351,8 +345,6 @@
     <script src="assets/js/script-editor/init.js"></script>
     <script src="assets/js/script-editor/plan.js"></script>
     <script src="assets/js/script-editor/query.js"></script>
-    <script src="assets/js/script-editor/doctor.js"></script>
-    <script src="assets/js/script-editor/learn.js"></script>
     <script src="assets/js/script-editor/dashboard.js"></script>
     <script src="assets/js/script-editor/websocket.js"></script>
     <script src="assets/js/script-editor/picker.js"></script>
@@ -781,7 +773,7 @@
     <div id="tasksModal" class="modal-overlay tasks-modal" style="display:none;">
         <div class="modal-dialog">
             <div class="modal-header">
-                <h3><i class="fas fa-tasks"></i> 写作任务管理</h3>
+                <h3><i class="fas fa-tasks"></i> 全局任务管理</h3>
                 <button class="modal-close" onclick="closeTasksModal()">×</button>
             </div>
             <div class="modal-body">
@@ -890,8 +882,8 @@
                                     <input type="text" id="initCreateBookAuthor" class="init-input" placeholder="输入作者名（可选）">
                                 </div>
                                 <div class="init-form-group">
-                                    <label>简介</label>
-                                    <textarea id="initCreateBookDesc" class="init-textarea" rows="3" placeholder="一句话简介（可选）"></textarea>
+                                    <label>备注</label>
+                                    <textarea id="initCreateBookDesc" class="init-textarea" rows="3" placeholder="输入备注（可选）"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -911,6 +903,24 @@
                         <div class="continue-section">
                             <div class="continue-section-title">
                                 <i class="fas fa-info-circle"></i> 故事核与商业定位
+                            </div>
+                            <div id="step2AiZone" class="ai-gen-zone">
+                                <div id="step2AiPlaceholder" class="ai-gen-placeholder">
+                                    <div class="ai-gen-placeholder-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                                    <div class="ai-gen-placeholder-text">
+                                        <div class="ai-gen-placeholder-title">智能生成故事核与商业定位</div>
+                                        <div class="ai-gen-placeholder-desc">AI 将根据你的题材，生成 3 套差异化方案供你选择</div>
+                                    </div>
+                                    <button class="btn btn-ai-generate" onclick="generateAiData()"><i class="fas fa-wand-magic-sparkles"></i> 智能生成</button>
+                                </div>
+                                <div id="step2AiLoading" class="ai-gen-loading" style="display:none;">
+                                    <div class="ai-gen-spinner"></div>
+                                    <span>正在为你生成方案...</span>
+                                </div>
+                                <div id="step2AiResult" class="ai-gen-result" style="display:none;"></div>
+                            </div>
+                            <div id="step2OptionsContainer" class="step-options-container" style="display:none;">
+                                <div id="step2OptionsList"></div>
                             </div>
                             <div class="continue-prompt-area">
                                 <div class="init-form-row">
@@ -981,6 +991,24 @@
                             <div class="continue-section-title">
                                 <i class="fas fa-user"></i> 角色骨架与关系冲突
                             </div>
+                            <div id="step3AiZone" class="ai-gen-zone">
+                                <div id="step3AiPlaceholder" class="ai-gen-placeholder">
+                                    <div class="ai-gen-placeholder-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                                    <div class="ai-gen-placeholder-text">
+                                        <div class="ai-gen-placeholder-title">智能生成角色设定</div>
+                                        <div class="ai-gen-placeholder-desc">AI 将生成 3 套主角设定与关系冲突方案</div>
+                                    </div>
+                                    <button class="btn btn-ai-generate" onclick="generateAiData()"><i class="fas fa-wand-magic-sparkles"></i> 智能生成</button>
+                                </div>
+                                <div id="step3AiLoading" class="ai-gen-loading" style="display:none;">
+                                    <div class="ai-gen-spinner"></div>
+                                    <span>正在为你生成方案...</span>
+                                </div>
+                                <div id="step3AiResult" class="ai-gen-result" style="display:none;"></div>
+                            </div>
+                            <div id="step3OptionsContainer" class="step-options-container" style="display:none;">
+                                <div id="step3OptionsList"></div>
+                            </div>
                             <div class="continue-prompt-area">
                                 <div class="init-form-row">
                                     <div class="init-form-group">
@@ -1048,6 +1076,24 @@
                             <div class="continue-section-title">
                                 <i class="fas fa-star"></i> 金手指与兑现机制 <span class="init-optional">(特定题材必填)</span>
                             </div>
+                            <div id="step4AiZone" class="ai-gen-zone">
+                                <div id="step4AiPlaceholder" class="ai-gen-placeholder">
+                                    <div class="ai-gen-placeholder-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                                    <div class="ai-gen-placeholder-text">
+                                        <div class="ai-gen-placeholder-title">智能生成金手指设计</div>
+                                        <div class="ai-gen-placeholder-desc">AI 将生成 3 套金手指方案，含类型、风格与代价机制</div>
+                                    </div>
+                                    <button class="btn btn-ai-generate" onclick="generateAiData()"><i class="fas fa-wand-magic-sparkles"></i> 智能生成</button>
+                                </div>
+                                <div id="step4AiLoading" class="ai-gen-loading" style="display:none;">
+                                    <div class="ai-gen-spinner"></div>
+                                    <span>正在为你生成方案...</span>
+                                </div>
+                                <div id="step4AiResult" class="ai-gen-result" style="display:none;"></div>
+                            </div>
+                            <div id="step4OptionsContainer" class="step-options-container" style="display:none;">
+                                <div id="step4OptionsList"></div>
+                            </div>
                             <div class="continue-prompt-area">
                                 <div class="init-form-row">
                                     <div class="init-form-group">
@@ -1110,6 +1156,24 @@
                         <div class="continue-section">
                             <div class="continue-section-title">
                                 <i class="fas fa-globe"></i> 世界观与力量规则 <span class="init-optional">(特定题材必填)</span>
+                            </div>
+                            <div id="step5AiZone" class="ai-gen-zone">
+                                <div id="step5AiPlaceholder" class="ai-gen-placeholder">
+                                    <div class="ai-gen-placeholder-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                                    <div class="ai-gen-placeholder-text">
+                                        <div class="ai-gen-placeholder-title">智能生成世界观设定</div>
+                                        <div class="ai-gen-placeholder-desc">AI 将生成 3 套世界观与力量体系方案</div>
+                                    </div>
+                                    <button class="btn btn-ai-generate" onclick="generateAiData()"><i class="fas fa-wand-magic-sparkles"></i> 智能生成</button>
+                                </div>
+                                <div id="step5AiLoading" class="ai-gen-loading" style="display:none;">
+                                    <div class="ai-gen-spinner"></div>
+                                    <span>正在为你生成方案...</span>
+                                </div>
+                                <div id="step5AiResult" class="ai-gen-result" style="display:none;"></div>
+                            </div>
+                            <div id="step5OptionsContainer" class="step-options-container" style="display:none;">
+                                <div id="step5OptionsList"></div>
                             </div>
                             <div class="continue-prompt-area">
                                 <div class="init-form-row">
@@ -1176,6 +1240,21 @@
                             <div class="continue-section-title">
                                 <i class="fas fa-lock"></i> 创意约束包（差异化核心）
                             </div>
+                            <div id="step6AiZone" class="ai-gen-zone">
+                                <div id="step6AiPlaceholder" class="ai-gen-placeholder">
+                                    <div class="ai-gen-placeholder-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                                    <div class="ai-gen-placeholder-text">
+                                        <div class="ai-gen-placeholder-title">智能生成创意约束包</div>
+                                        <div class="ai-gen-placeholder-desc">AI 将生成 3 套差异化约束方案，含反套路规则与卖点设计</div>
+                                    </div>
+                                    <button class="btn btn-ai-generate" onclick="generateAiData()"><i class="fas fa-wand-magic-sparkles"></i> 智能生成</button>
+                                </div>
+                                <div id="step6AiLoading" class="ai-gen-loading" style="display:none;">
+                                    <div class="ai-gen-spinner"></div>
+                                    <span>正在为你生成方案...</span>
+                                </div>
+                                <div id="step6AiResult" class="ai-gen-result" style="display:none;"></div>
+                            </div>
                             <div id="constraintPackagesContainer" style="display:none;">
                                 <div id="constraintPackagesList"></div>
                             </div>
@@ -1236,26 +1315,50 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="initModalFooterCloseBtn" onclick="closeInitModal()">关闭</button>
-                <button class="btn btn-warning" id="initAiBtn" onclick="generateAiData()" style="display:none;">AI生成</button>
                 <button class="btn btn-primary" id="initPrevBtn" onclick="prevStep()" style="display:none;">上一步</button>
                 <button class="btn btn-danger" id="initCancelBtn" onclick="cancelInit()" style="display:none;">取消任务</button>
                 <button class="btn btn-primary" id="initNextBtn" onclick="nextStep()">下一步</button>
+            </div>
+            <!-- 选项详情浮层 -->
+            <div id="optionDetailOverlay" class="modal-overlay option-detail-modal" style="display:none;" onclick="if(event.target===this)closeOptionDetail()">
+                <div class="modal-dialog" style="max-width:560px;">
+                    <div class="modal-header">
+                        <h3 id="optionDetailTitle" style="display:flex;align-items:center;gap:8px;"></h3>
+                        <div id="optionDetailScore" class="option-detail-score"></div>
+                        <button class="modal-close" onclick="closeOptionDetail()">&times;</button>
+                    </div>
+                    <div id="optionDetailContent" class="modal-body"></div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeOptionDetail()">关闭</button>
+                        <button id="optionDetailSelectBtn" class="btn btn-primary" onclick="confirmOptionSelect()">选择此方案</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- 状态查询模态框 -->
     <div id="queryModal" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog" style="max-width: 650px;">
+        <div class="modal-dialog" style="max-width: 700px; max-height: 85vh;">
             <div class="modal-header">
                 <h3><i class="fas fa-search"></i> 状态查询</h3>
                 <button class="modal-close" onclick="closeQueryModal()">×</button>
             </div>
             <div class="modal-body">
+                <!-- 搜索框 -->
                 <div class="rag-search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="queryQuestion" placeholder="输入问题，例如：主角当前的修为境界是多少？" onkeydown="if(event.key==='Enter')submitQuery()">
+                    <div class="rag-search-inner">
+                        <i class="fas fa-search rag-search-icon"></i>
+                        <input type="text" id="queryQuestion" placeholder="输入查询内容，例如：主角当前的修为境界" onkeydown="if(event.key==='Enter')submitQuery()" oninput="toggleQueryClearBtn()">
+                        <button class="query-clear-btn" id="queryClearBtn" style="display:none;" onclick="clearQuerySearch()" title="清空搜索">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button class="query-search-btn" onclick="submitQuery()" title="搜索">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
                 </div>
+                <!-- 查询结果区（搜索后显示） -->
                 <div id="queryLoading" style="display:none; text-align:center; padding:20px; color:var(--neu-text-muted);">
                     <i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>检索中...
                 </div>
@@ -1266,108 +1369,40 @@
                     <i class="fas fa-inbox" style="font-size:24px; margin-bottom:8px; display:block;"></i>
                     <span>未找到相关内容</span>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeQueryModal()">关闭</button>
-                <button class="btn btn-primary" id="querySubmitBtn" onclick="submitQuery()">查询</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 项目体检模态框 -->
-    <div id="doctorModal" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog" style="max-width: 700px;">
-            <div class="modal-header">
-                <h3><i class="fas fa-heartbeat"></i> 项目体检</h3>
-                <button class="modal-close" onclick="closeDoctorModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="continue-section">
-                    <div class="continue-section-title">
-                        <i class="fas fa-stethoscope"></i> 体检选项
-                    </div>
-                    <div class="continue-prompt-area">
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="doctorDeep" checked>
-                            深度体检（检查设定一致性、逻辑漏洞等）
-                        </label>
-                        <p style="font-size: 12px; color: var(--neu-text-muted); margin-top: 8px;">
-                            深度体检会检查角色行为一致性、能力体系平衡性、时间线逻辑等多个维度。
-                        </p>
-                    </div>
-                </div>
-
-                <div class="continue-progress-container" id="doctorProgressContainer" style="display:none;">
-                    <div class="continue-progress-bar">
-                        <div class="continue-progress-fill" id="doctorProgressFill" style="width: 0%"></div>
-                    </div>
-                    <div class="continue-progress-info">
-                        <span id="doctorProgressText">0%</span>
-                        <span id="doctorProgressMessage">体检中...</span>
-                    </div>
-                </div>
-
-                <div id="doctorResult" style="display:none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <div style="font-weight: 600;">体检报告</div>
-                        <span id="doctorScoreBadge" class="badge" style="font-size: 14px;"></span>
-                    </div>
-                    <div id="doctorIssues" style="margin-bottom: 12px;"></div>
-                    <div id="doctorSuggestions"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeDoctorModal()">关闭</button>
-                <button class="btn btn-primary" id="doctorStartBtn" onclick="startDoctor()">开始体检</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 项目学习模态框 -->
-    <div id="learnModal" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3><i class="fas fa-book-reader"></i> 项目学习</h3>
-                <button class="modal-close" onclick="closeLearnModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="continue-section">
-                    <div class="continue-section-title">
-                        <i class="fas fa-graduation-cap"></i> 学习内容
-                    </div>
-                    <div class="continue-prompt-area">
-                        <div style="margin-bottom: 12px;">
-                            <label>当前章节</label>
-                            <select id="learnChapterSelect" class="form-control">
-                                <option value="">请选择章节</option>
-                            </select>
+                <!-- 浏览全部区（默认显示，搜索后隐藏） -->
+                <div id="queryPanelBrowse">
+                    <div class="rag-browse-toolbar">
+                        <div class="rag-browse-filters" id="ragBrowseFilters">
+                            <span class="rag-browse-filter active" data-type="" onclick="filterRagBrowse('')">全部</span>
+                            <span class="rag-browse-filter" data-type="character" onclick="filterRagBrowse('character')">角色</span>
+                            <span class="rag-browse-filter" data-type="worldview" onclick="filterRagBrowse('worldview')">世界观</span>
+                            <span class="rag-browse-filter" data-type="power_system" onclick="filterRagBrowse('power_system')">力量体系</span>
+                            <span class="rag-browse-filter" data-type="golden_finger" onclick="filterRagBrowse('golden_finger')">金手指</span>
+                            <span class="rag-browse-filter" data-type="volume_outline" onclick="filterRagBrowse('volume_outline')">卷纲</span>
+                            <span class="rag-browse-filter" data-type="foreshadow" onclick="filterRagBrowse('foreshadow')">伏笔</span>
+                            <span class="rag-browse-filter" data-type="chapter" onclick="filterRagBrowse('chapter')">章节</span>
+                            <span class="rag-browse-filter" data-type="chapter_summary" onclick="filterRagBrowse('chapter_summary')">章节摘要</span>
+                            <span class="rag-browse-filter" data-type="chapter_paragraph" onclick="filterRagBrowse('chapter_paragraph')">章节原文</span>
                         </div>
-                        <label>学习内容或写作心得</label>
-                        <textarea id="learnContent" class="form-control" rows="4" placeholder="输入要学习的内容，例如：
-1. 战斗描写的节奏控制技巧
-2. 对话中的潜台词设计
-3. 如何制造悬念和钩子..."></textarea>
+                        <div class="rag-browse-stats" id="ragBrowseStats"></div>
                     </div>
-                </div>
-
-                <div class="continue-progress-container" id="learnProgressContainer" style="display:none;">
-                    <div class="continue-progress-bar">
-                        <div class="continue-progress-fill" id="learnProgressFill" style="width: 0%"></div>
+                    <div class="rag-browse-list" id="ragBrowseList">
+                        <div class="rag-empty">
+                            <i class="fas fa-database"></i>
+                            <p>加载中...</p>
+                        </div>
                     </div>
-                    <div class="continue-progress-info">
-                        <span id="learnProgressText">0%</span>
-                        <span id="learnProgressMessage">学习中...</span>
-                    </div>
-                </div>
-
-                <div id="learnResult" style="display:none; margin-top: 12px;">
-                    <div style="font-weight: 600; margin-bottom: 8px;">学习成果</div>
-                    <div id="learnResultContent"></div>
+                    <div class="rag-browse-pagination" id="ragBrowsePagination"></div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeLearnModal()">关闭</button>
-                <button class="btn btn-primary" id="learnStartBtn" onclick="startLearn()">开始学习</button>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn btn-secondary" id="reindexRagBtn" onclick="startReindexRag()" title="清空旧向量数据并重新索引项目设定和所有章节内容">
+                        <i class="fas fa-sync-alt"></i> 重建RAG索引
+                    </button>
+                    <span id="reindexProgressText" style="font-size:12px; color:var(--neu-text-muted); display:none;"></span>
+                </div>
+                <button class="btn btn-secondary" onclick="closeQueryModal()">关闭</button>
             </div>
         </div>
     </div>

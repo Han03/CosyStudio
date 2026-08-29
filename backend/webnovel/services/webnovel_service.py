@@ -4,7 +4,7 @@
 1. 上下文构建（前文、角色、世界观、名词解释、卷纲规划）
 2. RAG语义检索
 3. 章节创作（起草、审查、润色）
-4. 质量审查（爽点、一致性、节奏、OOC、连贯性、追读力）
+4. 质量审查（爽点、一致性、节奏、OOC、连贯性、结尾自然度）
 5. 事实记录
 6. 自动备份
 7. 后台任务管理
@@ -21,39 +21,273 @@ from datetime import datetime
 
 from utils.logger import log_manager
 from repositories import (
-    get_script, get_script_chapters_all, get_script_chapter, get_script_lines, get_script_characters,
+    get_script, get_script_chapters_all, get_script_chapter,
     get_writing_tasks, add_writing_task, update_writing_task, get_writing_task,
+    delete_writing_task, get_active_writing_tasks,
     get_ebook, get_chapters
 )
 from webnovel.repositories import (
     get_webnovel_project_by_script, get_volume_outlines_by_project,
     get_chapter_meta_list, get_chapter_meta, update_chapter_meta,
-    add_review_record, get_review_records, get_chapter_review_summary,
+    add_review_record, get_review_records, delete_chapter_review_records,
     get_worldview_by_project, get_timelines_by_project, add_timeline, add_timeline_chapter,
     get_webnovel_state_by_project, update_webnovel_state, add_webnovel_state,
     get_chapter_plans_by_volume,
     get_character_cards_by_project, get_golden_finger_by_project,
     get_power_system_by_project, get_foreshadows_by_project, get_villains_by_project,
+    get_character_card, get_character_items_by_project,
 )
 from core.model_executor import get_model_executor
 from infrastructure.websocket_broadcast import ws_broadcast_manager
 
 
+# character_type 存储为英文，须翻译为中文以匹配中文查询（与 init_executor._type_label 保持一致）
+_CHAR_TYPE_LABELS = {
+    'protagonist': '主角', 'co_protagonist': '主角团核心', 'heroine': '女主',
+    'villain': '反派', 'supporting': '配角', 'minor': '龙套',
+}
+
+
+def _normalize_field_value(val, enumerated: bool = False) -> str:
+    """将字段值统一转换为适合索引的自然语言文本。
+
+    字段值可能是列表、JSON 数组字符串或普通字符串；
+    枚举型字段（境界链、标签等）按常见分隔符拆分后用顿号连接以保留枚举结构，
+    其余字段原样使用，避免拆碎自然描述。
+    """
+    if val is None:
+        return ""
+    if isinstance(val, (list, tuple)):
+        return "、".join(str(x).strip() for x in val if str(x).strip())
+    if isinstance(val, str):
+        text = val.strip()
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+                if isinstance(parsed, list):
+                    return "、".join(str(x).strip() for x in parsed if str(x).strip())
+            except (ValueError, TypeError):
+                pass
+        if enumerated:
+            items = [s.strip() for s in re.split(r"[、，,;；\n]", text) if s.strip()]
+            return "、".join(items)
+        return text
+    return str(val).strip()
+
+
+def _join_field_sentences(field_specs: list, data: dict) -> str:
+    """按字段规格拼装自然语句，逐字段遍历确保非空字段不丢失。
+
+    field_specs: [(字段名, 语句模板, 是否枚举型字段)]，模板以 {v} 占位。
+    返回逗号连接的语句主体（不含句末句号）；无非空字段时返回空字符串。
+    """
+    clauses = []
+    for key, template, enumerated in field_specs:
+        val = _normalize_field_value(data.get(key, ''), enumerated)
+        if val:
+            clauses.append(template.format(v=val))
+    return "，".join(clauses)
+
+
+def _build_character_chunk_text(char: dict) -> str:
+    """将角色卡格式化为自然描述的 RAG 索引文本（全量索引与增量重建共用）。
+
+    采用自然陈述句并保留字段词（如"核心欲望是……"），以贴合自然语言查询；
+    字段名须与 webnovel_character_card 表 schema 一致。
+    """
+    if not char or not char.get('name', ''):
+        return ""
+    name = char.get('name', '')
+    raw_type = char.get('character_type', '')
+    type_label = _CHAR_TYPE_LABELS.get(raw_type, raw_type)
+    opener = f"{name}是本作的{type_label}。" if type_label else f"{name}是本作登场的角色。"
+    field_specs = [
+        ('identity', '其身份是{v}', False),
+        ('core_personality', '性格{v}', False),
+        ('true_desire', '核心欲望是{v}', False),
+        ('personality_flaw', '性格缺陷是{v}', False),
+        ('alias', '曾用名是{v}', False),
+        ('age', '年龄为{v}', False),
+        ('long_term_goal', '长期目标是{v}', False),
+        ('first_impression', '给人的初印象是{v}', False),
+        ('core_tags', '核心标签包括{v}', True),
+        ('behavior_pattern', '行为模式是{v}', False),
+        ('ability_limit', '能力上限是{v}', False),
+        ('items_text', '随身携带的物品有{v}', False),
+    ]
+    body = _join_field_sentences(field_specs, char)
+    if not body:
+        return opener
+    return opener + body + "。"
+
+
+def _build_char_items_text(project_id: int, char_id: int) -> str:
+    """构建单个角色的持有物品文本（顿号连接，无物品时返回空字符串）。"""
+    try:
+        from webnovel.repositories import get_character_items
+        names = [
+            it.get("item_name", "") for it in get_character_items(char_id)
+            if it.get("item_name")
+        ]
+        return "、".join(names)
+    except Exception:
+        return ""
+
+
+def _build_worldview_chunk_text(worldview: dict) -> str:
+    """将世界观设定格式化为自然描述的 RAG 索引文本。
+
+    字段名须与 webnovel_worldview 表 schema 一致。
+    """
+    if not worldview:
+        return ""
+    field_specs = [
+        ('world_summary', '世界整体概述为{v}', False),
+        ('core_regions', '核心区域包括{v}', True),
+        ('important_locations', '重要地点有{v}', True),
+        ('social_hierarchy', '社会阶层划分为{v}', False),
+        ('hard_constraints', '世界观硬约束是{v}', False),
+        ('energy_cycle', '能量循环方式为{v}', False),
+        ('technology_basis', '技术基础是{v}', False),
+        ('currency_system', '货币体系是{v}', False),
+        ('belief_ideology', '信仰意识形态是{v}', False),
+        ('resource_distribution', '资源分布是{v}', False),
+    ]
+    body = _join_field_sentences(field_specs, worldview)
+    if not body:
+        return ""
+    return "本作品的世界观设定如下。" + body + "。"
+
+
+def _build_power_system_chunk_text(power_system: dict) -> str:
+    """将力量体系格式化为自然描述的 RAG 索引文本。
+
+    字段名须与 webnovel_power_system 表 schema 一致；
+    境界链等枚举字段保留顿号枚举结构。
+    """
+    if not power_system:
+        return ""
+    system_type = str(power_system.get('system_type', '') or '').strip()
+    opener = f"本作品的力量体系类型为{system_type}。" if system_type else "本作品的力量体系设定如下。"
+    field_specs = [
+        ('typical_realm_chain', '境界体系自低到高依次为{v}', True),
+        ('core_creed', '核心信条是{v}', False),
+        ('energy_source', '能量来源是{v}', False),
+        ('cost_rules', '力量的代价规则是{v}', False),
+        ('fairness_principle', '公平原则是{v}', False),
+        ('battle_rhythm', '战斗节奏是{v}', False),
+        ('damage_defense_logic', '伤害防御逻辑是{v}', False),
+        ('counter_relations', '克制关系是{v}', False),
+    ]
+    body = _join_field_sentences(field_specs, power_system)
+    if not body:
+        return opener
+    return opener + body + "。"
+
+
+def _build_golden_finger_chunk_text(golden_finger: dict) -> str:
+    """将金手指设定格式化为自然描述的 RAG 索引文本。
+
+    字段名须与 webnovel_golden_finger 表 schema 一致。
+    """
+    if not golden_finger:
+        return ""
+    main_role = str(golden_finger.get('main_role', '') or '').strip() or "主角"
+    gf_type = str(golden_finger.get('type', '') or '').strip()
+    opener = f"{main_role}的金手指类型为{gf_type}。" if gf_type else f"{main_role}拥有一项金手指。"
+    field_specs = [
+        ('core_function', '其核心功能是{v}', False),
+        ('trigger_condition', '触发条件是{v}', False),
+        ('visibility', '可见度为{v}', False),
+        ('irreversible_cost', '不可逆代价是{v}', False),
+        ('cost_limitation', '代价限制是{v}', False),
+        ('cooldown_limit', '冷却限制是{v}', False),
+    ]
+    body = _join_field_sentences(field_specs, golden_finger)
+    if not body:
+        return opener
+    return opener + body + "。"
+
+
+def _build_volume_outline_chunk_text(vol: dict) -> str:
+    """将卷纲格式化为自然描述的 RAG 索引文本。
+
+    字段名须与 webnovel_volume_outline 表 schema 一致。
+    """
+    if not vol:
+        return ""
+    volume_number = vol.get('volume_number', '?')
+    volume_name = str(vol.get('volume_name', '') or '').strip()
+    if volume_name:
+        opener = f"第{volume_number}卷卷名为《{volume_name}》，本卷卷纲要点如下。"
+    else:
+        opener = f"第{volume_number}卷卷纲要点如下。"
+    field_specs = [
+        ('core_conflict', '本卷核心冲突是{v}', False),
+        ('protagonist_goal', '主角目标是{v}', False),
+        ('volume_climax', '本卷高潮事件是{v}', False),
+        ('catalyst_event', '催化事件是{v}', False),
+        ('new_hook', '新钩子是{v}', False),
+        ('unresolved_issues', '未解决问题有{v}', True),
+    ]
+    body = _join_field_sentences(field_specs, vol)
+    if not body:
+        return ""
+    return opener + body + "。"
+
+
+def _build_foreshadow_chunk_text(fs: dict) -> str:
+    """将伏笔格式化为自然描述的 RAG 索引文本。"""
+    if not fs:
+        return ""
+    content = str(fs.get('content', '') or '').strip()
+    if not content:
+        return ""
+    parts = [f"作品埋入了一条伏笔：{content}"]
+    planted = fs.get('buried_chapter', 0)
+    payoff = fs.get('payoff_chapter', 0)
+    if planted:
+        parts.append(f"该伏笔埋入第{planted}章")
+    if payoff:
+        parts.append(f"预计在第{payoff}章回收")
+    level = str(fs.get('level', '') or '').strip()
+    if level:
+        parts.append(f"伏笔级别为{level}")
+    return "，".join(parts) + "。"
+
+
+def _build_villain_chunk_text(v: dict) -> str:
+    """将反派信息格式化为自然描述的 RAG 索引文本。
+
+    字段名须与 webnovel_villain 表 schema 一致。
+    """
+    if not v:
+        return ""
+    name = str(v.get('name', '') or '').strip()
+    faction = str(v.get('identity_faction', '') or '').strip()
+    if name and faction:
+        opener = f"{name}是本作的反派，身份阵营是{faction}。"
+    elif name:
+        opener = f"{name}是本作的反派。"
+    else:
+        opener = "本作存在一名反派，其设定如下。"
+    field_specs = [
+        ('core_desire', '其核心欲望是{v}', False),
+        ('core_fear', '其核心恐惧是{v}', False),
+        ('shared_desire_flaw', '与主角的共同缺陷是{v}', False),
+        ('action_principle', '行动准则是{v}', False),
+        ('power_level', '实力层级是{v}', False),
+        ('key_abilities', '关键能力包括{v}', True),
+        ('counter_points', '反制要点是{v}', False),
+    ]
+    body = _join_field_sentences(field_specs, v)
+    if not body:
+        return opener
+    return opener + body + "。"
+
+
 class WebnovelService:
     """网文创作服务。"""
-
-    REVIEW_DIMENSIONS = [
-        {"key": "excitement", "name": "爽点设计", "description": "是否有足够的爽点，打脸、逆袭、升级是否爽快有力"},
-        {"key": "face_slapping", "name": "打脸力度", "description": "打脸情节是否铺垫充分，反击是否爽快解气"},
-        {"key": "consistency", "name": "设定一致性", "description": "人物性格、设定、世界观是否保持一致"},
-        {"key": "rhythm", "name": "节奏控制", "description": "情节推进是否合理，张弛有度，是否有拖沓"},
-        {"key": "ooc", "name": "OOC检查", "description": "人物行为是否符合其设定，是否有OOC行为"},
-        {"key": "coherence", "name": "逻辑连贯", "description": "情节是否连贯，逻辑是否通顺"},
-        {"key": "retention", "name": "追读力", "description": "是否能吸引读者继续阅读，是否有悬念和钩子"},
-        {"key": "dialogue", "name": "对话质量", "description": "对话是否符合人物性格，是否有潜台词，是否生动"},
-        {"key": "description", "name": "描写水平", "description": "场景、情感描写是否有画面感，是否调动五感"},
-        {"key": "upgrade", "name": "升级感", "description": "实力提升是否有清晰的等级感和成就感"},
-    ]
 
     def __init__(self):
         self._logger = log_manager.get_logger("webnovel_service")
@@ -80,9 +314,12 @@ class WebnovelService:
         if script is None:
             return {"success": False, "error": "剧本不存在"}
 
-        # 清理残留的 "running" 任务（服务器意外中断后可能残留）
-        running_tasks = get_writing_tasks(script_id, None, "running")
-        for rt in (running_tasks or []):
+        # 清理残留的进行中任务（服务器意外中断后可能残留）。
+        # 含 pending：任务创建后、工作流置 running 前的极短窗口中断会残留，
+        # 若不清理会永久阻塞全局互斥检查。
+        stale_tasks = (get_writing_tasks(script_id, None, "running") or []) + \
+                      (get_writing_tasks(script_id, None, "pending") or [])
+        for rt in stale_tasks:
             # 如果任务已有结果（polished或draft），说明已完成但状态未更新，标记为completed
             if rt.get("polished") or rt.get("draft"):
                 update_writing_task(rt["id"], status="completed", progress=100,
@@ -93,13 +330,27 @@ class WebnovelService:
         if chapter_index is None:
             chapter_index = self._determine_continue_chapter(script_id)
 
-        # 再次检查清理后是否还有 running 任务
-        running_tasks = get_writing_tasks(script_id, None, "running")
-        if running_tasks:
+        # 再次检查清理后是否还有进行中任务（pending + running）
+        if self._count_active_tasks(script_id) > 0:
             return {"success": False, "error": "剧本已有正在运行的创作任务"}
+
+        # 🔴 本地模型模式下全局只允许一个创作任务：本地 LLM/Embedding/Reranker 为单实例，
+        # 推理层虽已串行锁保护，但多任务排队会导致后续任务长时间无响应，入口处直接拒绝更友好。
+        # 云端模式下各任务独立请求，不受此限制。
+        # 注：统计 pending+running，pending 窗口（创建后到工作流置 running 前）同样互斥。
+        if self._is_local_text_predict_default():
+            global_active = [t for t in get_active_writing_tasks() if t.get("script_id") != script_id]
+            if global_active:
+                return {"success": False, "error": "本地模型模式下同一时间仅支持一个创作任务，请等待当前任务完成"}
 
         task = add_writing_task(script_id, chapter_index, "continue", prompt=prompt)
         task_id = task["id"]
+
+        # 🔴 插入后复检：消除"先查后插"竞态（同一剧本双击/两个编辑器并发请求时，
+        # 两个请求可能都通过上方检查）。下方均为同步调用，其间无 await，不会被其他协程交错。
+        if self._count_active_tasks(script_id) > 1:
+            delete_writing_task(task_id)
+            return {"success": False, "error": "剧本已有正在运行的创作任务"}
 
         asyncio.create_task(self._execute_writing_workflow(task_id, enable_polish=enable_polish, auto_apply=auto_apply))
 
@@ -110,6 +361,26 @@ class WebnovelService:
             "status": "running",
             "message": f"创作任务已创建，目标章节: 第{chapter_index}章"
         }
+
+    def _is_local_text_predict_default(self) -> bool:
+        """判断当前默认（最高优先级）文本预测能力是否为本地模型。
+
+        无法判断时保守返回 True（按本地处理，宁可拒绝也不并发压模型）。
+        """
+        try:
+            from models.model_capability_manager import capability_manager
+            cap = capability_manager.get_best_capability("text_predict")
+            if not cap:
+                return True
+            return cap.get("platform_code", "local") == "local"
+        except Exception:
+            return True
+
+    def _count_active_tasks(self, script_id: int) -> int:
+        """统计指定剧本进行中的创作任务数（pending + running）。"""
+        pending = get_writing_tasks(script_id, None, "pending") or []
+        running = get_writing_tasks(script_id, None, "running") or []
+        return len(pending) + len(running)
 
     def _determine_continue_chapter(self, script_id: int) -> int:
         """自动判断创作章节。
@@ -250,6 +521,29 @@ class WebnovelService:
                 facts_recorded=json.dumps(result.get("context", {}).get("facts", [])) if result.get("context", {}).get("facts") else "",
                 context=json.dumps(result.get("context", {}))
             )
+
+            # 审查结果落库审查记录表，供质量审查报告模态框读取；先清旧数据避免章节重写残留
+            review_records = result.get("context", {}).get("review_result", [])
+            if review_records and not result.get("interrupted") and chapter_index is not None:
+                _rv_project = get_webnovel_project_by_script(script_id)
+                if _rv_project:
+                    delete_chapter_review_records(_rv_project["id"], chapter_index)
+                    for review in review_records:
+                        if not isinstance(review, dict):
+                            continue
+                        add_review_record(
+                            project_id=_rv_project["id"],
+                            chapter_number=chapter_index,
+                            review_type=review.get("dimension", ""),
+                            score=int(review.get("score", 0) or 0),
+                            feedback=json.dumps({
+                                "name": review.get("name", ""),
+                                "issues": review.get("issues", []),
+                                "strengths": review.get("strengths", []),
+                            }, ensure_ascii=False),
+                            suggestions=review.get("suggestions", "") or "",
+                        )
+
             await self._broadcast_task_status(task_id)
 
             if polished_content and polished_content.strip():
@@ -260,9 +554,9 @@ class WebnovelService:
                 _project = get_webnovel_project_by_script(script_id)
                 _project_id = _project["id"] if _project else 0
                 if _project_id:
-                    # 提取追读钩子并回写 chapter_meta
+                    # 提取结尾状态并回写 chapter_meta
                     await self._extract_and_save_hook(_project_id, chapter_index, polished_content)
-                    # 追读钩子提取完成后，标记章节元数据为已完成
+                    # 结尾状态提取完成后，标记章节元数据为已完成
                     _meta = get_chapter_meta(_project_id, chapter_index)
                     if _meta:
                         update_chapter_meta(_meta["id"], hook_type="已完成")
@@ -467,63 +761,6 @@ class WebnovelService:
         except Exception as e:
             return {"success": False, "error_message": str(e)}
 
-    async def _build_context(self, script_id: int, chapter_index: int) -> Dict[str, Any]:
-        """构建写作上下文。"""
-        context = {}
-
-        # 🔴 注入 script_id / project_id 到 context，供下游 LLM 调用时
-        # 传递给 execute_text_chat 统一入口，确保日志记录能关联到脚本/项目
-        context["script_id"] = script_id
-
-        project = get_webnovel_project_by_script(script_id)
-        if project:
-            context["project_id"] = project["id"]
-            worldview = get_worldview_by_project(project["id"])
-            context["world_settings"] = [worldview] if worldview else []
-        else:
-            context["project_id"] = 0
-            context["world_settings"] = []
-        context["characters"] = get_script_characters(script_id)
-
-        project = get_webnovel_project_by_script(script_id)
-        if project:
-            context["volume_outlines"] = get_volume_outlines_by_project(project["id"])
-            # chapter_plans 由 ContextBuilderExecutor 负责填充，此处不再用 chapter_meta 冒充
-            context["chapter_plans"] = []
-        else:
-            context["volume_outlines"] = []
-            context["chapter_plans"] = []
-
-        context["previous_chapters"] = []
-        for i in range(max(0, chapter_index - 3), chapter_index):
-            lines = get_script_lines(script_id, i)
-            if lines:
-                content = "\n".join(line["content"] for line in lines)
-                context["previous_chapters"].append({
-                    "chapter_index": i,
-                    "content": content[:2000] if len(content) > 2000 else content,
-                })
-
-        current_lines = get_script_lines(script_id, chapter_index)
-        if current_lines:
-            context["current_content"] = "\n".join(line["content"] for line in current_lines)
-        else:
-            context["current_content"] = ""
-
-        rag_chunks = []
-        if context.get("current_content") and project:
-            try:
-                result = await self._model_executor.execute_text_to_vector([context["current_content"][:300]])
-                embeddings = result.get("embeddings", [])
-                if embeddings:
-                    from services.vector_store import get_rag_service
-                    rag_chunks = get_rag_service().search(project["id"], embeddings[0], limit=5)
-            except Exception:
-                pass
-        context["rag_context"] = [chunk["content"] for chunk in rag_chunks]
-
-        return context
-
     async def _generate_writing_brief(self, context: Dict[str, Any], user_prompt: str = "") -> str:
         """生成写作任务书。"""
         prompt_parts = [
@@ -627,140 +864,6 @@ class WebnovelService:
         )
         content = result.get("content", "") if result else ""
         return content if content.strip() else ""
-
-    async def _review_chapter(self, draft: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """多维度审查章节质量（单次LLM调用完成所有维度）。"""
-        _sid = int(context.get("script_id", 0) or 0)
-        _pid = int(context.get("project_id", 0) or 0)
-
-        # 构建维度说明列表
-        dimension_lines = []
-        for d in self.REVIEW_DIMENSIONS:
-            dimension_lines.append(f"- {d['name']}({d['key']})：{d['description']}")
-        dimensions_text = "\n".join(dimension_lines)
-
-        prompt = f"""请作为专业网文编辑，从以下所有维度一次性审查该章节内容：
-
-【审查维度】
-{dimensions_text}
-
-【上下文】
-世界观设定: {json.dumps([s['name'] for s in context.get('world_settings', [])], ensure_ascii=False)}
-角色列表: {json.dumps([c['role'] for c in context.get('characters', [])], ensure_ascii=False)}
-前文内容: {context.get('previous_content', '')[:500]}
-
-【章节内容】
-{draft[:4000]}
-
-【审查要求】
-请对每个维度分别评分，按照以下格式输出JSON：
-{{
-    "reviews": [
-        {{
-            "dimension": "维度key（如excitement/consistency等）",
-            "name": "维度中文名",
-            "score": 1-10的整数评分,
-            "issues": [
-                {{
-                    "severity": "critical/high/medium/low",
-                    "location": "问题位置描述，如第3段/第100字",
-                    "description": "问题详细描述",
-                    "evidence": "原文引用或上下文对比",
-                    "fix_hint": "修复建议"
-                }}
-            ],
-            "strengths": ["优点1", "优点2"],
-            "suggestions": "综合修改建议"
-        }}
-    ]
-}}
-
-注意：
-- reviews数组必须包含上述所有维度，每个维度一条
-- severity=critical 表示严重问题，需要强制修改
-- severity=high 表示重要问题，建议修改
-- severity=medium/low 表示一般问题，可选择性修改
-- issues数组可以为空（如果没有问题）
-- 直接输出JSON，不要包含其他内容
-"""
-
-        result = await self._model_executor.execute_text_chat(
-            prompt=prompt,
-            system_prompt="你是一位专业的网文编辑，擅长从多维度进行质量审查，输出严格的JSON格式",
-            max_tokens=3000,
-            script_id=_sid,
-            project_id=_pid,
-            executor_name="webnovel_service",
-            prompt_name="review_all_dimensions",
-        )
-
-        content = result.get("content", "") if result else ""
-        results = []
-
-        try:
-            content = re.sub(r'```json\s*', '', content)
-            content = re.sub(r'\s*```', '', content)
-
-            json_match = re.search(r'\{[\s\S]*\}', content)
-            if json_match:
-                review_data = json.loads(json_match.group())
-            else:
-                review_data = {"reviews": []}
-        except:
-            review_data = {"reviews": []}
-
-        reviews = review_data.get("reviews", [])
-
-        # 将LLM返回的reviews映射到标准格式，确保所有维度都有结果
-        reviewed_keys = set()
-        for review in reviews:
-            dim_key = review.get("dimension", "")
-            dim_name = review.get("name", "")
-            score = review.get("score", 5)
-            issues = review.get("issues", [])
-            strengths = review.get("strengths", [])
-            suggestions = review.get("suggestions", "")
-
-            feedback_items = []
-            for i in issues:
-                if isinstance(i, dict) and 'severity' in i and 'description' in i:
-                    feedback_items.append(f"{i['severity']}: {i['description']}")
-                elif isinstance(i, str):
-                    feedback_items.append(i)
-
-            # 匹配到REVIEW_DIMENSIONS中的维度
-            matched_dim = None
-            for d in self.REVIEW_DIMENSIONS:
-                if d["key"] == dim_key or d["name"] == dim_name:
-                    matched_dim = d
-                    break
-
-            if matched_dim:
-                reviewed_keys.add(matched_dim["key"])
-                results.append({
-                    "dimension": matched_dim["key"],
-                    "name": matched_dim["name"],
-                    "score": score,
-                    "issues": issues,
-                    "strengths": strengths,
-                    "suggestions": suggestions,
-                    "feedback": ", ".join(feedback_items) if feedback_items else "",
-                })
-
-        # 补全未被LLM返回的维度，赋予默认中等分数
-        for d in self.REVIEW_DIMENSIONS:
-            if d["key"] not in reviewed_keys:
-                results.append({
-                    "dimension": d["key"],
-                    "name": d["name"],
-                    "score": 5,
-                    "issues": [],
-                    "strengths": [],
-                    "suggestions": "",
-                    "feedback": "",
-                })
-
-        return results
 
     async def _polish_chapter(self, draft: str, review_result: List[Dict[str, Any]], script_id: int = 0, project_id: int = 0) -> str:
         """根据审查结果润色章节。"""
@@ -1102,7 +1205,7 @@ class WebnovelService:
             self._logger.error(f"[WebnovelService] 更新 webnovel_state 失败: {e}")
 
     async def _extract_and_save_hook(self, project_id: int, chapter_index: int, content: str):
-        """从润色内容中提取追读钩子并回写到 chapter_meta。
+        """从润色内容中提取结尾状态并回写到 chapter_meta。
 
         注意：不回写 hook_type，该字段由调用方用于标记状态（如"已完成"）。
         """
@@ -1111,18 +1214,18 @@ class WebnovelService:
             if not chapter_meta:
                 return
 
-            prompt = f"""请从以下章节内容末尾提取追读钩子（悬念、未解问题、吸引读者继续阅读的悬念点）：
+            prompt = f"""请从以下章节内容末尾提取结尾留下的故事状态与未了线索（若结尾安静收束、无明显悬念，不要强行提取）：
 
 【章节内容末尾】
 {content[-800:]}
 
 请输出严格的JSON格式：
-{{"hook_content": "钩子内容描述", "hook_type": "悬念式/冲突式/反转型/情感式", "hook_strength": "强/中/弱", "hook_pattern": "钩子手法（如：悬念留白/矛盾激化/信息差/反转）", "ending_emotion": "期待/紧张/感动/愤怒", "ending_time": "场景时间（如：白天/夜晚/黄昏/清晨）", "ending_location": "场景地点"}}
-如果没有明显的钩子，hook_content输出空字符串。
+{{"hook_content": "结尾故事状态/未了线索描述", "hook_type": "悬念式/冲突式/反转型/情感式/安静收束", "hook_strength": "强/中/弱", "hook_pattern": "结尾手法（如：悬念留白/矛盾激化/信息差/反转/情绪落点）", "ending_emotion": "期待/紧张/感动/愤怒/平静", "ending_time": "场景时间（如：白天/夜晚/黄昏/清晨）", "ending_location": "场景地点"}}
+如果没有明显的悬念或未了线索，hook_content输出空字符串。
 """
             result = await self._model_executor.execute_text_chat(
                 prompt=prompt,
-                system_prompt="你是一位专业的网文编辑，擅长识别和设计追读钩子。请输出严格的JSON格式。",
+                system_prompt="你是一位专业的网文编辑，擅长识别章节结尾的故事状态。请输出严格的JSON格式。",
                 max_tokens=300,
                 script_id=0,
                 project_id=project_id,
@@ -1147,12 +1250,70 @@ class WebnovelService:
                     ending_time=hook_data.get("ending_time", ""),
                     ending_location=hook_data.get("ending_location", ""),
                 )
-                self._logger.info(f"[WebnovelService] 已提取并保存第{chapter_index}章追读钩子")
+                self._logger.info(f"[WebnovelService] 已提取并保存第{chapter_index}章结尾状态")
         except Exception as e:
-            self._logger.error(f"[WebnovelService] 提取追读钩子失败: {e}")
+            self._logger.error(f"[WebnovelService] 提取结尾状态失败: {e}")
+
+    async def _generate_chapter_summary(self, project_id: int, chapter_index: int, content: str) -> str:
+        """调用 LLM 生成章节的结构化摘要（200字以内）。
+
+        返回格式化的文本，包含概要、关键事件、角色变化。
+        若 LLM 调用失败则回退到机械截取。
+        """
+        try:
+            prompt = (
+                f"请为以下小说章节生成结构化摘要（总长不超过 200 字）：\n\n"
+                f"【章节内容】\n{content[:3000]}\n\n"
+                f"请输出严格的 JSON 格式：\n"
+                f'{{"summary": "章节概要（100字以内）", '
+                f'"key_events": ["事件1", "事件2"], '
+                f'"character_changes": ["角色A: 变化描述"]}}'
+            )
+            result = await self._model_executor.execute_text_chat(
+                prompt=prompt,
+                system_prompt="你是一位专业的内容分析助手，擅长提取文本中的关键信息。输出严格的 JSON 格式。",
+                max_tokens=400,
+                script_id=0,
+                project_id=project_id,
+                executor_name="webnovel_service",
+                prompt_name="chapter_summary",
+            )
+            response = result.get("content", "") if result else ""
+            if not response:
+                return ""
+
+            from utils.llm_json_parser import parse_llm_json
+            summary_data = parse_llm_json(
+                response,
+                executor_name="webnovel_service",
+                prompt_name="chapter_summary",
+            )
+            if not summary_data:
+                return ""
+
+            # 格式化为可读文本
+            parts = [f"第{chapter_index}章摘要"]
+            s = summary_data.get("summary", "")
+            if s:
+                parts.append(f"概要: {s}")
+            events = summary_data.get("key_events", [])
+            if events:
+                parts.append("关键事件: " + "; ".join(str(e) for e in events[:5]))
+            changes = summary_data.get("character_changes", [])
+            if changes:
+                parts.append("角色变化: " + "; ".join(str(c) for c in changes[:5]))
+            return "\n".join(parts)
+
+        except Exception as e:
+            self._logger.warning(f"[WebnovelService] LLM 生成第{chapter_index}章摘要失败，回退到机械截取: {e}")
+            return ""
 
     async def _store_rag_chunk(self, project_id: int, chapter_index: int, content: str):
         """将章节结构化摘要存储为 RAG 片段，同时将章节原文做段落切片索引。
+
+        包含两种摘要：
+        1. LLM 生成的结构化摘要（chunk_type=chapter_summary）：包含概要、关键事件、角色变化
+        2. 机械截取摘要（chunk_type=chapter）：作为回退
 
         段落切片采用滑动窗口：每个 chunk 包含 [前一段, 当前段, 后一段]，
         首段无前段、末段无后段，以此保证检索时上下文连贯。
@@ -1161,39 +1322,49 @@ class WebnovelService:
             from services.vector_store import get_rag_service
             rag = get_rag_service()
 
-            # === 1. 章节摘要（chunk_type=chapter）===
+            # 清理当前章节的旧数据（精确删除，不影响其他章节）
+            rag.delete_by_chapter_number(project_id, "chapter", chapter_index)
+            rag.delete_by_chapter_number(project_id, "chapter_summary", chapter_index)
+
+            # === 1. LLM 结构化摘要（chunk_type=chapter_summary）===
+            structured_summary = await self._generate_chapter_summary(project_id, chapter_index, content)
+
+            # === 2. 机械截取摘要（chunk_type=chapter，作为回退）===
             lines = [f"第{chapter_index}章"]
             lines.append(f"内容概要: {content[:300]}...")
             if len(content) > 500:
                 lines.append(f"章尾: {content[-200:]}")
-            summary = "\n".join(lines)
+            mechanical_summary = "\n".join(lines)
 
-            # 清理旧数据
-            rag.delete_by_type(project_id, "chapter")
-
-            # === 2. 章节原文段落切片（chunk_type=chapter_paragraph）===
+            # === 3. 章节原文段落切片（chunk_type=chapter_paragraph）===
+            # 每个 chunk 只含单个段落（精准 embedding），查询时按需扩展上下文
             paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
             para_chunks_data = []
-            if len(paragraphs) >= 2:
-                rag.delete_by_type(project_id, "chapter_paragraph")
-                for i in range(len(paragraphs)):
-                    prev_p = paragraphs[i - 1] if i > 0 else ""
-                    curr_p = paragraphs[i]
-                    next_p = paragraphs[i + 1] if i < len(paragraphs) - 1 else ""
-                    parts = [p for p in [prev_p, curr_p, next_p] if p]
+            if paragraphs:
+                rag.delete_by_chapter_number(project_id, "chapter_paragraph", chapter_index)
+                for i, para_text in enumerate(paragraphs):
                     para_chunks_data.append({
-                        "content": "\n".join(parts),
-                        "para_start": i,
-                        "para_end": i + 2 if i < len(paragraphs) - 1 else i + 1,
+                        "content": para_text,
+                        "para_index": i,
                     })
 
-            # === 3. 构建 chunks 列表，批量计算 embedding 后一次写入 ===
+            # === 4. 构建 chunks 列表，批量计算 embedding 后一次写入 ===
             all_chunks = [{
-                "content": summary,
+                "content": mechanical_summary,
                 "chunk_type": "chapter",
                 "chapter_number": chapter_index,
                 "metadata": {"chapter_index": chapter_index, "word_count": len(content)},
             }]
+
+            # 添加 LLM 结构化摘要
+            if structured_summary:
+                all_chunks.append({
+                    "content": structured_summary,
+                    "chunk_type": "chapter_summary",
+                    "chapter_number": chapter_index,
+                    "metadata": {"chapter_index": chapter_index, "word_count": len(content)},
+                })
+
             for pc in para_chunks_data:
                 all_chunks.append({
                     "content": pc["content"],
@@ -1201,8 +1372,7 @@ class WebnovelService:
                     "chapter_number": chapter_index,
                     "metadata": {
                         "chapter_index": chapter_index,
-                        "para_start": pc["para_start"],
-                        "para_end": pc["para_end"],
+                        "para_index": pc["para_index"],
                         "total_paragraphs": len(paragraphs),
                     },
                 })
@@ -1214,19 +1384,66 @@ class WebnovelService:
             if all_embeddings:
                 rag.add_chunks(project_id, all_chunks, all_embeddings)
 
-            if para_chunks_data:
-                self._logger.info(
-                    f"[WebnovelService] 第{chapter_index}章段落切片完成，"
-                    f"共 {len(para_chunks_data)} 个片段（{len(paragraphs)} 段）"
-                )
+            summary_types = [c["chunk_type"] for c in all_chunks]
+            self._logger.info(
+                f"[WebnovelService] 第{chapter_index}章 RAG 索引完成，"
+                f"共 {len(all_chunks)} 个片段（类型: {set(summary_types)}）"
+            )
         except Exception as e:
             self._logger.error(f"[WebnovelService] 存储 RAG 片段失败: {e}")
+
+    async def reindex_character_cards(self, project_id: int, char_ids) -> int:
+        """按 char_id 增量重建角色卡 RAG 片段（角色卡创建/改名/合并后调用）。
+
+        先删除对应 char_id 的旧片段，再重新构建文本并写入；
+        已删除的角色卡（查不到记录）仅清理旧片段。失败不阻断主流程。
+        """
+        try:
+            from services.vector_store import get_rag_service
+            rag = get_rag_service()
+
+            chunks = []
+            for char_id in char_ids:
+                rag.delete_by_char_id(project_id, char_id)
+                card = get_character_card(project_id, char_id)
+                if not card:
+                    continue
+                # 附加持有物品清单（事实记录阶段维护；无物品时不附加该字段）
+                items_text = _build_char_items_text(project_id, char_id)
+                if items_text:
+                    card["items_text"] = items_text
+                text = _build_character_chunk_text(card)
+                if not text:
+                    continue
+                chunks.append({
+                    "content": text,
+                    "chunk_type": "character",
+                    "chapter_number": 0,
+                    "metadata": {"source": "character_card", "char_id": char_id},
+                })
+
+            if not chunks:
+                return 0
+
+            all_texts = [c["content"] for c in chunks]
+            result = await self._model_executor.execute_text_to_vector(all_texts)
+            embeddings = result.get("embeddings", []) if result else []
+            if embeddings:
+                rag.add_chunks(project_id, chunks, embeddings)
+                self._logger.info(
+                    f"[WebnovelService] 角色卡 RAG 增量索引完成，char_ids={list(char_ids)}，"
+                    f"共 {len(chunks)} 个片段"
+                )
+            return len(chunks)
+        except Exception as e:
+            self._logger.error(f"[WebnovelService] 角色卡 RAG 增量索引失败: {e}")
+            return 0
 
     async def _index_project_settings(self, project_id: int):
         """将项目设定数据全量索引到 RAG 向量库。
 
         在深度初始化完成后调用，将角色、世界观、力量体系、金手指、卷纲、伏笔、反派等
-        设定数据格式化后写入 webnovel_rag_chunks 表并计算 embedding。
+        设定数据格式化为自然描述后写入 RAG 向量库并计算 embedding。
         """
         indexed_count = 0
         # 收集所有待索引的文本，最后批量编码
@@ -1239,117 +1456,61 @@ class WebnovelService:
             pending_items.append((chunk_type, content, chapter_number, metadata))
 
         try:
-            # 1. 角色卡
+            # 1. 角色卡（文本格式与增量重建共用 _build_character_chunk_text）
             characters = get_character_cards_by_project(project_id)
+            # 批量加载持有物品（事实记录阶段维护；失败时降级为空不阻断索引）
+            try:
+                _items_by_char = get_character_items_by_project(project_id)
+            except Exception:
+                _items_by_char = {}
             for char in characters:
-                parts = [f"角色[{char.get('name', '')}]({char.get('character_type', '')})"]
-                fields = {
-                    'personality': '性格', 'background': '背景',
-                    'voice_style': '说话风格', 'core_desire': '核心欲望',
-                    'core_flaw': '核心缺陷', 'signature_skills': '标志技能',
-                    'tags': '标签'
-                }
-                for key, label in fields.items():
-                    val = char.get(key, '')
-                    if val:
-                        parts.append(f"{label}={val}")
-                _collect_one("character", "\n".join(parts), metadata=json.dumps({"source": "character_card", "char_id": char.get("id")}))
+                _names = [
+                    it.get("item_name", "") for it in _items_by_char.get(char.get("id"), [])
+                    if it.get("item_name")
+                ]
+                if _names:
+                    char["items_text"] = "、".join(_names)
+                text = _build_character_chunk_text(char)
+                if text:
+                    _collect_one("character", text, metadata=json.dumps({"source": "character_card", "char_id": char.get("id")}))
 
-            # 2. 世界观
+            # 2. 世界观（字段名须与 webnovel_worldview 表 schema 一致，见 _build_worldview_chunk_text）
             worldview = get_worldview_by_project(project_id)
             if worldview:
-                parts = ["世界观设定:"]
-                fields = {
-                    'world_scale': '规模', 'world_summary': '概述',
-                    'core_regions': '核心区域', 'important_locations': '重要地点',
-                    'social_hierarchy': '社会阶层', 'hard_constraints': '硬约束',
-                    'energy_cycle': '能量循环', 'technology_basis': '技术基础',
-                    'currency_system': '货币体系'
-                }
-                for key, label in fields.items():
-                    val = worldview.get(key, '')
-                    if val:
-                        parts.append(f"{label}: {val}")
-                _collect_one("worldview", "\n".join(parts), metadata=json.dumps({"source": "worldview"}))
+                _collect_one("worldview", _build_worldview_chunk_text(worldview),
+                             metadata=json.dumps({"source": "worldview"}))
 
-            # 3. 力量体系
+            # 3. 力量体系（字段名须与 webnovel_power_system 表 schema 一致）
             power_system = get_power_system_by_project(project_id)
             if power_system:
-                parts = [f"力量体系({power_system.get('system_type', '')}):"]
-                fields = {
-                    'core_rules': '核心规则', 'upgrade_conditions': '升级条件',
-                    'battle_style': '战斗风格', 'hard_limits': '硬性上限',
-                    'cost_mechanism': '代价机制'
-                }
-                for key, label in fields.items():
-                    val = power_system.get(key, '')
-                    if val:
-                        parts.append(f"{label}: {val}")
-                _collect_one("power_system", "\n".join(parts), metadata=json.dumps({"source": "power_system"}))
+                _collect_one("power_system", _build_power_system_chunk_text(power_system),
+                             metadata=json.dumps({"source": "power_system"}))
 
-            # 4. 金手指
+            # 4. 金手指（字段名须与 webnovel_golden_finger 表 schema 一致）
             golden_finger = get_golden_finger_by_project(project_id)
             if golden_finger:
-                parts = [f"金手指[{golden_finger.get('name', '')}]({golden_finger.get('gf_type', '')}):"]
-                fields = {
-                    'style': '风格', 'visibility': '可见度',
-                    'irreversible_cost': '不可逆代价', 'fulfillment_mechanism': '兑现机制',
-                    'cooldown_limit': '冷却限制'
-                }
-                for key, label in fields.items():
-                    val = golden_finger.get(key, '')
-                    if val:
-                        parts.append(f"{label}: {val}")
-                _collect_one("golden_finger", "\n".join(parts), metadata=json.dumps({"source": "golden_finger"}))
+                _collect_one("golden_finger", _build_golden_finger_chunk_text(golden_finger),
+                             metadata=json.dumps({"source": "golden_finger"}))
 
-            # 5. 卷纲
+            # 5. 卷纲（字段名须与 webnovel_volume_outline 表 schema 一致）
             volumes = get_volume_outlines_by_project(project_id)
             for vol in volumes:
-                parts = [f"第{vol.get('volume_number', '?')}卷[{vol.get('title', '')}]:"]
-                fields = {
-                    'core_conflict': '核心冲突', 'expected_chapters': '预期章节',
-                    'summary': '概要'
-                }
-                for key, label in fields.items():
-                    val = vol.get(key, '')
-                    if val:
-                        parts.append(f"{label}: {val}")
-                _collect_one("volume_outline", "\n".join(parts), chapter_number=vol.get('volume_number', 0),
-                           metadata=json.dumps({"source": "volume_outline", "volume_id": vol.get("id")}))
+                _collect_one("volume_outline", _build_volume_outline_chunk_text(vol),
+                             chapter_number=vol.get('volume_number', 0),
+                             metadata=json.dumps({"source": "volume_outline", "volume_id": vol.get("id")}))
 
             # 6. 伏笔
             foreshadows = get_foreshadows_by_project(project_id)
             for fs in foreshadows:
-                content = fs.get('content', '')
-                if not content:
-                    continue
-                parts = [f"伏笔: {content}"]
-                planted = fs.get('buried_chapter', 0)
-                payoff = fs.get('payoff_chapter', 0)
-                if planted:
-                    parts.append(f"埋入第{planted}章")
-                if payoff:
-                    parts.append(f"预计回收第{payoff}章")
-                level = fs.get('level', '')
-                if level:
-                    parts.append(f"级别: {level}")
-                _collect_one("foreshadow", "\n".join(parts), chapter_number=planted,
+                planted = fs.get('buried_chapter', 0) or 0
+                _collect_one("foreshadow", _build_foreshadow_chunk_text(fs), chapter_number=planted,
                            metadata=json.dumps({"source": "foreshadow", "foreshadow_id": fs.get("id")}))
 
-            # 7. 反派
+            # 7. 反派（字段名须与 webnovel_villain 表 schema 一致）
             villains = get_villains_by_project(project_id)
             for v in villains:
-                parts = [f"反派[{v.get('name', '')}]({v.get('tier', '')}):"]
-                fields = {
-                    'goal': '目标', 'mirror_traits': '镜像特质',
-                    'relationship_with_protagonist': '与主角关系',
-                    'counter_method': '对抗方式', 'level_order': '层级'
-                }
-                for key, label in fields.items():
-                    val = v.get(key, '')
-                    if val:
-                        parts.append(f"{label}: {val}")
-                _collect_one("villain", "\n".join(parts), metadata=json.dumps({"source": "villain", "villain_id": v.get("id")}))
+                _collect_one("villain", _build_villain_chunk_text(v),
+                             metadata=json.dumps({"source": "villain", "villain_id": v.get("id")}))
 
             # 批量编码并写入向量库
             if pending_items:
@@ -1426,59 +1587,30 @@ class WebnovelService:
 
         return {"success": True, "message": "任务已取消"}
 
-    async def get_chapter_review(self, script_id: int, chapter_index: int) -> Dict[str, Any]:
-        """获取章节审查结果。"""
+    async def get_chapter_review(self, script_id: int, chapter_index: int) -> List[Dict[str, Any]]:
+        """获取章节审查结果（来自创作流水线落库的审查记录）。"""
         project = get_webnovel_project_by_script(script_id)
         if not project:
-            return {
-                "chapter_index": chapter_index,
-                "dimension_results": [],
-                "records": [],
-            }
-        
+            return []
+
         records = get_review_records(project["id"], chapter_index)
-        summary = get_chapter_review_summary(project["id"], chapter_index)
-
-        dimension_results = []
-        for dimension in self.REVIEW_DIMENSIONS:
-            key = dimension["key"]
-            avg_score = summary.get(key, {}).get("avg_score", 0)
-            count = summary.get(key, {}).get("count", 0)
-            dimension_results.append({
-                "key": key,
-                "name": dimension["name"],
-                "avg_score": avg_score,
-                "count": count,
+        review_list = []
+        for record in records:
+            try:
+                feedback = json.loads(record.get("feedback") or "{}")
+            except (ValueError, TypeError):
+                feedback = {}
+            if not isinstance(feedback, dict):
+                feedback = {}
+            review_list.append({
+                "dimension": record.get("review_type", ""),
+                "name": feedback.get("name") or record.get("review_type", ""),
+                "score": record.get("score", 0),
+                "issues": feedback.get("issues", []),
+                "strengths": feedback.get("strengths", []),
+                "suggestions": record.get("suggestions", ""),
             })
-
-        return {
-            "chapter_index": chapter_index,
-            "dimension_results": dimension_results,
-            "records": records,
-        }
-
-    async def manual_review(self, script_id: int, chapter_index: int, content: str) -> Dict[str, Any]:
-        """手动触发章节审查。"""
-        context = await self._build_context(script_id, chapter_index)
-        review_result = await self._review_chapter(content, context)
-
-        project = get_webnovel_project_by_script(script_id)
-        if project:
-            for review in review_result:
-                add_review_record(
-                    project_id=project["id"],
-                    chapter_number=chapter_index,
-                    review_type=review["dimension"],
-                    score=review["score"],
-                    feedback=review["feedback"],
-                    suggestions=review["suggestions"]
-                )
-
-        return {
-            "success": True,
-            "chapter_index": chapter_index,
-            "review_result": review_result,
-        }
+        return review_list
 
 
 _webnovel_service = None

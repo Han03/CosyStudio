@@ -435,12 +435,15 @@ async def delete_script(script_id: int):
 class RenameScriptRequest(BaseModel):
     script_id: int
     name: str
+    author: Optional[str] = None
+    description: Optional[str] = None
 
 
 @router.post("/api/books/scripts/rename")
 async def rename_script(req: RenameScriptRequest):
-    """重命名剧本（更新书名）。"""
+    """重命名剧本（更新书名），同时可选更新作者和备注。"""
     from repositories.script_repository import get_script, update_script
+    from repositories.ebook_library_repository import update_ebook
 
     script = get_script(req.script_id)
     if not script:
@@ -449,7 +452,23 @@ async def rename_script(req: RenameScriptRequest):
     if not new_name:
         raise HTTPException(status_code=400, detail="书名不能为空")
     update_script(req.script_id, name=new_name)
-    return {"success": True, "message": "书名已更新"}
+
+    # 同步更新备注（scripts 表）
+    if req.description is not None:
+        update_script(req.script_id, description=req.description.strip())
+
+    # 同步更新作者和备注（ebook_library 表）
+    updated_fields = {}
+    if req.author is not None:
+        updated_fields["author"] = req.author.strip()
+    if req.description is not None:
+        updated_fields["description"] = req.description.strip()
+    if updated_fields:
+        book_id = script.get("book_id")
+        if book_id:
+            update_ebook(book_id, **updated_fields)
+
+    return {"success": True, "message": "信息已更新"}
 
 
 @router.get("/api/books/scripts/lines")

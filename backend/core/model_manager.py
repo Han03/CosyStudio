@@ -2,6 +2,7 @@
 import sys
 import json
 import shutil
+import subprocess
 import threading
 import time
 import traceback
@@ -76,6 +77,22 @@ MODEL_CATEGORIES = {
         "module": "models.qwen_embedding_model",
         "class_name": "QwenEmbeddingModel",
     },
+    "qwen_reranker": {
+        "name": "Qwen3-Reranker",
+        "description": "片段重排序模型",
+        "extensions": [".bin", ".safetensors", ".json"],
+        "loadable": True,
+        "conversational": False,
+        "config_key": "qwen_reranker",
+        "params_config_key": "qwen_reranker_config",
+        "param_resolver_key": "qwen_reranker",
+        "loaded_flag": "qwen_reranker_loaded",
+        "loading_status_key": "qwen_reranker",
+        "model_attr": "qwen_reranker_model",
+        "reset_method": "reset_qwen_reranker",
+        "module": "models.qwen_reranker_model",
+        "class_name": "QwenRerankerModel",
+    },
     "other": {
         "name": "其他",
         "description": "其他模型",
@@ -116,6 +133,10 @@ RECOMMENDED_MODELS = {
         {"name": "Qwen3-Embedding-0.6B", "model_id": "Qwen/Qwen3-Embedding-0.6B", "description": "通义千问轻量文本嵌入模型，低显存高速度，适配边缘与轻量 RAG 语义检索。"},
         {"name": "Qwen3-Embedding-8B", "model_id": "Qwen/Qwen3-Embedding-8B", "description": "通义千问 8B 高性能文本嵌入模型，用于长文档、多语言语义检索与向量知识库构建。"},
     ],
+    "qwen_reranker": [
+        {"name": "Qwen3-Reranker-0.6B", "model_id": "Qwen/Qwen3-Reranker-0.6B", "description": "通义千问轻量片段重排序模型，低显存高速度，适配边缘与轻量 RAG 检索结果精排。"},
+        {"name": "Qwen3-Reranker-4B", "model_id": "Qwen/Qwen3-Reranker-4B", "description": "通义千问 4B 高性能片段重排序模型，用于长文档、多语言检索结果精排。"},
+    ],
 }
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -125,9 +146,8 @@ MODEL_INDEX_FILE = os.path.join(MODELS_DIR, "model_index.json")
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-_download_thread = None
+_download_process = None
 _download_lock = threading.Lock()
-_download_stop_event = threading.Event()
 
 def _ensure_index_file():
     if not os.path.exists(MODEL_INDEX_FILE):
@@ -276,85 +296,44 @@ def _add_to_index(name: str, path: str, category: str, description: str = ""):
     
     _save_index(index)
 
-def _download_thread_func(model_name: str, save_dir: str, category: str, source: str = "modelscope"):
-    global _download_stop_event
-
+def _download_watcher(proc: subprocess.Popen, model_name: str, save_dir: str, category: str):
+    """监控下载子进程退出，根据最终状态收尾（入索引/清理临时文件）。"""
     try:
-        _model_logger.info("=" * 60)
-        _model_logger.info("[下载管理] 开始下载任务")
-        _model_logger.info("[下载管理] 模型名称: %s", model_name)
-        _model_logger.info("[下载管理] 分类: %s", category)
-        _model_logger.info("[下载管理] 保存目录: %s", save_dir)
-        _model_logger.info("[下载管理] 下载源: %s", source)
-
-        status = {
-            "status": "downloading",
-            "progress": 5,
-            "message": "正在启动下载...",
-            "model_name": model_name,
-            "category": category,
-            "path": save_dir
-
-        }
-        update_download_status(status)
-
-        from utils.download_model import download_model
-
-        result = download_model(
-            model_name=model_name,
-            save_dir=save_dir,
-            status_file_path=DOWNLOAD_STATUS_FILE,
-            source=source,
-            stop_event=_download_stop_event
-        )
-
-        if result.get("success"):
-            status = {
-                "status": "ready",
-                "progress": 100,
-                "message": "下载完成",
-            }
-            update_download_status(status)
-            _add_to_index(model_name, result.get("path", save_dir), category)
-            _model_logger.info("[下载管理] 下载完成")
+        proc.wait()
+        status = _load_download_status()
+        final_status = status.get("status")
+        if final_status == "ready":
+            _add_to_index(model_name, save_dir, category)
+            _model_logger.info("[下载管理] 下载完成，已写入模型索引")
+        elif final_status == "canceled":
+            _clean_temp_files(save_dir)
+            _model_logger.info("[下载管理] 下载已取消，临时文件已清理")
+        elif final_status == "error":
+            _model_logger.error("[下载管理] 下载失败: %s", status.get("error", ""))
         else:
-            if result.get("canceled"):
-                _model_logger.info("[下载管理] 下载已取消")
-                _clean_temp_files(save_dir)
-            else:
-                _model_logger.error("[下载管理] 下载失败: %s", result.get("error"))
-                status = {
-                    "status": "error",
-                    "message": f"下载失败: {result.get('error')}",
-                    "error": result.get("error", "下载失败"),
-                }
-                update_download_status(status)
-
+            # 子进程异常退出且未写入终态，补写错误状态避免前端卡在下载中
+            update_download_status({
+                "status": "error",
+                "message": "下载进程异常退出",
+                "error": "下载进程异常退出",
+            })
+            _model_logger.error("[下载管理] 下载进程异常退出，returncode=%s", proc.returncode)
     except Exception as e:
-        _model_logger.error("[下载管理] 下载异常: %s", e)
-        _model_logger.error("[下载管理] 完整堆栈:\n%s", traceback.format_exc())
-        status = {
-            "status": "error",
-            "message": f"下载失败: {str(e)}",
-            "error": str(e),
-        }
-        update_download_status(status)
+        _model_logger.error("[下载管理] 下载监控异常: %s", e)
 
 def start_download(model_name: str, category: str, source: str = "modelscope") -> Dict:
-    global _download_thread, _download_stop_event
-    
+    global _download_process
+
     with _download_lock:
-        if _download_thread and _download_thread.is_alive():
+        if _download_process and _download_process.poll() is None:
             return {"success": False, "error": "已有下载任务正在进行"}
-        
-        _download_stop_event.clear()
-        
+
         cat_dir = os.path.join(MODELS_DIR, category)
         os.makedirs(cat_dir, exist_ok=True)
-        
+
         model_name_clean = model_name.replace('/', '_').replace('\\', '_')
         save_dir = os.path.join(cat_dir, model_name_clean)
-        
+
         status = {
             "status": "downloading", 
             "progress": 0, 
@@ -365,10 +344,31 @@ def start_download(model_name: str, category: str, source: str = "modelscope") -
             "source": source
         }
         update_download_status(status)
-        
-        _download_thread = threading.Thread(target=_download_thread_func, args=(model_name, save_dir, category, source), daemon=True)
-        _download_thread.start()
-        
+
+        # 以独立子进程执行下载，取消时可直接终止进程，立即中断 snapshot_download
+        script_path = os.path.join(PROJECT_ROOT, "backend", "utils", "download_model.py")
+        cmd = [sys.executable, script_path, model_name, save_dir, DOWNLOAD_STATUS_FILE, source]
+        creationflags = 0
+        if os.name == "nt":
+            creationflags = subprocess.CREATE_NO_WINDOW
+        try:
+            _download_process = subprocess.Popen(cmd, creationflags=creationflags)
+        except Exception as e:
+            _model_logger.error("[下载管理] 启动下载子进程失败: %s", e)
+            update_download_status({
+                "status": "error",
+                "message": f"启动下载失败: {e}",
+                "error": str(e),
+            })
+            return {"success": False, "error": f"启动下载失败: {e}"}
+
+        watcher = threading.Thread(
+            target=_download_watcher,
+            args=(_download_process, model_name, save_dir, category),
+            daemon=True
+        )
+        watcher.start()
+
         return {"success": True, "message": "下载任务已启动"}
 
 def get_download_status() -> Dict:
@@ -410,33 +410,38 @@ def get_recommended_models(category: str = None) -> List[Dict]:
     return [model for models in RECOMMENDED_MODELS.values() for model in models]
 
 def cancel_download() -> Dict:
-    global _download_thread
-    
+    global _download_process
+
     with _download_lock:
-        if _download_thread and _download_thread.is_alive():
-            _download_stop_event.set()
+        proc = _download_process
+        if proc and proc.poll() is None:
+            # 直接终止下载子进程，立即中断下载，不阻塞当前请求
             try:
-                _download_thread.join(timeout=120)
-            except Exception as e:
-                _model_logger.error("[下载管理] 下载线程取消异常: %s", e)
-                pass
-            _download_thread = None
-        
+                proc.terminate()
+                proc.wait(timeout=10)
+            except Exception:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=5)
+                except Exception as e:
+                    _model_logger.error("[下载管理] 终止下载子进程失败: %s", e)
+        _download_process = None
+
         download_status = get_download_status()
         save_dir = download_status.get("path", "")
-        
+
         saved_bytes = 0
         if save_dir and os.path.exists(save_dir):
             saved_bytes = get_directory_size(save_dir)
-        
+
         status = {
             "status": "canceled",
             "progress": download_status.get("progress", 0),
             "message": "下载已取消",
         }
         update_download_status(status)
-        
-        return {"success": True, "message": "下载取消请求已发送", "saved_bytes": saved_bytes}
+
+        return {"success": True, "message": "下载已取消", "saved_bytes": saved_bytes}
 
 def delete_model(model_path: str) -> Dict:
     if not os.path.exists(model_path):
@@ -444,6 +449,10 @@ def delete_model(model_path: str) -> Dict:
     
     if not model_path.startswith(MODELS_DIR):
         return {"success": False, "error": "无权删除此路径"}
+    
+    download_status = _load_download_status()
+    if download_status.get("status") == "downloading" and download_status.get("path") == model_path:
+        return {"success": False, "error": "该模型正在下载中，请先取消下载"}
     
     try:
         if os.path.isdir(model_path):
@@ -780,6 +789,69 @@ async def async_load_qwen_embedding_model(model_path, force=False):
     await loop.run_in_executor(None, lambda: load_qwen_embedding_model(model_path, force))
 
 
+def load_qwen_reranker_model(model_path, force=False):
+    from core.global_manager import global_manager
+
+    qwen_reranker_model = global_manager.qwen_reranker_model
+    qwen_reranker_model_lock = global_manager.qwen_reranker_model_lock
+    model_loading_status = global_manager.model_loading_status
+    system_status = global_manager.system_status
+
+    with qwen_reranker_model_lock:
+        qwen_reranker_model = global_manager.qwen_reranker_model
+        if not force and qwen_reranker_model is not None and qwen_reranker_model.is_loaded():
+            add_log(f"Qwen3-Reranker模型已加载，跳过加载（force={force}）")
+            return
+
+        add_log(f"正在加载Qwen3-Reranker模型: {model_path}")
+        system_status["current_operation"] = "加载Qwen3-Reranker模型"
+
+        from models.qwen_reranker_model import QwenRerankerModel
+        qwen_reranker_model = QwenRerankerModel(model_path)
+        global_manager.qwen_reranker_model = qwen_reranker_model
+
+        if qwen_reranker_model.is_loaded():
+            global_manager.set_qwen_reranker_loaded(True)
+            system_status["qwen_reranker_loaded"] = True
+            add_log("Qwen3-Reranker模型加载成功")
+        else:
+            add_log("Qwen3-Reranker模型加载失败", "ERROR")
+            model_loading_status["qwen_reranker"]["status"] = "error"
+            model_loading_status["qwen_reranker"]["message"] = "Qwen3-Reranker模型加载失败"
+
+        system_status["current_operation"] = "空闲"
+
+
+def find_qwen_reranker_model():
+    from core.config_manager import get_config
+    config = get_config()
+    model_path = config.get("models", {}).get("qwen_reranker", {}).get("model_path", "")
+    if model_path and os.path.exists(model_path):
+        return model_path
+    return None
+
+
+def ensure_qwen_reranker_loaded() -> bool:
+    from core.global_manager import global_manager
+
+    if global_manager.qwen_reranker_model is not None and global_manager.qwen_reranker_model.is_loaded():
+        return True
+
+    model_path = find_qwen_reranker_model()
+    if model_path is None:
+        add_log("未找到可用的Qwen3-Reranker模型", "ERROR")
+        return False
+
+    load_qwen_reranker_model(model_path)
+    return global_manager.qwen_reranker_model is not None and global_manager.qwen_reranker_model.is_loaded()
+
+
+async def async_load_qwen_reranker_model(model_path, force=False):
+    import asyncio
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, lambda: load_qwen_reranker_model(model_path, force))
+
+
 def reset_all_models():
     from core.global_manager import global_manager
 
@@ -787,11 +859,13 @@ def reset_all_models():
     global_manager.qwen_model = None
     global_manager.dreamlite_model = None
     global_manager.qwen_embedding_model = None
+    global_manager.qwen_reranker_model = None
 
     global_manager.set_cosyvoice_loaded(False)
     global_manager.set_qwen_loaded(False)
     global_manager.set_dreamlite_loaded(False)
     global_manager.set_qwen_embedding_loaded(False)
+    global_manager.set_qwen_reranker_loaded(False)
 
     system_status = global_manager.system_status
 

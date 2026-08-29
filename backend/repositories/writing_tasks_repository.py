@@ -108,3 +108,17 @@ def get_running_tasks() -> List[dict]:
             ("running",)
         )
         return [dict(row) for row in cursor.fetchall()]
+
+
+def get_active_writing_tasks() -> List[dict]:
+    """获取所有进行中的写作任务（pending 或 running）。
+
+    pending 仅在任务创建后、工作流启动前的极短窗口存在；
+    全局互斥检查需同时统计两种状态，否则跨剧本并发请求可从 pending 窗口穿过。
+    """
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "SELECT * FROM script_writing_tasks WHERE status IN ('pending', 'running') ORDER BY created_at DESC"
+        )
+        return [dict(row) for row in cursor.fetchall()]

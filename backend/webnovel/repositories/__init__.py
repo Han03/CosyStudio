@@ -12,8 +12,11 @@ from .golden_finger_repository import (
 )
 from .character_card_repository import (
     add_character_card, get_character_card, get_character_cards_by_project,
-    update_character_card, add_character_relationship, get_character_relationships,
+    update_character_card, delete_character_card, reassign_character_data,
+    add_character_relationship, get_character_relationships,
     add_character_growth, get_character_growths, add_character_power, get_character_power,
+    upsert_character_item, mark_character_item_lost,
+    get_character_items, get_character_items_by_project,
     get_active_character_ids
 )
 from .character_group_repository import (

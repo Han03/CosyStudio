@@ -19,7 +19,8 @@ CAPABILITY_TYPES = {
     "text_predict": "文本预测",
     "text_to_speech": "语音合成",
     "text_to_image": "文生图",
-    "text_to_vector": "文本转向量"
+    "text_to_vector": "文本转向量",
+    "text_rerank": "片段重排序"
 }
 
 PLATFORM_CODES = {
@@ -90,6 +91,9 @@ DEFAULT_CONFIG = {
     "qwen_embedding_config": {
         "batch_size": 32,
         "max_length": 512
+    },
+    "qwen_reranker_config": {
+        "max_length": 1024
     },
     "platform_keys": {
         "local": {
@@ -255,6 +259,16 @@ DEFAULT_CONFIG = {
                 "enabled": True,
                 "description": "本地Qwen-Embedding文本转向量"
             }
+        ],
+        "text_rerank": [
+            {
+                "id": "rerank_local_qwen_reranker",
+                "platform_code": "local",
+                "model_code": "qwen_reranker",
+                "priority": 10,
+                "enabled": True,
+                "description": "本地Qwen3-Reranker片段重排序"
+            }
         ]
     },
     "call_point_models": {},
@@ -332,6 +346,9 @@ def get_dreamlite_model_config():
 def get_qwen_embedding_model_config():
     return get_model_config("qwen_embedding")
 
+def get_qwen_reranker_model_config():
+    return get_model_config("qwen_reranker")
+
 def set_config(new_config):
     global _current_config
     with _config_lock:
@@ -369,6 +386,9 @@ def update_dreamlite_model_config(model_path, model_name):
 
 def update_qwen_embedding_model_config(model_path, model_name):
     return update_model_config("qwen_embedding", model_path, model_name)
+
+def update_qwen_reranker_model_config(model_path, model_name):
+    return update_model_config("qwen_reranker", model_path, model_name)
 
 def get_qwen_generate_params():
     config = get_config()
@@ -480,6 +500,33 @@ def update_qwen_embedding_config_params(batch_size=None, max_length=None):
             if value is not None:
                 try:
                     _current_config["qwen_embedding_config"][key] = int(float(value))
+                except (ValueError, TypeError):
+                    pass
+
+        _save_config()
+
+    return _current_config
+
+def get_qwen_reranker_config_params():
+    config = get_config()
+    return config.get("qwen_reranker_config", {"max_length": 1024})
+
+def update_qwen_reranker_config_params(max_length=None):
+    with _config_lock:
+        if _current_config is None:
+            _load_config()
+
+        if "qwen_reranker_config" not in _current_config:
+            _current_config["qwen_reranker_config"] = {}
+
+        int_params = {
+            "max_length": max_length,
+        }
+
+        for key, value in int_params.items():
+            if value is not None:
+                try:
+                    _current_config["qwen_reranker_config"][key] = int(float(value))
                 except (ValueError, TypeError):
                     pass
 

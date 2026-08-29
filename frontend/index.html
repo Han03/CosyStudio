@@ -112,8 +112,12 @@
                                 <span class="status-dot unavailable" id="headerEmbeddingDot"></span>
                                 <span class="model-dot-name">Embedding</span>
                             </span>
+                            <span class="model-dot-item" title="Reranker: 未加载">
+                                <span class="status-dot unavailable" id="headerRerankerDot"></span>
+                                <span class="model-dot-name">Reranker</span>
+                            </span>
                         </div>
-                        <span class="models-summary" id="headerModelsSummary">0/4</span>
+                        <span class="models-summary" id="headerModelsSummary">0/5</span>
                     </div>
                 </div>
                 <div class="header-right">
@@ -172,6 +176,9 @@
                                 </button>
                                 <button class="btn btn-outline-secondary" data-category="qwen_embedding" onclick="filterModels('qwen_embedding')">
                                     <i class="fas fa-puzzle-piece"></i> Qwen3-Embedding
+                                </button>
+                                <button class="btn btn-outline-secondary" data-category="qwen_reranker" onclick="filterModels('qwen_reranker')">
+                                    <i class="fas fa-sort-amount-down"></i> Qwen3-Reranker
                                 </button>
                             </div>
                         </div>
@@ -389,8 +396,8 @@
                         <input type="text" class="form-control" id="emptyBookAuthor" placeholder="请输入作者名（可选）">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">简介</label>
-                        <textarea class="form-control" id="emptyBookDescription" rows="2" placeholder="请输入书籍简介（可选）"></textarea>
+                        <label class="form-label">备注</label>
+                        <textarea class="form-control" id="emptyBookDescription" rows="2" placeholder="请输入备注（可选）"></textarea>
                     </div>
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i> 创建空书后可直接打开剧本编辑页面进行智能创作。
@@ -580,6 +587,7 @@
                             <option value="qwen">Qwen</option>
                             <option value="dreamlite">DreamLite</option>
                             <option value="qwen_embedding">Qwen3-Embedding</option>
+                            <option value="qwen_reranker">Qwen3-Reranker</option>
                         </select>
                     </div>
                     <div class="mb-3">

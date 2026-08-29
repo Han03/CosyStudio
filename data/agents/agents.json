@@ -12,7 +12,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -44,7 +45,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -76,7 +78,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -108,7 +111,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -141,7 +145,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -173,7 +178,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -207,7 +213,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -240,7 +247,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -272,7 +280,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -304,7 +313,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -336,7 +346,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -368,7 +379,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -401,7 +413,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -433,7 +446,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -465,7 +479,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -497,7 +512,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -529,7 +545,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -561,7 +578,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -593,7 +611,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -625,7 +644,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -658,7 +678,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -690,7 +711,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -723,7 +745,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -755,7 +778,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -787,7 +811,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -819,7 +844,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -851,7 +877,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -883,7 +910,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -915,7 +943,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -947,7 +976,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -979,7 +1009,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1011,7 +1042,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1043,7 +1075,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1075,7 +1108,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1107,7 +1141,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1139,7 +1174,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1171,7 +1207,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1203,7 +1240,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1235,7 +1273,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {
@@ -1267,7 +1306,8 @@
       "cosyvoice": {},
       "qwen": {},
       "dreamlite": {},
-      "qwen_embedding": {}
+      "qwen_embedding": {},
+      "qwen_reranker": {}
     },
     "voice_tones": [
       {

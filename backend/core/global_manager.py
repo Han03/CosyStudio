@@ -7,11 +7,11 @@ class GlobalManager:
     全局变量管理器 - 统一管理应用中的全局状态
 
     包含：
-    - 模型实例（cosyvoice_model, qwen_model, dreamlite_model, qwen_embedding_model）
+    - 模型实例（cosyvoice_model, qwen_model, dreamlite_model, qwen_embedding_model, qwen_reranker_model）
     - 智能体管理器（agent_manager）
     - 系统状态（system_status, model_loading_status, system_resources）
     - 并发控制锁（cosyvoice_model_lock, qwen_model_lock等）
-    - 各模型的配置参数（qwen_generate_params, cosyvoice_config, dreamlite_config, qwen_embedding_config）
+    - 各模型的配置参数（qwen_generate_params, cosyvoice_config, dreamlite_config, qwen_embedding_config, qwen_reranker_config）
 
     所有模型实例、加载状态、锁、参数属性均从 MODEL_CATEGORIES 字典派生。
     """
@@ -89,12 +89,14 @@ class GlobalManager:
             get_qwen_generate_params,
             get_cosyvoice_config_params,
             get_dreamlite_config_params,
-            get_qwen_embedding_config_params
+            get_qwen_embedding_config_params,
+            get_qwen_reranker_config_params
         )
         self.qwen_generate_params = get_qwen_generate_params()
         self.cosyvoice_config = get_cosyvoice_config_params()
         self.dreamlite_config = get_dreamlite_config_params()
         self.qwen_embedding_config = get_qwen_embedding_config_params()
+        self.qwen_reranker_config = get_qwen_reranker_config_params()
 
     def _read_version(self):
         """从 version.json 读取版本号"""
@@ -170,6 +172,17 @@ class GlobalManager:
             "error": None
         }
 
+    def reset_qwen_reranker(self):
+        """重置Qwen3-Reranker模型"""
+        self._qwen_reranker_model = None
+        self.system_status["qwen_reranker_loaded"] = False
+        self.model_loading_status["qwen_reranker"] = {
+            "status": "not_loaded",
+            "progress": 0,
+            "message": "未加载",
+            "error": None
+        }
+
     def _set_model_loaded(self, model:str, loaded: bool):
         """设置模型加载状态"""
         self.system_status[model] = loaded
@@ -199,6 +212,10 @@ class GlobalManager:
         """设置Qwen3-Embedding加载状态"""
         self._set_model_loaded("qwen_embedding", loaded)
 
+    def set_qwen_reranker_loaded(self, loaded: bool):
+        """设置Qwen3-Reranker加载状态"""
+        self._set_model_loaded("qwen_reranker", loaded)
+
     def update_qwen_generate_params(self, params):
         """更新Qwen生成参数"""
         from .config_manager import update_qwen_generate_params as save_params
@@ -224,6 +241,13 @@ class GlobalManager:
         save_config(batch_size=batch_size, max_length=max_length)
         from .config_manager import get_qwen_embedding_config_params
         self.qwen_embedding_config = get_qwen_embedding_config_params()
+
+    def update_qwen_reranker_config(self, max_length=None):
+        """更新Qwen3-Reranker配置参数"""
+        from .config_manager import update_qwen_reranker_config_params as save_config
+        save_config(max_length=max_length)
+        from .config_manager import get_qwen_reranker_config_params
+        self.qwen_reranker_config = get_qwen_reranker_config_params()
 
     @property
     def cosyvoice_model(self):
@@ -264,6 +288,16 @@ class GlobalManager:
     def qwen_embedding_model(self, value):
         """设置Qwen3-Embedding模型"""
         self._qwen_embedding_model = value
+
+    @property
+    def qwen_reranker_model(self):
+        """获取Qwen3-Reranker模型"""
+        return self._qwen_reranker_model
+
+    @qwen_reranker_model.setter
+    def qwen_reranker_model(self, value):
+        """设置Qwen3-Reranker模型"""
+        self._qwen_reranker_model = value
 
     def try_acquire_model(self, model_type: str) -> bool:
         """尝试获取模型运行权限。

@@ -59,7 +59,6 @@
 
 | 工具 | 说明 |
 |------|------|
-| 项目体检 | 检查项目数据完整性（表结构/角色卡/卷纲是否为空等） |
 | 状态查询 | 根据自然语言查询项目设定信息 |
 | 项目学习 | 从成功案例中提取可复用的写作模式 |
 
@@ -294,7 +293,6 @@ python start_server.py
 | `POST /webnovel/review` | 质量审查 |
 | `POST /chapters/continue` | 创作章节（核心入口） |
 | `GET /webnovel/dashboard` | 项目面板数据 |
-| `GET /webnovel/doctor` | 项目体检 |
 
 ### 有声书
 

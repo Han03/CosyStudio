@@ -99,7 +99,7 @@ class DraftPolisherExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=full_prompt,
                 system_prompt=system_prompt,
-                max_tokens=6000,
+                max_tokens=8000,
                 script_id=script_id,
                 project_id=project_id,
                 executor_name="draft_polisher_executor",
@@ -132,6 +132,11 @@ class DraftPolisherExecutor(BaseExecutor):
                     polished_content = "\n".join(lines).strip()
 
             if not polished_content:
+                polished_content = draft_content
+
+            # 润色职责是扩写（白描稿1200-1800字 → 成品3000-5000字），
+            # 若输出反而短于草稿，说明模型压缩而非扩写，采用草稿保底避免质量退化。
+            if len(polished_content) < len(draft_content):
                 polished_content = draft_content
 
             summary = f"草稿润色完成：润色后{len(polished_content)}字"

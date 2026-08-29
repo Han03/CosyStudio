@@ -1,4 +1,6 @@
 let loadingProgressInterval = null;
+let downloadProgressInterval = null;
+let downloadPollFailCount = 0;
 let modelListCache = [];
 let currentModelFilter = 'qwen';
 let currentConfig = {};
@@ -22,7 +24,8 @@ function loadSingleModel(category) {
         'cosyvoice': (p) => ({ cosyvoice_model_path: p }),
         'qwen_omni': (p) => ({ qwen_omni_model_path: p }),
         'dreamlite': (p) => ({ dreamlite_model_path: p }),
-        'qwen_embedding': (p) => ({ qwen_embedding_model_path: p })
+        'qwen_embedding': (p) => ({ qwen_embedding_model_path: p }),
+        'qwen_reranker': (p) => ({ qwen_reranker_model_path: p })
     };
 
     const modelPath = currentConfig.models && currentConfig.models[category] 
@@ -147,6 +150,7 @@ function refreshModelList() {
             return orderA - orderB;
         });
         renderFilteredModels();
+        syncDownloadPollingState();
     })
     .catch(e => {
         console.error('加载模型列表失败:', e);
@@ -191,7 +195,7 @@ function selectModelRadio(category, modelPath, modelName) {
     if (targetInput) {
         targetInput.checked = true;
     }
-    apiRequest(`${API_BASE_URL}/api/models_select`, {
+    apiRequest(`${API_BASE_URL}/api/models/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category, model_path: modelPath, model_name: modelName }),
@@ -274,9 +278,10 @@ function renderFilteredModels() {
             const progress = model.download_progress || 0;
             statusHtml = `<span class="badge bg-warning"><i class="fas fa-spinner fa-spin"></i> 下载中</span>`;
             progressBarHtml = `
-                <div class="model-download-progress">
+                <div class="model-download-progress" data-download-progress="${model.path}">
                     <div class="model-download-progress-bar" style="width: ${progress}%"></div>
                 </div>
+                <div class="model-download-detail" data-download-detail="${model.path}" style="font-size: 12px; color: #888; margin-top: 4px;">${progress}%</div>
             `;
         } else if (model.status === 'error') {
             statusHtml = `<span class="badge bg-danger"><i class="fas fa-exclamation-triangle"></i> 错误</span>`;
@@ -320,7 +325,7 @@ function renderFilteredModels() {
         ` : '';
 
         return `
-            <div class="model-item">
+            <div class="model-item" data-model-path="${model.path}">
                 <div class="model-item-info" style="display: flex; align-items: flex-start; gap: 12px;">
                     ${selectHtml}
                     <div style="flex: 1;">
@@ -479,6 +484,95 @@ function resumeModelDownload(modelName, category) {
     startModelDownload(modelName, category);
 }
 
+function startDownloadProgressPolling() {
+    if (downloadProgressInterval) return;
+    downloadPollFailCount = 0;
+    downloadProgressInterval = setInterval(pollDownloadStatusOnce, 2000);
+}
+
+function stopDownloadProgressPolling() {
+    if (downloadProgressInterval) {
+        clearInterval(downloadProgressInterval);
+        downloadProgressInterval = null;
+    }
+    downloadPollFailCount = 0;
+}
+
+function syncDownloadPollingState() {
+    const hasDownloading = modelListCache.some(m => m.status === 'downloading');
+    if (hasDownloading) {
+        startDownloadProgressPolling();
+    } else {
+        stopDownloadProgressPolling();
+    }
+}
+
+function findDownloadElement(attrName, modelPath) {
+    // Windows 路径含反斜杠，不能直接拼进 CSS 选择器（会被当作转义序列），逐元素比对属性值
+    const elements = document.querySelectorAll(`[${attrName}]`);
+    for (const el of elements) {
+        if (el.getAttribute(attrName) === modelPath) {
+            return el;
+        }
+    }
+    return null;
+}
+
+function updateDownloadProgressCard(statusData) {
+    const progress = statusData.progress || 0;
+    const progressContainer = findDownloadElement('data-download-progress', statusData.path);
+    const bar = progressContainer ? progressContainer.querySelector('.model-download-progress-bar') : null;
+    if (bar) {
+        bar.style.width = `${progress}%`;
+    }
+    const detail = findDownloadElement('data-download-detail', statusData.path);
+    if (detail) {
+        const parts = [`${progress}%`];
+        if (statusData.speed_str) parts.push(statusData.speed_str);
+        if (statusData.eta_str) parts.push(statusData.eta_str);
+        detail.textContent = parts.join(' · ');
+    }
+}
+
+function pollDownloadStatusOnce() {
+    fetch(`${API_BASE_URL}/api/models/download-status`)
+        .then(r => r.json())
+        .then(statusData => {
+            downloadPollFailCount = 0;
+            const modelStatus = statusData.status;
+            const modelPath = statusData.path || '';
+
+            if (!modelPath || !['downloading', 'ready', 'error', 'canceled'].includes(modelStatus)) {
+                return;
+            }
+
+            if (modelStatus !== 'downloading') {
+                stopDownloadProgressPolling();
+                refreshModelList();
+                return;
+            }
+
+            const cached = modelListCache.find(m => m.path === modelPath);
+            const visible = cached && cached.category === currentModelFilter;
+            if (visible) {
+                updateDownloadProgressCard(statusData);
+            } else {
+                if (cached) {
+                    cached.status = 'downloading';
+                    cached.download_progress = statusData.progress || 0;
+                }
+                renderFilteredModels();
+            }
+        })
+        .catch(e => {
+            console.error('获取下载状态失败:', e);
+            downloadPollFailCount += 1;
+            if (downloadPollFailCount >= 3) {
+                stopDownloadProgressPolling();
+            }
+        });
+}
+
 function cancelModelDownload() {
     if (!confirm('确定要取消当前下载吗？')) {
         return;
@@ -516,6 +610,7 @@ function startModelDownload(modelName, category) {
         if (data.success) {
             showToast('下载已开始，请在模型列表中查看进度', 'success');
             refreshModelList();
+            startDownloadProgressPolling();
         } else {
             showToast('下载失败: ' + (data.error || ''), 'error');
         }
@@ -658,6 +753,7 @@ function confirmModelDownload() {
         if (data.success) {
             showToast('下载已开始，请在模型列表中查看进度', 'success');
             refreshModelList();
+            startDownloadProgressPolling();
         } else {
             showToast('下载失败: ' + (data.error || ''), 'error');
         }

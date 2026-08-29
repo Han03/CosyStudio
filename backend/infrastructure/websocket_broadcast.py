@@ -230,6 +230,37 @@ class WebSocketBroadcastManager:
         for conn in disconnected:
             self.unregister_connection(script_id, conn)
 
+    async def broadcast_reindex_progress(self, script_id: int, status: str, message: str, progress: int = 0):
+        """广播 RAG 重建索引进度
+
+        Args:
+            script_id: 剧本ID
+            status: 状态 running/completed/failed
+            message: 进度描述消息
+            progress: 进度百分比 0-100
+        """
+        connections = self._script_connections.get(script_id, set())
+        if not connections:
+            return
+
+        message_data = {
+            "type": "reindex_progress",
+            "script_id": script_id,
+            "status": status,
+            "message": message,
+            "progress": progress,
+        }
+
+        disconnected = []
+        for conn in connections:
+            try:
+                await conn.send_json(message_data)
+            except Exception:
+                disconnected.append(conn)
+
+        for conn in disconnected:
+            self.unregister_connection(script_id, conn)
+
     async def broadcast_init_progress(self, script_id: int, status: str, step: str, message: str, progress: int = 0):
         """广播深度初始化进度
 

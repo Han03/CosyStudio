@@ -1,5 +1,5 @@
 ---
-system_prompt: 你是一位专业的网文章纲设计师，擅长设计紧凑、有钩子的章节结构
+system_prompt: 你是一位专业的网文章纲设计师，擅长设计行云流水、读不出章节边界的章节结构
 user_prompt: |
   请为第{volume_number}卷的第{batch_chapter_start}-{batch_chapter_end}章设计章节规划（第{batch_index}/{total_batches}批）：
 
@@ -41,7 +41,7 @@ user_prompt: |
   6. 关键事件：必须发生的事件（按顺序）
   7. 预期爽点：本章的爽点设计
   8. 伏笔埋设/回收：本章涉及的伏笔
-  9. 章末钩子：结尾的悬念
+  9. 收尾方式：从以下自然停点中为每章选择一种——动作/对话进行到一半切断、情绪落点安静收束、信息差留白、危机骤起（慎用，连续章节最多出现一次）；相邻章节禁止使用相同收尾方式
 
   【结构化节点规范】
   - CBN (Chapter Beginning Node)：章首节点，每章固定1个，格式为"主体 | 动作/变化 | 对象/结果"
@@ -64,7 +64,7 @@ user_prompt: |
         "key_events": ["事件1", "事件2", "事件3"],
         "expected_cool_points": "预期爽点",
         "foreshadowing": "伏笔埋设/回收",
-        "chapter_hook": "章末钩子",
+        "chapter_hook": "收尾方式",
         "time_anchor": "时间锚点",
         "chapter_duration": "章内跨度",
         "interval_from_prev": "与上章间隔",
@@ -74,7 +74,7 @@ user_prompt: |
         "perspective": "视角/主角",
         "key_entities": "关键实体",
         "chapter_change": "本章变化",
-        "unresolved_questions": "章末未闭合问题",
+        "unresolved_questions": "章末未闭合问题（可为空）",
         "cbn": "章首节点",
         "cpns": ["推进节点1", "推进节点2"],
         "cen": "章末节点",

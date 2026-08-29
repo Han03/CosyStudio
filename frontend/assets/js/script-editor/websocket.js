@@ -110,6 +110,9 @@ function handleWsMessage(msg) {
         case 'chapter_plans_generated':
             handleChapterPlansGeneratedMessage(msg);
             break;
+        case 'reindex_progress':
+            handleReindexProgressMessage(msg);
+            break;
         case 'pong':
             break;
         default:
@@ -439,5 +442,11 @@ function handleChapterPlansGeneratedMessage(msg) {
         if (typeof loadWebnovelOutline === 'function') {
             loadWebnovelOutline();
         }
+    }
+}
+
+function handleReindexProgressMessage(msg) {
+    if (typeof window.handleReindexProgress === 'function') {
+        window.handleReindexProgress(msg);
     }
 }

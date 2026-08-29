@@ -21,6 +21,7 @@ async def load_models_async(request: Request):
     qwen_path = data.get("qwen_model_path")
     dreamlite_path = data.get("dreamlite_model_path")
     qwen_embedding_path = data.get("qwen_embedding_model_path")
+    qwen_reranker_path = data.get("qwen_reranker_model_path")
 
     tasks = []
 
@@ -51,6 +52,13 @@ async def load_models_async(request: Request):
         if global_manager.model_loading_status["qwen_embedding"]["status"] == "loading":
             return {"success": False, "error": "Qwen3-Embedding模型正在加载中"}
         tasks.append(model_manager.async_load_qwen_embedding_model(qwen_embedding_path, force=True))
+
+    if qwen_reranker_path:
+        if not os.path.exists(qwen_reranker_path):
+            return {"success": False, "error": f"Qwen3-Reranker模型路径不存在: {qwen_reranker_path}"}
+        if global_manager.model_loading_status["qwen_reranker"]["status"] == "loading":
+            return {"success": False, "error": "Qwen3-Reranker模型正在加载中"}
+        tasks.append(model_manager.async_load_qwen_reranker_model(qwen_reranker_path, force=True))
 
     if tasks:
         for task in tasks:
@@ -160,7 +168,7 @@ async def import_model(
     else:
         return {"success": False, "error": "请提供源路径或上传文件"}
 
-@router.delete("/delete")
+@router.post("/delete")
 async def delete_model(request: Request):
     try:
         data = await request.json()

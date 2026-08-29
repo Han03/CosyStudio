@@ -138,7 +138,8 @@ const MODEL_STATUS_MAP = [
     { dotId: 'headerQwenDot', name: 'Qwen', key: 'qwen_loaded' },
     { dotId: 'headerCosyvoiceDot', name: 'CosyVoice', key: 'cosyvoice_loaded' },
     { dotId: 'headerDreamliteDot', name: 'DreamLite', key: 'dreamlite_loaded' },
-    { dotId: 'headerEmbeddingDot', name: 'Embedding', key: 'qwen_embedding_loaded' }
+    { dotId: 'headerEmbeddingDot', name: 'Embedding', key: 'qwen_embedding_loaded' },
+    { dotId: 'headerRerankerDot', name: 'Reranker', key: 'qwen_reranker_loaded' }
 ];
 
 function updateModelsCombinedStatus(data) {

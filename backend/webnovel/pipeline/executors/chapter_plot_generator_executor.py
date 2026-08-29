@@ -92,24 +92,30 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
             # 故事摘要（从项目数据加载）
             story_summary = project.get("story_summary", "")
 
-            # 前文回顾
+            # 前文回顾：剧情生成是策划层，上一章取头尾各 1000 字兼顾起因与断点；
+            # 更早章节为结构化摘要（自带标题）或开头截取回退。
             previous_chapters_text = ""
             if writing_context.get("previous_chapters"):
                 pc_parts = []
                 for prev in writing_context["previous_chapters"]:
                     if prev.get("is_latest"):
-                        pc_parts.append(f"第{prev['chapter_index']}章（上一章，请仔细承接）:\n{prev['content'][:1000]}")
+                        _c = prev["content"]
+                        if len(_c) > 2000:
+                            _c = _c[:1000] + "\n……（中段省略）……\n" + _c[-1000:]
+                        pc_parts.append(f"第{prev['chapter_index']}章（上一章，请仔细承接）:\n{_c}")
+                    elif prev.get("is_summary"):
+                        pc_parts.append(prev["content"])
                     else:
                         pc_parts.append(f"第{prev['chapter_index']}章: {prev['content'][:300]}")
                 previous_chapters_text = "\n".join(pc_parts)
 
-            # 上一章追读钩子
+            # 上一章结尾状态
             previous_hook_text = ""
             prev_hook = writing_context.get("previous_hook", {})
             if prev_hook and prev_hook.get("hook_content"):
                 previous_hook_text = (
-                    f"- 钩子内容: {prev_hook['hook_content']}\n"
-                    f"- 钩子类型: {prev_hook.get('hook_type', '')}\n"
+                    f"- 结尾状态: {prev_hook['hook_content']}\n"
+                    f"- 状态类型: {prev_hook.get('hook_type', '')}\n"
                     f"- 结尾情绪: {prev_hook.get('ending_emotion', '')}"
                 )
 
@@ -199,6 +205,24 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
                     )
                 active_loops_text = "\n".join(al_parts)
 
+            # RAG 语义检索上下文（来自 context_builder 的多轮查询结果）
+            rag_context_text = ""
+            rag_results = writing_context.get("rag_context", [])
+            if rag_results:
+                rag_parts = []
+                for r in rag_results[:8]:
+                    if isinstance(r, str):
+                        rag_parts.append(r[:200])
+                    elif isinstance(r, dict):
+                        content = r.get("content", "")[:200]
+                        chunk_type = r.get("chunk_type", "")
+                        ch_num = r.get("chapter_number", 0)
+                        if chunk_type and ch_num:
+                            rag_parts.append(f"[第{ch_num}章/{chunk_type}] {content}")
+                        else:
+                            rag_parts.append(content)
+                rag_context_text = "\n".join(rag_parts)
+
             # 加载 prompt 模板并填充
             prompt_data = self._load_prompt("chapter_plot_generate")
             full_prompt = prompt_data["user_prompt"].format(
@@ -223,6 +247,7 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
                 power_system_info=power_system_info,
                 worldview_info=worldview_info,
                 active_loops=active_loops_text,
+                rag_context=rag_context_text,
             )
             system_prompt = prompt_data["system_prompt"] or "你是一位资深网文策划编辑，擅长将章节规划拆解为详细的场景级剧情列表"
 

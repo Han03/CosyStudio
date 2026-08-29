@@ -132,6 +132,13 @@ const CAPABILITY_TYPE_DETAILS = {
         color: '#f59e0b',
         description: '将文本转换为向量表示，用于语义检索和相似度计算',
         output_type: '同步'
+    },
+    text_rerank: {
+        name: '片段重排序',
+        icon: 'fa-sort-amount-down',
+        color: '#ef4444',
+        description: '对检索候选片段按与查询的相关性重新排序，用于 RAG 结果精排',
+        output_type: '同步'
     }
 };
 

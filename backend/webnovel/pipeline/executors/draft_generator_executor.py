@@ -1,11 +1,12 @@
 """执行器7：草稿生成器（剧情创作）。
 
-基于章节剧情生成器输出的详细剧情列表创作正文草稿。
+基于章节剧情生成器输出的详细剧情列表创作白描草稿。
 prompt 仅包含写作要求、输出格式和剧情列表，大幅精简上下文。
+草稿定位为白描骨架稿（便于后续多轮审查），文笔细节由润色阶段完成。
 
 输出要求：
-1. 完整的章节草稿内容（2000-3000字）
-2. 包含极简的场景描写和对话
+1. 白描草稿内容（1200-1800字），只叙述事件、行为和关键对话
+2. 不写环境渲染、心理独白、五感描写和修辞
 3. 遵循剧情列表中的场景顺序和事件
 4. 使用JSON格式输出，包含content和chapter_title字段
 """
@@ -50,14 +51,17 @@ class DraftGeneratorExecutor(BaseExecutor):
             # ── 构建动态 section ──
             continue_prev = "开篇直接承接上一章结尾，不要有剧情中断感觉;" if chapter_index > 1 else ""
 
-            # 前文回顾
+            # 前文回顾：上一章由 context_builder 整章注入（已限长），不再截断；
+            # 更早章节为结构化摘要（自带“第N章摘要”标题）或开头截取回退。
             writing_context = context.get("writing_context", {})
             previous_chapters_text = ""
             if writing_context.get("previous_chapters"):
                 pc_parts = ["\n\n【前文回顾】"]
                 for prev in writing_context["previous_chapters"]:
                     if prev.get("is_latest"):
-                        pc_parts.append(f"第{prev['chapter_index']}章（上一章，请仔细承接）:\n{prev['content'][:1500]}")
+                        pc_parts.append(f"第{prev['chapter_index']}章（上一章，请仔细承接）:\n{prev['content']}")
+                    elif prev.get("is_summary"):
+                        pc_parts.append(prev["content"])
                     else:
                         pc_parts.append(f"第{prev['chapter_index']}章: {prev['content'][:500]}")
                 previous_chapters_text = "\n".join(pc_parts)
@@ -70,6 +74,24 @@ class DraftGeneratorExecutor(BaseExecutor):
             # 角色速写（本章剧情涉及的角色）
             character_info = self._build_character_info(chapter_plot, writing_context)
 
+            # RAG 语义检索上下文（来自 context_builder 的多轮查询结果）
+            rag_context_section = ""
+            rag_results = writing_context.get("rag_context", [])
+            if rag_results:
+                rag_parts = []
+                for r in rag_results[:5]:
+                    if isinstance(r, str):
+                        rag_parts.append(r[:200])
+                    elif isinstance(r, dict):
+                        content = r.get("content", "")[:200]
+                        chunk_type = r.get("chunk_type", "")
+                        ch_num = r.get("chapter_number", 0)
+                        if chunk_type and ch_num:
+                            rag_parts.append(f"[第{ch_num}章/{chunk_type}] {content}")
+                        else:
+                            rag_parts.append(content)
+                rag_context_section = "\n".join(rag_parts)
+
             # 从 .md 文件加载 prompt 模板
             prompt_data = self._load_prompt("draft_generate")
             full_prompt = prompt_data["user_prompt"].format(
@@ -78,6 +100,7 @@ class DraftGeneratorExecutor(BaseExecutor):
                 character_info=character_info,
                 previous_chapters=previous_chapters_text,
                 user_prompt_section=user_prompt_section,
+                rag_context=rag_context_section,
             )
             system_prompt = prompt_data["system_prompt"] or "你是一位畅销网文作家，擅长创作精彩的网络小说章节"
 
@@ -86,7 +109,7 @@ class DraftGeneratorExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=full_prompt,
                 system_prompt=system_prompt,
-                max_tokens=4000,
+                max_tokens=3500,
                 script_id=script_id,
                 project_id=project_id,
                 executor_name=self.step_name,
@@ -210,6 +233,18 @@ class DraftGeneratorExecutor(BaseExecutor):
             goals = char.get("goals", "")
             if goals:
                 parts.append(f"目标:{goals}")
+            # 持有物品清单（事实记录阶段维护，无记录时明示"无"，杜绝凭空掏出物品）
+            items = char.get("items", []) or []
+            item_names = [
+                it.get("name", "") for it in items
+                if isinstance(it, dict) and it.get("name")
+            ]
+            parts.append(f"持有物品:{'、'.join(item_names)}" if item_names else "持有物品:无")
             lines.append(" | ".join(parts))
+
+        lines.append(
+            "物品一致性约束：角色使用、掏出、挥动任何物品前，必须已在其持有物品清单中；"
+            "禁止凭空出现清单外的物品；若剧情需要新物品，必须先写获得它的过程。"
+        )
 
         return "\n".join(lines)

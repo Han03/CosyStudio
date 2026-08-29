@@ -129,6 +129,26 @@ def parse_llm_json(
 
     content = content.strip()
 
+    # 多 JSON 块防御：LLM 可能在截断/自我修正后拼接输出多个顶层 JSON 块，
+    # 若直接取首{到尾}会把两段包在一起，json_repair 会将后块嵌套进前块未闭合的对象，
+    # 导致字段被污染（如角色组 emotional_pivot 吞掉整个团队结构）。
+    # 先按 markdown 围栏切段再配对括号，避免前段未闭合的 { 把后段吞进同一块；
+    # 存在完整闭合块时优先采用（单块场景也生效，可绕过未闭合残段），
+    # 多块时优先取最后一个可解析的完整块（模型最终输出）。
+    blocks = []
+    for seg in re.split(r"```(?:json)?", content):
+        blocks.extend(_split_top_level_json_blocks(seg))
+    if blocks:
+        picked = None
+        for block in reversed(blocks):
+            try:
+                if isinstance(json.loads(block), dict):
+                    picked = block
+                    break
+            except json.JSONDecodeError:
+                continue
+        content = picked or blocks[-1]
+
     # 提取最外层的 JSON 对象
     first_brace = content.find("{")
     last_brace = content.rfind("}")
@@ -225,9 +245,23 @@ def parse_llm_json(
         if existing_log_id > 0:
             try:
                 from repositories.llm_call_log_repository import update_llm_call_log
-                update_llm_call_log(log_id=existing_log_id, **log_kwargs)
-            except Exception:
-                pass
+                # 🔴 update_llm_call_log 仅接受固定参数集，必须先过滤掉 log_kwargs 中的
+                #    元数据键（request_id/executor_name/system_prompt 等），否则 TypeError 会导致
+                #    解析结果回写失败、日志里 parse_success 永远为假 0。
+                _allowed_update_keys = (
+                    "raw_output", "parsed_output", "parse_success", "success_strategy",
+                    "strategies_tried", "error_message", "input_tokens", "output_tokens", "latency_ms",
+                )
+                update_kwargs = {k: v for k, v in log_kwargs.items() if k in _allowed_update_keys}
+                update_llm_call_log(log_id=existing_log_id, **update_kwargs)
+            except Exception as _upd_ex:
+                try:
+                    from utils.logger import log_manager
+                    log_manager.get_logger("llm_call_log").error(
+                        f"[LLM_LOG_UPDATE_SKIP] {type(_upd_ex).__name__}: {_upd_ex}"
+                    )
+                except Exception:
+                    pass
         else:
             _enqueue_log(log_kwargs)
 
@@ -734,6 +768,42 @@ def _fix_missing_commas_in_objects(text: str) -> str:
         i += 1
     
     return ''.join(result)
+
+
+def _split_top_level_json_blocks(text: str) -> list:
+    """用状态机按括号配对切分文本中的顶层 JSON 块（考虑字符串内括号与转义）。
+
+    仅收集能正常闭合的块；未闭合的残块（如截断输出的前半段）不会入选。
+    """
+    blocks = []
+    depth = 0
+    start = -1
+    in_string = False
+    escape = False
+    for i, ch in enumerate(text):
+        if escape:
+            escape = False
+            continue
+        if in_string:
+            if ch == '\\':
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+            continue
+        if ch in '{[':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch in '}]':
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    blocks.append(text[start:i + 1])
+                    start = -1
+    return blocks
 
 
 def _extract_valid_json_fragment(text: str) -> str:

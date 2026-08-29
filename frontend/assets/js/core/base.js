@@ -19,6 +19,7 @@ const MODEL_CATEGORIES = {
     'qwen': 'Qwen',
     'dreamlite': 'DreamLite',
     'qwen_embedding': 'Qwen3-Embedding',
+    'qwen_reranker': 'Qwen3-Reranker',
 };
 window.MODEL_CATEGORIES = MODEL_CATEGORIES;
 

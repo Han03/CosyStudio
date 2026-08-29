@@ -60,10 +60,7 @@ class PipelineOrchestrator:
             "draft_polisher",
             "fact_recorder",
         ],
-        "review": ["review_executor"],
         "query": ["query_executor"],
-        "doctor": ["doctor_executor"],
-        "learn": ["learn_executor"],
         "story_system": ["story_system"],
     }
 

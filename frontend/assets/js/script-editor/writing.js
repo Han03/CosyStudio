@@ -583,7 +583,8 @@ async function searchRag() {
     if (!query || !state.scriptId) return;
 
     try {
-        const data = await apiRequest(`/api/books/scripts/rag/search?script_id=${state.scriptId}&query=${encodeURIComponent(query)}&limit=10`, { silent: true });
+        // 默认使用分级阈值（min_score=0）
+        const data = await apiRequest(`/api/books/scripts/rag/search?script_id=${state.scriptId}&query=${encodeURIComponent(query)}&limit=10&min_score=0`, { silent: true });
         renderRagResults(data.chunks || []);
     } catch (e) {
         console.error('RAG检索失败:', e);
@@ -597,6 +598,7 @@ function renderRagResults(chunks) {
             <div class="rag-empty">
                 <i class="fas fa-search"></i>
                 <p>未找到相关内容</p>
+                <p style="font-size:0.8em;color:#888;margin-top:4px;">已启用相似度阈值过滤，低相关性结果已被过滤</p>
             </div>
         `;
         return;
@@ -605,19 +607,37 @@ function renderRagResults(chunks) {
     const typeLabels = {
         'character': '角色', 'worldview': '世界观', 'power_system': '力量体系',
         'golden_finger': '金手指', 'volume_outline': '卷纲', 'foreshadow': '伏笔',
-        'villain': '反派', 'chapter': '章节', 'chapter_paragraph': '章节原文'
+        'villain': '反派', 'chapter': '章节', 'chapter_summary': '章节摘要',
+        'chapter_paragraph': '章节原文'
     };
 
     container.innerHTML = chunks.map(chunk => {
         const typeLabel = typeLabels[chunk.chunk_type] || chunk.chunk_type || '未知';
         const chapterInfo = chunk.chapter_number ? ` · 第${chunk.chapter_number}章` : '';
+        const score = (chunk.score || 0) * 100;
+        // 按相似度等级着色：>=85% 绿色，>=75% 橙色，<75% 红色
+        const scoreColor = score >= 85 ? '#4caf50' : score >= 75 ? '#ff9800' : '#f44336';
+        // 章节原文段落：展示前后上下文
+        const hasContext = chunk.context_before || chunk.context_after;
+        let contentHtml = '';
+        if (hasContext) {
+            if (chunk.context_before) {
+                contentHtml += `<div class="rag-ctx-block rag-ctx-before">${escapeHtml(chunk.context_before)}</div>`;
+            }
+            contentHtml += `<div class="rag-ctx-hit">${escapeHtml(chunk.content || '')}</div>`;
+            if (chunk.context_after) {
+                contentHtml += `<div class="rag-ctx-block rag-ctx-after">${escapeHtml(chunk.context_after)}</div>`;
+            }
+        } else {
+            contentHtml = `<div class="rag-result-content">${escapeHtml(chunk.content || '')}</div>`;
+        }
         return `
         <div class="rag-result-card">
             <div class="rag-result-header">
                 <span class="rag-result-source">${typeLabel}${chapterInfo}</span>
-                <span class="rag-result-score">相似度: ${((chunk.score || 0) * 100).toFixed(1)}%</span>
+                <span class="rag-result-score" style="color:${scoreColor}">相似度: ${score.toFixed(1)}%</span>
             </div>
-            <div class="rag-result-content">${escapeHtml(chunk.content || '')}</div>
+            ${contentHtml}
         </div>
         `;
     }).join('');

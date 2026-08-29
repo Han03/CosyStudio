@@ -12,7 +12,6 @@ async function showInitModal(opts = {}) {
 
     document.getElementById('initModal').style.display = 'flex';
     document.getElementById('initProgressContainer').style.display = 'none';
-    document.getElementById('initAiBtn').style.display = 'none';
     document.getElementById('initPrevBtn').style.display = 'none';
     document.getElementById('initCancelBtn').style.display = 'none';
     document.getElementById('initNextBtn').style.display = 'block';
@@ -197,7 +196,7 @@ async function restoreInitData() {
         if (initData.constraints) {
             const cs = initData.constraints;
             if (cs.anti_trope) document.getElementById('initAntiTrope').value = cs.anti_trope;
-            if (cs.hard_constraints) document.getElementById('initConstraints').value = cs.hard_constraints;
+            if (cs.hard_constraints) document.getElementById('initConstraints').value = Array.isArray(cs.hard_constraints) ? cs.hard_constraints.join('\n') : cs.hard_constraints;
             if (cs.core_selling_points) document.getElementById('initCoreSellingPoints').value = cs.core_selling_points;
             if (cs.opening_hook) document.getElementById('initOpeningHook').value = cs.opening_hook;
         }
@@ -207,6 +206,17 @@ async function restoreInitData() {
             currentInitStep = result.current_step;
         }
 
+        // 恢复 AI 占位区域状态：有已保存数据的步骤显示结果态，否则显示占位卡片
+        for (let s = 2; s <= 6; s++) {
+            const dataKey = getDataKeyForStep(s);
+            const hasData = dataKey && initData[dataKey] && Object.keys(initData[dataKey]).length > 0;
+            if (hasData) {
+                showAiResult(s);
+            } else {
+                showAiPlaceholder(s);
+            }
+        }
+
         console.log('[init] 已恢复初始化数据，当前步骤:', currentInitStep);
     } catch (e) {
         console.warn('[init] 恢复初始化数据失败:', e);
@@ -214,6 +224,21 @@ async function restoreInitData() {
 }
 
 function resetAllFields() {
+    // 重置所有 AI 占位区域
+    for (let s = 2; s <= 6; s++) {
+        showAiPlaceholder(s);
+    }
+
+    // 清除步骤 2-5 选项状态
+    stepOptions = { 2: [], 3: [], 4: [], 5: [] };
+    stepSelectedIndex = { 2: -1, 3: -1, 4: -1, 5: -1 };
+    for (let s = 2; s <= 5; s++) {
+        const container = document.getElementById(`step${s}OptionsContainer`);
+        const list = document.getElementById(`step${s}OptionsList`);
+        if (container) container.style.display = 'none';
+        if (list) list.innerHTML = '';
+    }
+
     // Step 1 字段
     const createBookName = document.getElementById('initCreateBookName');
     if (createBookName) createBookName.value = '';
@@ -298,7 +323,7 @@ function updateStepUI() {
         }
     }
 
-    // 切到 Step 1 时，回填已有书名（从 Step 2 回退或已有剧本直接回第一步时）
+    // 切到 Step 1 时，回填已有书名/作者/备注（从 Step 2 回退或已有剧本直接回第一步时）
     if (currentInitStep === 1) {
         const existingName = state.scriptData?.name || document.getElementById('initTitle')?.value || '';
         const createNameEl = document.getElementById('initCreateBookName');
@@ -309,14 +334,21 @@ function updateStepUI() {
                 createNameEl.dataset.autoFilled = 'true';
             }
         }
+        // 回填作者和备注
+        const authorEl = document.getElementById('initCreateBookAuthor');
+        if (authorEl && state.scriptData?.author && !authorEl.value.trim()) {
+            authorEl.value = state.scriptData.author;
+        }
+        const descEl = document.getElementById('initCreateBookDesc');
+        if (descEl && state.scriptData?.description && !descEl.value.trim()) {
+            descEl.value = state.scriptData.description;
+        }
     }
 
     document.getElementById('initPrevBtn').style.display = currentInitStep > 1 ? 'block' : 'none';
-    document.getElementById('initAiBtn').style.display = currentInitStep >= 2 && currentInitStep <= 6 ? 'block' : 'none';
 
     if (currentInitStep === 7) {
         document.getElementById('initNextBtn').textContent = '确认并初始化';
-        document.getElementById('initAiBtn').style.display = 'none';
         generateSummary();
     } else if (currentInitStep === 1) {
         document.getElementById('initNextBtn').textContent = state.scriptId ? '下一步' : '创建并下一步';
@@ -375,27 +407,41 @@ async function nextStep() {
             return;
         }
 
-        // Step 1 已有 script_id 时：检查是否修改了书名，保存后进入 Step 2
+        // Step 1 已有 script_id 时：检查是否修改了书名/作者/备注，保存后进入 Step 2
         if (currentInitStep === 1 && state.scriptId) {
             const newName = document.getElementById('initCreateBookName')?.value.trim();
+            const newAuthor = document.getElementById('initCreateBookAuthor')?.value.trim() || '';
+            const newDesc = document.getElementById('initCreateBookDesc')?.value.trim() || '';
             const oldName = state.scriptData?.name || '';
-            if (newName && newName !== oldName) {
+            const oldAuthor = state.scriptData?.author || '';
+            const oldDesc = state.scriptData?.description || '';
+            const hasChanges = (newName && newName !== oldName) || newAuthor !== oldAuthor || newDesc !== oldDesc;
+            if (hasChanges) {
                 try {
+                    const body = { script_id: state.scriptId, name: newName || oldName };
+                    if (newAuthor !== oldAuthor) body.author = newAuthor;
+                    if (newDesc !== oldDesc) body.description = newDesc;
                     const data = await apiRequest('/api/books/scripts/rename', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ script_id: state.scriptId, name: newName }),
+                        body: JSON.stringify(body),
                         errorPrefix: '保存失败'
                     });
                     if (data.success) {
-                        if (window.setScriptTitle) setScriptTitle(newName);
-                        showToast('书名已更新', 'success');
+                        if (newName && newName !== oldName && window.setScriptTitle) setScriptTitle(newName);
+                        // 同步本地状态
+                        if (state.scriptData) {
+                            if (newName) state.scriptData.name = newName;
+                            state.scriptData.author = newAuthor;
+                            state.scriptData.description = newDesc;
+                        }
+                        showToast('信息已更新', 'success');
                     } else {
-                        showToast(data.message || '保存书名失败', 'error');
+                        showToast(data.message || '保存失败', 'error');
                     }
                 } catch (e) {
-                    console.error('保存书名失败:', e);
-                    showToast('保存书名失败: ' + e.message, 'error');
+                    console.error('保存信息失败:', e);
+                    showToast('保存失败: ' + e.message, 'error');
                 }
             }
             // 同步 Step 2 的只读书名字段
@@ -544,12 +590,16 @@ function validateStep(step) {
             }
             break;
         case 6:
-            if (constraintPackages.length > 0) {
-                if (selectedPackageIndex < 0) {
-                    alert('请选择一个创意约束包方案');
+            // 允许不选择方案，直接填写表单也能通过
+            if (constraintPackages.length > 0 && selectedPackageIndex < 0) {
+                // 有方案但未选择，检查表单是否已填写
+                if (!document.getElementById('initAntiTrope').value.trim() &&
+                    !document.getElementById('initConstraints').value.trim() &&
+                    !document.getElementById('initCoreSellingPoints').value.trim()) {
+                    alert('请选择一个创意约束包方案，或手动填写反套路规则、硬性约束和核心卖点');
                     return false;
                 }
-            } else {
+            } else if (constraintPackages.length === 0) {
                 if (!document.getElementById('initAntiTrope').value.trim()) {
                     alert('请输入反套路规则');
                     return false;
@@ -620,27 +670,27 @@ function saveStepData(step) {
                 sect_hierarchy: document.getElementById('initSectHierarchy').value.trim()
             };
             break;
-        case 6:
+        case 6: {
+            // 表单为最终数据源（选择方案后已回填到表单，用户可继续微调）
+            const hardText = document.getElementById('initConstraints').value.trim();
+            let hardConstraints = hardText;
             if (constraintPackages.length > 0 && selectedPackageIndex >= 0) {
-                const pkg = constraintPackages[selectedPackageIndex];
-                initData.constraints = {
-                    anti_trope: pkg.anti_trope_rule || '',
-                    hard_constraints: pkg.hard_constraints || [],
-                    core_selling_points: pkg.one_liner_selling_point || '',
-                    opening_hook: pkg.opening_hook || '',
-                    protagonist_flaw: pkg.protagonist_flaw_driven || '',
-                    villain_mirror: pkg.antagonist_mirror || '',
-                    selected_package_name: pkg.package_name || ''
-                };
-            } else {
-                initData.constraints = {
-                    anti_trope: document.getElementById('initAntiTrope').value.trim(),
-                    hard_constraints: document.getElementById('initConstraints').value.trim(),
-                    core_selling_points: document.getElementById('initCoreSellingPoints').value.trim(),
-                    opening_hook: document.getElementById('initOpeningHook').value.trim()
-                };
+                // 未修改时保持方案的数组格式，避免提交时丢失结构化数据
+                const pkgHard = constraintPackages[selectedPackageIndex].hard_constraints;
+                if (Array.isArray(pkgHard) && hardText === pkgHard.join('\n')) {
+                    hardConstraints = pkgHard;
+                } else if (hardText) {
+                    hardConstraints = hardText.split('\n').map(s => s.trim()).filter(Boolean);
+                }
             }
+            initData.constraints = {
+                anti_trope: document.getElementById('initAntiTrope').value.trim(),
+                hard_constraints: hardConstraints,
+                core_selling_points: document.getElementById('initCoreSellingPoints').value.trim(),
+                opening_hook: document.getElementById('initOpeningHook').value.trim()
+            };
             break;
+        }
     }
 }
 
@@ -682,13 +732,74 @@ function getStepKey(step) {
     return keys[step];
 }
 
+// ── AI 占位区域状态管理 ──
+
+/** 显示 AI 占位卡片（未生成状态） */
+function showAiPlaceholder(step) {
+    const zone = document.getElementById(`step${step}AiZone`);
+    if (!zone) return;
+    const placeholder = document.getElementById(`step${step}AiPlaceholder`);
+    const loading = document.getElementById(`step${step}AiLoading`);
+    const result = document.getElementById(`step${step}AiResult`);
+    if (placeholder) placeholder.style.display = 'flex';
+    if (loading) loading.style.display = 'none';
+    if (result) result.style.display = 'none';
+    // 隐藏选项容器
+    if (step <= 5) {
+        const optC = document.getElementById(`step${step}OptionsContainer`);
+        if (optC) optC.style.display = 'none';
+    }
+    if (step === 6) {
+        const pkgC = document.getElementById('constraintPackagesContainer');
+        if (pkgC) pkgC.style.display = 'none';
+    }
+}
+
+/** 显示 AI 加载状态 */
+function showAiLoading(step) {
+    const zone = document.getElementById(`step${step}AiZone`);
+    if (!zone) return;
+    const placeholder = document.getElementById(`step${step}AiPlaceholder`);
+    const loading = document.getElementById(`step${step}AiLoading`);
+    const result = document.getElementById(`step${step}AiResult`);
+    if (placeholder) placeholder.style.display = 'none';
+    if (loading) loading.style.display = 'flex';
+    if (result) result.style.display = 'none';
+}
+
+/** 显示 AI 生成结果区域 */
+function showAiResult(step) {
+    const zone = document.getElementById(`step${step}AiZone`);
+    if (!zone) return;
+    const placeholder = document.getElementById(`step${step}AiPlaceholder`);
+    const loading = document.getElementById(`step${step}AiLoading`);
+    const result = document.getElementById(`step${step}AiResult`);
+    if (placeholder) placeholder.style.display = 'none';
+    if (loading) loading.style.display = 'none';
+    if (result) result.style.display = 'block';
+}
+
+/** 重新生成：重置当前步骤选项并重新调用 AI */
+function regenerateAiData() {
+    const step = currentInitStep;
+    // 清除当前步骤的选项数据
+    if (step >= 2 && step <= 5) {
+        stepOptions[step] = [];
+        stepSelectedIndex[step] = -1;
+    }
+    if (step === 6) {
+        constraintPackages = [];
+        selectedPackageIndex = -1;
+    }
+    generateAiData();
+}
+
 async function generateAiData() {
-    const btn = document.getElementById('initAiBtn');
-    btn.disabled = true;
-    btn.textContent = '生成中...';
+    const step = currentInitStep;
+    showAiLoading(step);
     
     try {
-        saveStepData(currentInitStep);
+        saveStepData(step);
         
         const currentStepData = {};
         if (initData.project) currentStepData.project = initData.project;
@@ -698,36 +809,309 @@ async function generateAiData() {
         if (initData.world) currentStepData.world = initData.world;
         if (initData.constraints) currentStepData.constraints = initData.constraints;
         
-        const data = await apiRequest(`/api/books/scripts/webnovel/init/ai/generate/${currentInitStep}`, {
+        const data = await apiRequest(`/api/books/scripts/webnovel/init/ai/generate/${step}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 script_id: state.scriptId,
-                step: currentInitStep,
+                step: step,
                 current_data: currentStepData
             }),
             errorPrefix: 'AI生成失败'
         });
         if (data.success && data.data) {
-            fillStepData(currentInitStep, data.data, data.is_packages || false);
+            showAiResult(step);
+            if (data.is_multi_options && data.data.options) {
+                // 多选项模式：渲染选项卡片
+                stepOptions[step] = data.data.options;
+                stepSelectedIndex[step] = -1;
+                renderStepOptions(step, data.data.options);
+            } else if (data.is_packages) {
+                // 约束包模式
+                constraintPackages = data.data.constraint_packages || [];
+                selectedPackageIndex = -1;
+                renderConstraintPackages();
+            } else {
+                fillStepData(step, data.data, false);
+            }
         } else {
+            showAiPlaceholder(step);
             showToast('AI生成失败: ' + (data.error || '未知错误'), 'error');
         }
     } catch (e) {
         console.error('AI生成失败:', e);
+        showAiPlaceholder(step);
         showToast('AI生成失败: ' + e.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'AI生成';
     }
 }
 
 let constraintPackages = [];
 let selectedPackageIndex = -1;
 
+// ── 步骤 2-5 多选项状态 ──
+let stepOptions = { 2: [], 3: [], 4: [], 5: [] };
+let stepSelectedIndex = { 2: -1, 3: -1, 4: -1, 5: -1 };
+
+/** 各步骤选项卡片展示的字段定义（详情浮层用） */
+const STEP_OPTION_FIELDS = {
+    2: [
+        { key: 'genre', label: '题材' },
+        { key: 'one_liner', label: '一句话故事' },
+        { key: 'core_conflict', label: '核心冲突' },
+        { key: 'target_reader', label: '目标读者' },
+        { key: 'platform', label: '目标平台' },
+        { key: 'target_words', label: '目标字数', numeric: true },
+        { key: 'target_chapters', label: '目标章节', numeric: true }
+    ],
+    3: [
+        { key: 'name', label: '主角姓名' },
+        { key: 'archetype', label: '主角原型' },
+        { key: 'desire', label: '主角欲望' },
+        { key: 'flaw', label: '主角缺陷' },
+        { key: 'villain_mirror', label: '反派镜像' },
+        { key: 'heroine_config', label: '感情线' },
+        { key: 'antagonist_level', label: '反派分层' }
+    ],
+    4: [
+        { key: 'type', label: '类型' },
+        { key: 'name', label: '名称' },
+        { key: 'style', label: '风格' },
+        { key: 'visibility', label: '可见度' },
+        { key: 'irreversible_cost', label: '不可逆代价' },
+        { key: 'growth_rhythm', label: '成长节奏' }
+    ],
+    5: [
+        { key: 'scale', label: '世界规模' },
+        { key: 'power_system_type', label: '力量体系' },
+        { key: 'factions', label: '势力格局' },
+        { key: 'social_class', label: '社会阶层' },
+        { key: 'currency_system', label: '货币体系' },
+        { key: 'cultivation_chain', label: '境界链' },
+        { key: 'sect_hierarchy', label: '宗门层级' }
+    ]
+};
+
+/** 各步骤摘要行显示的主字段 */
+const STEP_OPTION_SUMMARY_FIELD = {
+    2: opt => [opt.genre, opt.one_liner].filter(Boolean).join(' · '),
+    3: opt => [opt.name, opt.archetype].filter(Boolean).join(' · '),
+    4: opt => [opt.type, opt.name].filter(Boolean).join(' · '),
+    5: opt => [opt.scale, opt.power_system_type].filter(Boolean).join(' · ')
+};
+
+/** 浮层当前待确认的选项 { step, index } */
+let _pendingOptionSelect = null;
+
+/** 计算选项总分 */
+function _calcTotalScore(scoring) {
+    return Object.values(scoring || {}).reduce((sum, s) => sum + (typeof s === 'object' ? (s.score || 0) : 0), 0);
+}
+
+/** 渲染步骤 2-5 的紧凑摘要行 */
+function renderStepOptions(step, options) {
+    const container = document.getElementById(`step${step}OptionsContainer`);
+    const list = document.getElementById(`step${step}OptionsList`);
+    if (!container || !list) return;
+
+    if (!options || options.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    stepOptions[step] = options;
+    container.style.display = 'block';
+    const summaryFn = STEP_OPTION_SUMMARY_FIELD[step] || (() => '');
+
+    let html = `<div class="option-summary-list">`;
+    html += options.map((opt, index) => {
+        const totalScore = _calcTotalScore(opt.scoring);
+        const isSelected = stepSelectedIndex[step] === index;
+        const summaryText = escapeHtml(summaryFn(opt));
+        const optName = escapeHtml(opt.option_name || `方案${String.fromCharCode(65 + index)}`);
+
+        return `<div class="option-summary-row ${isSelected ? 'selected' : ''}" onclick="quickSelectOption(${step}, ${index})">
+            <span class="summary-check"><i class="fas ${isSelected ? 'fa-check-circle' : 'fa-circle'}"></i></span>
+            <span class="summary-name">${optName}</span>
+            <span class="summary-text">${summaryText}</span>
+            <span class="summary-score"><span class="score-num">${totalScore}</span>分</span>
+            <button class="summary-detail-btn" onclick="event.stopPropagation(); showOptionDetail(${step}, ${index})" title="查看详情"><i class="fas fa-eye"></i></button>
+        </div>`;
+    }).join('');
+    html += `</div>`;
+    html += `<div class="option-hint"><span><i class="fas fa-wand-magic-sparkles"></i> 已为你智能生成 ${options.length} 套备选方案，点击即可选用，也可继续手动编辑</span><button class="btn-regenerate" onclick="regenerateAiData()"><i class="fas fa-rotate"></i> 重新生成</button></div>`;
+    list.innerHTML = html;
+}
+
+/** 打开选项详情浮层 */
+function showOptionDetail(step, index) {
+    const opt = stepOptions[step]?.[index];
+    if (!opt) return;
+
+    _pendingOptionSelect = { step, index };
+
+    const overlay = document.getElementById('optionDetailOverlay');
+    const titleEl = document.getElementById('optionDetailTitle');
+    const scoreEl = document.getElementById('optionDetailScore');
+    const contentEl = document.getElementById('optionDetailContent');
+    const selectBtn = document.getElementById('optionDetailSelectBtn');
+
+    const totalScore = _calcTotalScore(opt.scoring);
+    const fields = STEP_OPTION_FIELDS[step] || [];
+    const isSelected = stepSelectedIndex[step] === index;
+
+    titleEl.textContent = opt.option_name || `方案${String.fromCharCode(65 + index)}`;
+    scoreEl.innerHTML = `<span>${totalScore}</span><span style="font-size:10px;opacity:0.8">分</span>`;
+
+    // 构建详情内容
+    let fieldsHtml = fields.map(f => {
+        const val = opt[f.key];
+        if (val === undefined || val === null || val === '') return '';
+        return `<div class="constraint-package-item"><strong>${f.label}：</strong>${f.numeric ? val : escapeHtml(String(val))}</div>`;
+    }).filter(Boolean).join('');
+
+    let scoringHtml = '';
+    const scoring = opt.scoring || {};
+    if (Object.keys(scoring).length > 0) {
+        const labels = { creativity: '创意独特性', feasibility: '落地可行性', market_appeal: '市场吸引力', sustainability: '长线可持续性', emotional_impact: '情感冲击力' };
+        scoringHtml = `<div class="constraint-package-scoring">` + Object.entries(scoring).map(([key, s]) => {
+            if (typeof s !== 'object') return '';
+            return `<div class="scoring-row">
+                <span class="scoring-label">${labels[key] || key}</span>
+                <div class="scoring-bar"><div class="scoring-fill" style="width: ${(s.score || 0) * 10}%"></div></div>
+                <span class="scoring-value">${s.score || 0}/10</span>
+                <span class="scoring-reason">${escapeHtml(s.reason || '')}</span>
+            </div>`;
+        }).filter(Boolean).join('') + `</div>`;
+    }
+
+    contentEl.innerHTML = fieldsHtml + scoringHtml;
+    selectBtn.textContent = isSelected ? '已选择（点击更新）' : '选择此方案';
+
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+/** 关闭选项详情浮层 */
+function closeOptionDetail() {
+    const overlay = document.getElementById('optionDetailOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.style.overflow = '';
+    _pendingOptionSelect = null;
+}
+
+/** 浮层内“选择此方案”按钮确认 */
+function confirmOptionSelect() {
+    if (!_pendingOptionSelect) return;
+    const { step, index } = _pendingOptionSelect;
+    closeOptionDetail();
+    if (step === 6) {
+        selectConstraintPackage(index);
+    } else {
+        selectStepOption(step, index);
+    }
+}
+
+/** ESC 关闭浮层 */
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const overlay = document.getElementById('optionDetailOverlay');
+        if (overlay && overlay.style.display === 'flex') {
+            closeOptionDetail();
+        }
+    }
+});
+
+/** 摘要行点击 → 自动选择方案（不打开浮层） */
+function quickSelectOption(step, index) {
+    if (step === 6) {
+        selectConstraintPackage(index);
+    } else {
+        selectStepOption(step, index);
+    }
+}
+
+/** 选择步骤 2-5 的某个选项，填充表单 */
+function selectStepOption(step, index) {
+    stepSelectedIndex[step] = index;
+    renderStepOptions(step, stepOptions[step]);
+
+    const opt = stepOptions[step][index];
+    if (!opt) return;
+
+    // 各步骤字段 → 表单元素 ID 映射
+    const fieldMap = {
+        2: { genre: 'initGenre', one_liner: 'initOneLiner', core_conflict: 'initCoreConflict', target_words: 'initTargetWords', target_chapters: 'initTargetChapters', target_reader: 'initTargetReader', platform: 'initPlatform' },
+        3: { name: 'initProtagonistName', archetype: 'initProtagonistArchetype', desire: 'initProtagonistDesire', flaw: 'initProtagonistFlaw', structure: 'initProtagonistStructure', villain_mirror: 'initVillainMirror', heroine_config: 'initHeroineConfig', antagonist_level: 'initAntagonistLevel' },
+        4: { type: 'initGoldenFingerType', name: 'initGoldenFingerName', style: 'initGoldenFingerStyle', visibility: 'initGoldenFingerVisibility', irreversible_cost: 'initGoldenFingerCost' },
+        5: { scale: 'initWorldScale', power_system_type: 'initPowerSystemType', factions: 'initFactions', social_class: 'initSocialClass', currency_system: 'initCurrencySystem', cultivation_chain: 'initCultivationChain', sect_hierarchy: 'initSectHierarchy' }
+    };
+
+    const map = fieldMap[step] || {};
+    for (const [key, elId] of Object.entries(map)) {
+        const el = document.getElementById(elId);
+        if (!el || opt[key] === undefined || opt[key] === null) continue;
+        const val = String(opt[key]);
+        if (el.tagName === 'SELECT') {
+            setSelectValue(el, val);
+        } else {
+            el.value = val;
+        }
+    }
+
+    // 同步到 initData
+    saveStepData(step);
+
+    // 保存到后端
+    try {
+        apiRequest('/api/books/scripts/webnovel/init/select-option', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ script_id: state.scriptId, step: step, option_index: index }),
+            silent: true
+        });
+    } catch (e) {
+        console.warn('保存选项选择失败:', e);
+    }
+}
+
+/** 安全设置 select 元素值 */
+function setSelectValue(el, val) {
+    const opts = Array.from(el.options).map(o => o.value);
+    if (opts.includes(val)) {
+        el.value = val;
+    } else {
+        // 模糊匹配
+        for (const opt of opts) {
+            if (val.includes(opt) || opt.includes(val)) {
+                el.value = opt;
+                return;
+            }
+        }
+    }
+}
+
+/** HTML 转义 */
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function fillStepData(step, data, isPackages = false) {
     switch(step) {
         case 2:
+            if (data.genre) {
+                const genreSelect = document.getElementById('initGenre');
+                const genreOptions = Array.from(genreSelect.options).map(o => o.value);
+                if (genreOptions.includes(data.genre)) {
+                    genreSelect.value = data.genre;
+                } else {
+                    for (const opt of genreOptions) {
+                        if (data.genre.includes(opt) || opt.includes(data.genre)) {
+                            genreSelect.value = opt;
+                            break;
+                        }
+                    }
+                }
+            }
             if (data.one_liner) document.getElementById('initOneLiner').value = data.one_liner;
             if (data.core_conflict) document.getElementById('initCoreConflict').value = data.core_conflict;
             if (data.target_words) document.getElementById('initTargetWords').value = data.target_words;
@@ -802,100 +1186,56 @@ function renderConstraintPackages() {
     }
     
     container.style.display = 'block';
-    manualInput.style.display = 'none';
+    manualInput.style.display = 'block';
     
-    list.innerHTML = constraintPackages.map((pkg, index) => {
-        const scoring = pkg.scoring || {};
-        const totalScore = Object.values(scoring).reduce((sum, s) => sum + (s.score || 0), 0);
-        const hardConstraints = Array.isArray(pkg.hard_constraints) ? pkg.hard_constraints : [];
-        
-        return `
-            <div class="constraint-package-card ${selectedPackageIndex === index ? 'selected' : ''}" onclick="selectConstraintPackage(${index})">
-                <div class="constraint-package-header">
-                    <h4>${pkg.package_name || `方案${String.fromCharCode(65 + index)}`}</h4>
-                    <div class="constraint-package-score">
-                        <span class="score-value">${totalScore}</span>
-                        <span class="score-label">总分</span>
-                    </div>
-                </div>
-                <div class="constraint-package-body">
-                    <div class="constraint-package-item">
-                        <strong>一句话卖点：</strong>${pkg.one_liner_selling_point || ''}
-                    </div>
-                    <div class="constraint-package-item">
-                        <strong>反套路规则：</strong>${pkg.anti_trope_rule || ''}
-                    </div>
-                    <div class="constraint-package-item">
-                        <strong>硬约束：</strong>
-                        <ul>${hardConstraints.map(c => `<li>${c}</li>`).join('')}</ul>
-                    </div>
-                    <div class="constraint-package-item">
-                        <strong>主角缺陷驱动：</strong>${pkg.protagonist_flaw_driven || ''}
-                    </div>
-                    <div class="constraint-package-item">
-                        <strong>反派镜像：</strong>${pkg.antagonist_mirror || ''}
-                    </div>
-                    <div class="constraint-package-item">
-                        <strong>开篇钩子：</strong>${pkg.opening_hook || ''}
-                    </div>
-                    <div class="constraint-package-item">
-                        <strong>差异化说明：</strong>${pkg.differentiation || ''}
-                    </div>
-                </div>
-                <div class="constraint-package-scoring">
-                    <div class="scoring-row">
-                        <span class="scoring-label">创意独特性</span>
-                        <div class="scoring-bar">
-                            <div class="scoring-fill" style="width: ${(scoring.creativity?.score || 0) * 10}%"></div>
-                        </div>
-                        <span class="scoring-value">${scoring.creativity?.score || 0}/10</span>
-                        <span class="scoring-reason">${scoring.creativity?.reason || ''}</span>
-                    </div>
-                    <div class="scoring-row">
-                        <span class="scoring-label">落地可行性</span>
-                        <div class="scoring-bar">
-                            <div class="scoring-fill" style="width: ${(scoring.feasibility?.score || 0) * 10}%"></div>
-                        </div>
-                        <span class="scoring-value">${scoring.feasibility?.score || 0}/10</span>
-                        <span class="scoring-reason">${scoring.feasibility?.reason || ''}</span>
-                    </div>
-                    <div class="scoring-row">
-                        <span class="scoring-label">市场吸引力</span>
-                        <div class="scoring-bar">
-                            <div class="scoring-fill" style="width: ${(scoring.market_appeal?.score || 0) * 10}%"></div>
-                        </div>
-                        <span class="scoring-value">${scoring.market_appeal?.score || 0}/10</span>
-                        <span class="scoring-reason">${scoring.market_appeal?.reason || ''}</span>
-                    </div>
-                    <div class="scoring-row">
-                        <span class="scoring-label">长线可持续性</span>
-                        <div class="scoring-bar">
-                            <div class="scoring-fill" style="width: ${(scoring.sustainability?.score || 0) * 10}%"></div>
-                        </div>
-                        <span class="scoring-value">${scoring.sustainability?.score || 0}/10</span>
-                        <span class="scoring-reason">${scoring.sustainability?.reason || ''}</span>
-                    </div>
-                    <div class="scoring-row">
-                        <span class="scoring-label">情感冲击力</span>
-                        <div class="scoring-bar">
-                            <div class="scoring-fill" style="width: ${(scoring.emotional_impact?.score || 0) * 10}%"></div>
-                        </div>
-                        <span class="scoring-value">${scoring.emotional_impact?.score || 0}/10</span>
-                        <span class="scoring-reason">${scoring.emotional_impact?.reason || ''}</span>
-                    </div>
-                </div>
-                <div class="constraint-package-three-questions">
-                    <strong>三问筛选：</strong>
-                    <div class="question-item"><strong>Q1：</strong>${pkg.three_questions?.q1 || ''}</div>
-                    <div class="question-item"><strong>Q2：</strong>${pkg.three_questions?.q2 || ''}</div>
-                    <div class="question-item"><strong>Q3：</strong>${pkg.three_questions?.q3 || ''}</div>
-                </div>
-                <div class="constraint-package-select">
-                    ${selectedPackageIndex === index ? '<i class="fas fa-check-circle"></i> 已选择' : '<i class="fas fa-circle"></i> 点击选择'}
-                </div>
-            </div>
-        `;
-    }).join('');
+    let html = `<div class="option-summary-list">` + constraintPackages.map((pkg, index) => {
+        const isSelected = selectedPackageIndex === index;
+        const summaryText = (pkg.core_selling_points || pkg.anti_trope_rule || '').slice(0, 40);
+        const optName = escapeHtml(`方案${String.fromCharCode(65 + index)}`);
+
+        return `<div class="option-summary-row ${isSelected ? 'selected' : ''}" onclick="quickSelectOption(6, ${index})">
+            <span class="summary-check"><i class="fas ${isSelected ? 'fa-check-circle' : 'fa-circle'}"></i></span>
+            <span class="summary-name">${optName}</span>
+            <span class="summary-text">${escapeHtml(summaryText)}${summaryText.length >= 40 ? '...' : ''}</span>
+            <button class="summary-detail-btn" onclick="event.stopPropagation(); showPackageDetail(${index})" title="查看详情"><i class="fas fa-eye"></i></button>
+        </div>`;
+    }).join('') + `</div>`;
+    html += `<div class="option-hint"><span><i class="fas fa-wand-magic-sparkles"></i> 已为你智能生成 ${constraintPackages.length} 套约束包方案，点击即可选用，也可在下方手动编辑</span><button class="btn-regenerate" onclick="regenerateAiData()"><i class="fas fa-rotate"></i> 重新生成</button></div>`;
+    list.innerHTML = html;
+}
+
+/** 打开步骤6约束包详情浮层 */
+function showPackageDetail(index) {
+    const pkg = constraintPackages[index];
+    if (!pkg) return;
+
+    _pendingOptionSelect = { step: 6, index };
+
+    const overlay = document.getElementById('optionDetailOverlay');
+    const titleEl = document.getElementById('optionDetailTitle');
+    const scoreEl = document.getElementById('optionDetailScore');
+    const contentEl = document.getElementById('optionDetailContent');
+    const selectBtn = document.getElementById('optionDetailSelectBtn');
+
+    const isSelected = selectedPackageIndex === index;
+    const hardConstraints = Array.isArray(pkg.hard_constraints) ? pkg.hard_constraints : [];
+
+    titleEl.textContent = `方案${String.fromCharCode(65 + index)}`;
+    scoreEl.innerHTML = '';
+
+    let html = '';
+    html += `<div class="constraint-package-item"><strong>反套路规则：</strong>${escapeHtml(pkg.anti_trope_rule || '')}</div>`;
+    if (hardConstraints.length) {
+        html += `<div class="constraint-package-item"><strong>硬性约束：</strong><ul>${hardConstraints.map(c => `<li>${escapeHtml(c)}</li>`).join('')}</ul></div>`;
+    }
+    html += `<div class="constraint-package-item"><strong>核心卖点：</strong>${escapeHtml(pkg.core_selling_points || '')}</div>`;
+    html += `<div class="constraint-package-item"><strong>开篇钩子：</strong>${escapeHtml(pkg.opening_hook || '')}</div>`;
+
+    contentEl.innerHTML = html;
+    selectBtn.textContent = isSelected ? '已选择（点击更新）' : '选择此方案';
+
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
 }
 
 function selectConstraintPackage(index) {
@@ -906,12 +1246,17 @@ function selectConstraintPackage(index) {
     initData.constraints = {
         anti_trope: pkg.anti_trope_rule || '',
         hard_constraints: pkg.hard_constraints || [],
-        core_selling_points: pkg.one_liner_selling_point || '',
-        opening_hook: pkg.opening_hook || '',
-        protagonist_flaw: pkg.protagonist_flaw_driven || '',
-        villain_mirror: pkg.antagonist_mirror || '',
-        selected_package_name: pkg.package_name || ''
+        core_selling_points: pkg.core_selling_points || '',
+        opening_hook: pkg.opening_hook || ''
     };
+
+    // 将所选方案回填到表单输入框，与步骤 2-5 的选择行为保持一致
+    document.getElementById('initAntiTrope').value = pkg.anti_trope_rule || '';
+    document.getElementById('initConstraints').value = Array.isArray(pkg.hard_constraints)
+        ? pkg.hard_constraints.join('\n')
+        : (pkg.hard_constraints || '');
+    document.getElementById('initCoreSellingPoints').value = pkg.core_selling_points || '';
+    document.getElementById('initOpeningHook').value = pkg.opening_hook || '';
 }
 
 async function selectConstraintPackageAndSave(index) {

@@ -1,5 +1,6 @@
 """网文创作相关 API 接口。"""
 
+import asyncio
 import json
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Body, Form
@@ -14,8 +15,6 @@ from webnovel.repositories import (
     get_webnovel_project_by_script, get_volume_outlines_by_project,
     add_volume_outline, get_volume_outline, update_volume_outline, delete_volume_outline,
     get_chapter_meta_list, get_chapter_meta, add_chapter_meta, update_chapter_meta,
-    get_review_records, get_chapter_review_summary, add_review_record,
-    delete_review_record, delete_chapter_review_records,
     get_worldview_by_project, add_worldview, get_worldview,
     get_worldview_factions, get_worldview_history,
     get_timelines_by_project, add_timeline, add_timeline_chapter, add_timeline_countdown,
@@ -27,7 +26,7 @@ from webnovel.repositories import (
     get_chapter_plan, delete_chapter_plan, get_chapter_plans_by_volume,
     update_chapter_plan, add_chapter_plan,
     get_character_cards_by_project, get_character_relationships,
-    get_character_growths, get_character_power,
+    get_character_growths, get_character_power, get_character_items,
     get_character_group_by_project, get_character_group_members,
     get_character_group_arcs,
     get_golden_finger_by_project, get_golden_finger_upgrades,
@@ -200,6 +199,8 @@ def get_webnovel_character_cards(script_id: int):
             "relationships": get_character_relationships(cid),
             "growths": get_character_growths(cid),
             "power": get_character_power(cid),
+            # 随身物品（含已失去，前端按 status 区分展示；只读展示，由事实记录维护）
+            "items": get_character_items(cid, only_held=False),
         })
 
     # 角色组（一个项目通常只有一个组）
@@ -946,49 +947,63 @@ async def get_chapter_review(script_id: int, chapter_index: int):
     return {"success": True, "review": result}
 
 
-@router.post("/chapters/review")
-async def manual_review_chapter(script_id: int, chapter_index: int, content: str = Body("", description="章节内容")):
-    """手动审查章节。"""
-    service = get_webnovel_service()
-    result = await service.manual_review(script_id, chapter_index, content)
-    return result
-
-
-@router.get("/review-records")
-def list_review_records(script_id: int, chapter_index: int = Query(-1)):
-    """获取审查记录列表。"""
-    project = get_webnovel_project_by_script(script_id)
-    if not project:
-        return {"success": True, "records": []}
-    chapter_number = chapter_index if chapter_index >= 0 else None
-    records = get_review_records(project["id"], chapter_number)
-    return {"success": True, "records": records}
-
-
-@router.delete("/review-records")
-def remove_review_record(script_id: int, record_id: int):
-    """删除审查记录。"""
-    delete_review_record(record_id)
-    return {"success": True}
-
-
 # ========== RAG检索 ==========
 
 @router.get("/rag/search")
-def search_rag(script_id: int, query: str = Query(""), limit: int = Query(10)):
-    """搜索RAG索引。"""
+async def search_rag(script_id: int, query: str = Query(""), limit: int = Query(10),
+                     min_score: float = Query(0.0, ge=0.0, le=1.0)):
+    """搜索RAG索引。
+    
+    Args:
+        min_score: 最低相似度阈值（0=使用分级阈值，0.0=不过滤）。
+    """
     project = get_webnovel_project_by_script(script_id)
     if not project:
         return {"success": False, "chunks": []}
     chunks = []
     try:
         from core.global_manager import global_manager
+        from core.model_executor import _LOCAL_INFERENCE_LOCK
         embedding_model = getattr(global_manager, 'qwen_embedding_model', None)
         if embedding_model and embedding_model.is_loaded() and query:
-            embeddings = embedding_model.encode([query])
+            # query 文本用 is_query=True 添加 instruction prefix；
+            # 🔴 encode 须与流水线等本地推理串行（同一单实例模型），避免并发推理竞争。
+            async with _LOCAL_INFERENCE_LOCK:
+                embeddings = await asyncio.to_thread(lambda: embedding_model.encode([query], is_query=True))
             if embeddings and len(embeddings) > 0:
                 from services.vector_store import get_rag_service
-                chunks = get_rag_service().search(project["id"], embeddings[0].tolist(), limit=limit)
+                # min_score=0 表示使用 RAGService 的分级阈值（传 None）
+                effective_min_score = min_score if min_score > 0 else None
+                # encode 返回纯 Python list，不可调用 .tolist()
+                chunks = get_rag_service().search(
+                    project["id"], embeddings[0],
+                    limit=limit, min_score=effective_min_score,
+                )
+                # 对 chapter_paragraph 结果扩展前后段落上下文
+                rag_svc = get_rag_service()
+                for chunk in chunks:
+                    if chunk.get("chunk_type") != "chapter_paragraph":
+                        continue
+                    try:
+                        meta = json.loads(chunk["metadata"]) if chunk.get("metadata") else {}
+                        para_idx = meta.get("para_index")
+                        ch_num = chunk.get("chapter_number", 0)
+                        if para_idx is None or not ch_num:
+                            continue
+                        ctx_tuples = rag_svc.get_paragraphs_context(
+                            project["id"], ch_num, para_idx, context_range=1,
+                        )
+                        ctx_before = []
+                        ctx_after = []
+                        for text, idx in ctx_tuples:
+                            if idx < para_idx:
+                                ctx_before.append(text)
+                            elif idx > para_idx:
+                                ctx_after.append(text)
+                        chunk["context_before"] = "\n".join(ctx_before)
+                        chunk["context_after"] = "\n".join(ctx_after)
+                    except Exception:
+                        pass
     except Exception:
         pass
     return {"success": True, "chunks": chunks}

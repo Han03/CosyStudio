@@ -87,16 +87,6 @@ class QueryRequest(BaseModel):
     query_question: str = ""
 
 
-class LearnRequest(BaseModel):
-    learning_content: str = ""
-    current_chapter: int = 0
-
-
-class ReviewRequest(BaseModel):
-    chapter_index: int = 0
-    draft: str = ""
-
-
 @router.post("/init")
 async def webnovel_init(script_id: int, data: InitRequest):
     """深度初始化网文项目。"""
@@ -202,51 +192,14 @@ async def _execute_plan_workflow(task_id: int, script_id: int, volume_number: in
         update_writing_task(task_id, status="failed", error_message=str(e), progress_message=f"执行失败: {str(e)[:100]}")
 
 
-@router.post("/review")
-async def webnovel_review(script_id: int, data: ReviewRequest):
-    """质量审查。"""
-    script = get_script(script_id)
-    if not script:
-        raise HTTPException(status_code=404, detail="剧本不存在")
-
-    task = add_writing_task(script_id, data.chapter_index, "review")
-    task_id = task["id"]
-
-    asyncio.create_task(_execute_review_workflow(task_id, script_id, data.chapter_index, data.draft))
-
-    return {"success": True, "task_id": task_id, "message": "审查任务已创建"}
-
-
-async def _execute_review_workflow(task_id: int, script_id: int, chapter_index: int, draft: str):
-    """执行审查工作流。"""
-    try:
-        update_writing_task(task_id, status="running", progress=10, progress_message="开始质量审查...")
-
-        orchestrator = PipelineOrchestrator(script_id, chapter_index, task_id)
-        result = await orchestrator.execute_workflow("review", {"draft": draft})
-
-        if result["success"]:
-            review_result = result.get("context", {}).get("review_result", [])
-            avg_score = result.get("context", {}).get("average_score", 0)
-            update_writing_task(
-                task_id,
-                status="completed",
-                progress=100,
-                progress_message=f"审查完成，平均评分{avg_score:.1f}",
-                review_result=json.dumps(review_result)
-            )
-        else:
-            update_writing_task(task_id, status="failed", progress=0, progress_message=f"审查失败: {result.get('failed_steps', 0)}个步骤出错")
-
-    except Exception as e:
-        update_writing_task(task_id, status="failed", error_message=str(e), progress_message=f"执行失败: {str(e)[:100]}")
-
-
 @router.post("/query")
 async def webnovel_query(script_id: int, data: QueryRequest):
     """状态查询（基于RAG语义检索）。
 
-    按分类返回相似度超过95%的内容，每种分类最多返回5条。
+    按分类返回相似度超过阈值的内容，每种分类最多返回5条。
+    阈值由 RAGService 分级阈值自动管理（按 chunk_type 差异化）。
+    若配置了片段重排序（text_rerank）能力，向量粗排后会对候选片段做二次精排，
+    结果按重排序分数降序排列；重排序不可用时回退到向量相似度顺序。
     若检测到项目设定未索引到 RAG 向量库，自动触发索引重建。
     """
     script = get_script(script_id)
@@ -274,85 +227,113 @@ async def webnovel_query(script_id: int, data: QueryRequest):
         pass  # 索引重建失败不阻断查询，继续用已有数据检索
 
     chunks = []
+    reranked = False
     try:
         from core.model_executor import get_model_executor
         executor = get_model_executor()
-        result = await executor.execute_text_to_vector([query])
+        # query 文本用 is_query=True 添加 instruction prefix
+        result = await executor.execute_text_to_vector([query], is_query=True)
         embeddings = result.get("embeddings", [])
         if embeddings:
             from services.vector_store import get_rag_service
             # 获取足够多的候选结果，以便按分类过滤后仍有充足数据
-            all_results = get_rag_service().search(project_id, embeddings[0], limit=50)
+            # min_score=0 禁用分级阈值过滤，避免细节查询被误杀
+            # （如"主角身上有哪些物品"等细节查询，段落 chunk 中语义被前后叙事稀释，
+            #   相似度可能低于分级阈值，但结果仍具参考价值）
+            # 每类最多返回 5 条，总量可控
+            all_results = get_rag_service().search(
+                project_id, embeddings[0], limit=50, min_score=0
+            )
 
-            # 按相似度 > 0.95 过滤，再按 chunk_type 分组，每组最多 5 条
-            # 注：Qwen3-Embedding 在高维空间中所有文档对的余弦相似度普遍偏高（0.90~1.0），
-            # 因此阈值需设为 0.95 才能有效区分相关与无关内容
-            SCORE_THRESHOLD = 0.95
+            # Reranker 二次精排：向量相似度只反映语义距离，无法区分"话题相关"
+            # 与"真正回答问题"。对向量粗排的前 30 条候选调用片段重排序能力，
+            # 按 query-doc 相关性重新打分排序，提升命中片段的优先级。
+            # 未配置能力或调用失败时静默回退到向量相似度顺序，不阻断查询。
+            RERANK_CANDIDATES = 30
+            try:
+                candidates = all_results[:RERANK_CANDIDATES]
+                # 截断过长文档，控制重排序推理开销（tokenizer 侧也会按 max_length 截断）
+                documents = [(c.get("content") or "")[:512] for c in candidates]
+                if documents:
+                    rerank_result = await executor.execute_rerank(
+                        query, documents, top_k=len(documents)
+                    )
+                    if not rerank_result.get("error"):
+                        rerank_items = rerank_result.get("results", [])
+                        for item in rerank_items:
+                            idx = item.get("index", -1)
+                            if 0 <= idx < len(candidates):
+                                candidates[idx]["rerank_score"] = float(item.get("score", 0.0))
+                        if any("rerank_score" in c for c in candidates):
+                            # 有分数的片段按重排序分数降序在前，其余保持向量顺序在后
+                            candidates.sort(
+                                key=lambda c: c.get("rerank_score", -1.0), reverse=True
+                            )
+                            all_results = candidates + all_results[RERANK_CANDIDATES:]
+                            reranked = True
+            except Exception:
+                pass  # 重排序失败回退到向量相似度顺序
+
+            # 对 chapter_paragraph 结果扩展前后段落上下文
+            # 存储时每个 chunk 只含单段（精准 embedding），
+            # 查询时取回相邻段落供用户阅读，兼顾匹配精度与上下文完整性
+            rag_svc = get_rag_service()
+            for chunk in all_results:
+                if chunk.get("chunk_type") != "chapter_paragraph":
+                    continue
+                try:
+                    meta = json.loads(chunk["metadata"]) if chunk.get("metadata") else {}
+                    para_idx = meta.get("para_index")
+                    ch_num = chunk.get("chapter_number", 0)
+                    if para_idx is None or not ch_num:
+                        continue
+                    # get_paragraphs_context 返回 [(text, para_index), ...] 按序排列
+                    ctx_tuples = rag_svc.get_paragraphs_context(
+                        project_id, ch_num, para_idx, context_range=1,
+                    )
+                    ctx_before = []
+                    ctx_after = []
+                    for text, idx in ctx_tuples:
+                        if idx < para_idx:
+                            ctx_before.append(text)
+                        elif idx > para_idx:
+                            ctx_after.append(text)
+                    chunk["context_before"] = "\n".join(ctx_before)
+                    chunk["context_after"] = "\n".join(ctx_after)
+                except Exception:
+                    pass
+
+            # 按 chunk_type 分组，每组最多 5 条
             MAX_PER_CATEGORY = 5
             grouped: Dict[str, list] = {}
             for chunk in all_results:
-                if chunk.get("score", 0) <= SCORE_THRESHOLD:
-                    continue
                 cat = chunk.get("chunk_type", "unknown")
                 if cat not in grouped:
                     grouped[cat] = []
                 if len(grouped[cat]) < MAX_PER_CATEGORY:
                     grouped[cat].append(chunk)
 
-            # 转为有序列表返回（按每组首条的相似度降序排列分类）
+            # 转为有序列表返回（按每组首条分数降序排列分类）
+            # 重排序后用相关性分数排序，否则沿用向量相似度分数（两者量纲不同，不可混用）
+            def _cat_score(c):
+                return c.get("rerank_score", 0.0) if reranked else c.get("score", 0.0)
+
             chunks = []
-            for cat in sorted(grouped, key=lambda c: grouped[c][0]["score"], reverse=True):
+            for cat in sorted(grouped, key=lambda c: _cat_score(grouped[c][0]), reverse=True):
                 chunks.extend(grouped[cat])
         else:
             return {"success": False, "chunks": [], "error": "Embedding计算失败"}
     except Exception as e:
         return {"success": False, "chunks": [], "error": f"检索失败: {str(e)}"}
 
-    return {"success": True, "chunks": chunks}
+    return {"success": True, "chunks": chunks, "reranked": reranked}
 
 
-@router.get("/doctor")
-async def webnovel_doctor(script_id: int, deep: bool = Query(False)):
-    """项目体检。"""
-    script = get_script(script_id)
-    if not script:
-        raise HTTPException(status_code=404, detail="剧本不存在")
-
-    task = add_writing_task(script_id, 0, "doctor")
-    task_id = task["id"]
-
-    asyncio.create_task(_execute_doctor_workflow(task_id, script_id, deep))
-
-    return {"success": True, "task_id": task_id, "message": "体检任务已创建"}
-
-
-async def _execute_doctor_workflow(task_id: int, script_id: int, deep: bool):
-    """执行体检工作流。"""
-    try:
-        update_writing_task(task_id, status="running", progress=10, progress_message="开始项目体检...")
-
-        orchestrator = PipelineOrchestrator(script_id, 0, task_id)
-        result = await orchestrator.execute_workflow("doctor", {"deep": deep})
-
-        if result["success"]:
-            doctor_report = result.get("context", {}).get("doctor_report", {})
-            update_writing_task(
-                task_id,
-                status="completed",
-                progress=100,
-                progress_message=f"体检完成: {doctor_report.get('total_issues', 0)}个问题",
-                context=json.dumps(doctor_report)
-            )
-        else:
-            update_writing_task(task_id, status="failed", progress=0, progress_message="体检失败")
-
-    except Exception as e:
-        update_writing_task(task_id, status="failed", error_message=str(e), progress_message=f"执行失败: {str(e)[:100]}")
-
-
-@router.post("/learn")
-async def webnovel_learn(script_id: int, data: LearnRequest):
-    """项目学习。"""
+@router.get("/rag-chunks")
+def list_rag_chunks(script_id: int, page: int = Query(1, ge=1),
+                    page_size: int = Query(20, ge=1, le=100),
+                    chunk_type: str = Query("")):
+    """分页查看项目的所有 RAG 内容，便于用户审查。"""
     script = get_script(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="剧本不存在")
@@ -361,36 +342,141 @@ async def webnovel_learn(script_id: int, data: LearnRequest):
     if not project:
         raise HTTPException(status_code=400, detail="项目未初始化")
 
-    task = add_writing_task(script_id, data.current_chapter, "learn")
+    from services.vector_store import get_rag_service
+    result = get_rag_service().list_chunks_paginated(
+        project["id"], page=page, page_size=page_size, chunk_type=chunk_type,
+    )
+    return {"success": True, **result}
+
+
+@router.post("/reindex-rag")
+async def reindex_rag(script_id: int):
+    """重建 RAG 向量索引。
+
+    当 embedding 模型或检索策略变更后，已有向量可能失效。
+    本接口清空项目所有 RAG 向量后，重新索引项目设定和已有章节内容。
+    """
+    script = get_script(script_id)
+    if not script:
+        raise HTTPException(status_code=404, detail="剧本不存在")
+
+    project = get_webnovel_project_by_script(script_id)
+    if not project:
+        raise HTTPException(status_code=400, detail="项目未初始化，请先执行深度初始化")
+
+    task = add_writing_task(script_id, 0, "reindex")
     task_id = task["id"]
-
-    asyncio.create_task(_execute_learn_workflow(task_id, script_id, data.learning_content, data.current_chapter))
-
-    return {"success": True, "task_id": task_id, "message": "学习任务已创建"}
+    asyncio.create_task(_execute_reindex_workflow(task_id, script_id))
+    return {"success": True, "task_id": task_id, "message": "RAG重建索引任务已创建"}
 
 
-async def _execute_learn_workflow(task_id: int, script_id: int, learning_content: str, current_chapter: int):
-    """执行学习工作流。"""
+async def _execute_reindex_workflow(task_id: int, script_id: int):
+    """执行 RAG 重建索引工作流。"""
+    from utils.logger import log_manager
+    from infrastructure.websocket_broadcast import ws_broadcast_manager
+    _log = log_manager.get_logger("webnovel_reindex")
+
+    async def _broadcast(status: str, message: str, progress: int):
+        try:
+            await ws_broadcast_manager.broadcast_reindex_progress(script_id, status, message, progress)
+        except Exception as e:
+            _log.warning(f"[reindex] WS 广播失败: {e}")
+
     try:
-        update_writing_task(task_id, status="running", progress=10, progress_message="开始项目学习...")
+        update_writing_task(task_id, status="running", progress=5, progress_message="清空旧 RAG 向量数据...")
+        await _broadcast("running", "清空旧 RAG 向量数据...", 5)
 
-        orchestrator = PipelineOrchestrator(script_id, current_chapter, task_id)
-        result = await orchestrator.execute_workflow("learn", {"learning_content": learning_content, "current_chapter": current_chapter})
+        project = get_webnovel_project_by_script(script_id)
+        if not project:
+            update_writing_task(task_id, status="failed", progress_message="项目不存在")
+            await _broadcast("failed", "项目不存在", 0)
+            return
+        project_id = project["id"]
 
-        if result["success"]:
-            learned_patterns = result.get("context", {}).get("learned_patterns", [])
-            update_writing_task(
-                task_id,
-                status="completed",
-                progress=100,
-                progress_message=f"学习完成，新增{len(learned_patterns)}个写作模式",
-                context=json.dumps({"learned_patterns": learned_patterns})
-            )
-        else:
-            update_writing_task(task_id, status="failed", progress=0, progress_message="学习失败")
+        # 1. 清空项目所有 RAG 数据
+        from services.vector_store import get_rag_service
+        deleted = get_rag_service().clear_project(project_id)
+        _log.info(f"[reindex] script_id={script_id} 已清空 {deleted} 条 RAG 数据")
+
+        # 2. 重新索引项目设定
+        update_writing_task(task_id, progress=20, progress_message="重新索引项目设定...")
+        await _broadcast("running", "重新索引项目设定...", 20)
+        from webnovel.services.webnovel_service import WebnovelService
+        service = WebnovelService()
+        await service._index_project_settings(project_id)
+
+        # 3. 重新索引已有章节内容
+        from repositories import get_script_chapters_all, get_writing_tasks, get_script_lines
+        from services.script_service import ScriptService
+        script_svc = ScriptService()
+
+        # 从多个来源收集章节索引（webnovel 章节内容可能存在于不同位置）：
+        # - script_chapters 表（用户已应用创作结果时）
+        # - script_writing_tasks 表（创作完成后始终有 polished/draft）
+        # - script_lines 表（剧本编辑器台词行）
+        chapter_indices = set()
+        for ch in get_script_chapters_all(script_id):
+            if ch.get("chapter_index"):
+                chapter_indices.add(ch["chapter_index"])
+        for task in get_writing_tasks(script_id):
+            if task.get("chapter_index") and task.get("status") == "completed":
+                chapter_indices.add(task["chapter_index"])
+        for line in get_script_lines(script_id):
+            if line.get("chapter_index"):
+                chapter_indices.add(line["chapter_index"])
+        chapter_indices = sorted(chapter_indices)
+        total_chapters = len(chapter_indices)
+        _log.info(f"[reindex] script_id={script_id} 发现 {total_chapters} 个章节需要重建索引")
+
+        for i, ch_idx in enumerate(chapter_indices):
+            progress = 20 + int(75 * (i + 1) / total_chapters)
+            msg = f"重建第{ch_idx}章索引 ({i+1}/{total_chapters})..."
+            update_writing_task(task_id, progress=progress, progress_message=msg)
+            await _broadcast("running", msg, progress)
+
+            # 按优先级读取章节内容：
+            # 1. 章节文件（script_chapters + 独立文件）
+            # 2. 已完成的写作任务 polished 字段
+            # 3. 写作任务 draft 字段（无 polished 时回退）
+            # 4. script_lines 台词拼接（最终回退）
+            content = None
+            try:
+                content = script_svc._read_script_chapter_content(script_id, ch_idx)
+            except Exception:
+                pass
+            if not content:
+                # 从 writing_tasks 中找该章节最新的已完成任务
+                tasks = get_writing_tasks(script_id, ch_idx)
+                for t in tasks:
+                    if t.get("status") == "completed" and t.get("polished"):
+                        content = t["polished"]
+                        break
+                if not content:
+                    for t in tasks:
+                        if t.get("draft"):
+                            content = t["draft"]
+                            break
+            if not content:
+                lines = get_script_lines(script_id, ch_idx)
+                if lines:
+                    content = "\n".join(line["content"] for line in lines)
+            if content:
+                await service._store_rag_chunk(project_id, ch_idx, content)
+
+        done_msg = f"RAG索引重建完成，共索引 {total_chapters} 个章节"
+        update_writing_task(
+            task_id, status="completed", progress=100,
+            progress_message=done_msg
+        )
+        await _broadcast("completed", done_msg, 100)
 
     except Exception as e:
-        update_writing_task(task_id, status="failed", error_message=str(e), progress_message=f"执行失败: {str(e)[:100]}")
+        err_msg = f"RAG重建索引失败: {str(e)[:100]}"
+        update_writing_task(
+            task_id, status="failed", error_message=str(e),
+            progress_message=err_msg
+        )
+        await _broadcast("failed", err_msg, 0)
 
 
 @router.get("/dashboard")

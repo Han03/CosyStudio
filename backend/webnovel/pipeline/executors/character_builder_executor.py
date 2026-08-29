@@ -5,6 +5,7 @@
 """
 
 import json
+import re
 from typing import Dict, Any, Tuple, List, Optional
 
 from ..base_executor import BaseExecutor, ExecutorResult
@@ -15,12 +16,56 @@ from webnovel.repositories import (
     add_character_card, add_character_relationship, add_character_growth,
     add_character_power,
     add_character_group, add_character_group_member, add_character_group_arc,
-    get_character_cards_by_project,
+    get_character_cards_by_project, update_character_card,
     add_villain, add_villain_hierarchy, add_villain_plot_node,
 )
 from .init_executor import _safe_items, _sanitize_value
 
 _logger = log_manager.get_logger("character_builder")
+
+
+def _normalize_group_field(value) -> str:
+    """角色组字段归一化：将 LLM 返回的嵌套对象/数组转为可读自然语句。
+
+    避免 _sanitize_value 对 dict/list 直接 json.dumps 导致裸 JSON 串入库，
+    前端展示成一大段 JSON（如 decision_maker/emotional_pivot 输出对象时）。
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, dict):
+        # POV 比例表：{"李岩": 40, ...} → "李岩40%，苏瑶20%"
+        vals = list(value.values())
+        if vals and all(not isinstance(v, (dict, list)) for v in vals) \
+                and any(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+            return "，".join(
+                f"{_normalize_group_field(k)}{v}%" if isinstance(v, (int, float)) and not isinstance(v, bool)
+                else f"{_normalize_group_field(k)}: {_normalize_group_field(v)}"
+                for k, v in value.items()
+            )
+        # 角色位对象：拼成 "名字：职能说明" 自然语句，仅取标量描述字段，丢弃嵌套结构
+        name = _normalize_group_field(value.get("name", ""))
+        descs = [
+            _normalize_group_field(value.get(k))
+            for k in ("description", "role", "identity", "main_line_contribution", "key_ability", "key_flaw")
+        ]
+        descs = [d for d in descs if d]
+        if name:
+            return f"{name}：{'，'.join(descs)}" if descs else name
+        # 通用 dict：仅拼接标量字段，嵌套对象不展开（避免再次拼出超长串）
+        flat = [
+            f"{k}: {_normalize_group_field(v)}"
+            for k, v in value.items() if not isinstance(v, (dict, list))
+        ]
+        return "；".join(flat)
+    if isinstance(value, list):
+        return "；".join(s for s in (_normalize_group_field(v) for v in value) if s)
+    return str(value)
 
 
 class CharacterBuilderExecutor(BaseExecutor):
@@ -412,6 +457,45 @@ class CharacterBuilderExecutor(BaseExecutor):
 
         return villain_data or {}, villain_id
 
+    # 承担这些组内核心职能的成员视为角色团核心（decision_maker 等字段为含 name 的 JSON 字符串）
+    _CORE_GROUP_ROLES = ("decision_maker", "executor", "information_hub", "emotional_pivot")
+
+    def _resolve_member_type(self, member_name: str, cg_data: Dict[str, Any]) -> str:
+        """判定角色组成员的 character_type。
+
+        POV 权重 ≥ 15% 或承担组内核心职能 → co_protagonist（角色团核心），
+        其余 → supporting，避免核心成员与一次性龙套混在同一层级。
+        """
+        if not member_name:
+            return "supporting"
+        pov_raw = cg_data.get("pov_ratio", "")
+        pov_map = pov_raw if isinstance(pov_raw, dict) else {}
+        if isinstance(pov_raw, str) and pov_raw.strip().startswith("{"):
+            try:
+                parsed = json.loads(pov_raw)
+                if isinstance(parsed, dict):
+                    pov_map = parsed
+            except (json.JSONDecodeError, ValueError):
+                pov_map = {}
+        if not pov_map and isinstance(pov_raw, str):
+            # 兼容归一化后的 "李岩40%，苏瑶20%" 文本格式（_normalize_group_field 产出）
+            pov_map = {
+                m.group(1): float(m.group(2))
+                for m in re.finditer(r"([^，,；;：:\s]+)\s*(\d+(?:\.\d+)?)\s*%", pov_raw)
+            }
+        for name, ratio in pov_map.items():
+            try:
+                weight = float(ratio)
+            except (TypeError, ValueError):
+                continue
+            name_str = str(name)
+            if weight >= 15 and (name_str == member_name or member_name in name_str or name_str in member_name):
+                return "co_protagonist"
+        for key in self._CORE_GROUP_ROLES:
+            if member_name in str(cg_data.get(key, "") or ""):
+                return "co_protagonist"
+        return "supporting"
+
     async def build_character_group(
         self, project_data: Dict[str, Any], llm_context: Dict[str, Any]
     ) -> Tuple[Dict[str, Any], Optional[int]]:
@@ -433,7 +517,7 @@ class CharacterBuilderExecutor(BaseExecutor):
             members = cg_data.pop("members", [])
             arcs = cg_data.pop("arcs", [])
 
-            # 指定字段强制转为字符串
+            # 指定字段归一化为可读字符串（嵌套对象转自然语句，不再 json.dumps 裸入库）
             cg_string_keys = {
                 "common_goal", "stage_goal", "decision_maker", "executor",
                 "information_hub", "emotional_pivot", "pov_ratio", "rotation_rules",
@@ -442,29 +526,40 @@ class CharacterBuilderExecutor(BaseExecutor):
             }
             for k in list(cg_data.keys()):
                 if k in cg_string_keys:
-                    cg_data[k] = _sanitize_value(cg_data[k], "")
+                    cg_data[k] = _normalize_group_field(cg_data[k])
 
             cg = add_character_group(project_id, **cg_data)
             character_group_id = cg["id"]
 
-            # 构建角色卡 名称→ID 映射，用于基于成员名称匹配 character_id
+            # 构建角色卡 名称→卡 映射，用于基于成员名称匹配 character_id 与类型升级
             all_cards = get_character_cards_by_project(project_id)
-            name_to_id = {}
+            name_to_card = {}
             for card in all_cards:
                 name = card.get("name", "")
                 if name:
-                    name_to_id[name] = card["id"]
+                    name_to_card[name] = card
+            name_to_id = {n: c["id"] for n, c in name_to_card.items()}
 
             for member in _safe_items(members):
                 member_name = member.get("name", "")
                 # 优先精确匹配，回退子串匹配（处理 LLM 输出"张小帆（少年）"等情况）
                 char_id = name_to_id.get(member_name)
+                matched_card = name_to_card.get(member_name)
                 if char_id is None and member_name:
-                    for card_name, card_id in name_to_id.items():
+                    for card_name, card in name_to_card.items():
                         if member_name in card_name or card_name in member_name:
-                            char_id = card_id
+                            char_id = card["id"]
+                            matched_card = card
                             break
-                # 匹配失败：为该成员创建新角色卡（supporting 类型）
+                member_type = self._resolve_member_type(member_name, cg_data)
+                # 已匹配的 supporting 卡实际承担核心职能/高 POV 权重 → 升级为主角团核心
+                if matched_card and char_id and member_type == "co_protagonist" \
+                        and matched_card.get("character_type") == "supporting":
+                    update_character_card(char_id, character_type="co_protagonist")
+                    _logger.info(
+                        f"[character_builder] 角色团成员 '{member_name}' 升级为主角团核心 (co_protagonist)"
+                    )
+                # 匹配失败：为该成员创建新角色卡（按 POV/职能判定类型）
                 if char_id is None and member_name:
                     _logger.info(
                         f"[character_builder] 团队成员 '{member_name}' 未匹配到已有角色卡，创建新角色卡"
@@ -476,7 +571,7 @@ class CharacterBuilderExecutor(BaseExecutor):
                         "personality_flaw": _sanitize_value(member.get("key_flaw", "")),
                         "ability_limit": _sanitize_value(member.get("key_ability", "")),
                     }
-                    new_card = add_character_card(project_id, "supporting", **new_card_data)
+                    new_card = add_character_card(project_id, member_type, **new_card_data)
                     char_id = new_card.get("id")
                     # 更新映射表，避免后续同名成员重复创建
                     if char_id:

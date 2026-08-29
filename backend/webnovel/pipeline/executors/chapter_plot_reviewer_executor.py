@@ -1,7 +1,8 @@
 """执行器：章节剧情审查器。
 
 在剧情生成后、草稿生成前，对剧情列表进行多维度质量审查。
-若发现严重问题则触发修正（最多2轮），确保剧情质量后再进入正文写作。
+采用标记驱动决策：LLM 对问题/建议显式标记是否值得修正，
+存在标记项则触发修正（最多2轮），确保好建议被真正落实。
 """
 
 import json
@@ -63,15 +64,18 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
                 review_result = await self._review_plot(current_plot, chapter_plan, chapter_index)
                 last_review = review_result
 
-                avg_score = sum(r["score"] for r in review_result) / len(review_result) if review_result else 5
-                has_critical = any(
-                    issue.get("severity") in ("critical", "high")
+                # 标记驱动：存在值得修正的问题或可落实的建议才触发修正，分数仅作观测指标
+                has_actionable = any(
+                    issue.get("worth_revising")
                     for r in review_result
                     for issue in r.get("issues", [])
+                ) or any(
+                    r.get("suggestions_actionable") and r.get("suggestions")
+                    for r in review_result
                 )
 
-                # 评分达标且无严重问题 → 通过
-                if avg_score >= 7 and not has_critical:
+                # 无值得修正项 → 通过（分数仅供摘要展示）
+                if not has_actionable:
                     break
 
                 # 已达修正上限 → 使用当前结果
@@ -203,8 +207,22 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         for review in reviews:
             dim_key = review.get("dimension", "")
             score = review.get("score", 5)
-            issues = review.get("issues", [])
+            issues = []
+            for issue in review.get("issues", []):
+                if not isinstance(issue, dict):
+                    continue
+                severity = issue.get("severity", "")
+                # 标记缺省兜底：critical/high/medium 默认值得修正，low 默认不修正；
+                # critical/high 无论标记一律强制修正，保底不漏严重问题
+                worth = issue.get("worth_revising")
+                if severity in ("critical", "high"):
+                    worth = True
+                elif not isinstance(worth, bool):
+                    worth = severity == "medium"
+                issue["worth_revising"] = worth
+                issues.append(issue)
             suggestions = review.get("suggestions", "")
+            suggestions_actionable = bool(review.get("suggestions_actionable", False))
 
             matched_dim = None
             for d in self.REVIEW_DIMENSIONS:
@@ -220,6 +238,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
                     "score": score,
                     "issues": issues,
                     "suggestions": suggestions,
+                    "suggestions_actionable": suggestions_actionable,
                 })
 
         # 补全未被 LLM 返回的维度
@@ -246,9 +265,10 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
                     severity = issue.get("severity", "")
                     desc = issue.get("description", "")
                     fix_hint = issue.get("fix_hint", "")
-                    if severity in ("critical", "high"):
+                    # critical/high 无条件收集保底；其余按 worth_revising 标记收集
+                    if severity in ("critical", "high") or issue.get("worth_revising"):
                         issues.append(f"【{review['name']}·{severity}】{desc}\n修复建议: {fix_hint}")
-            if review.get("suggestions") and review.get("score", 5) < 7:
+            if review.get("suggestions_actionable") and review.get("suggestions"):
                 issues.append(f"【{review['name']}】{review['suggestions']}")
 
         if not issues:

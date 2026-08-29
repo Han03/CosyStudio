@@ -367,9 +367,9 @@ function renderWorldState(data) {
 // ══════════ 角色卡选项卡渲染 ══════════
 
 const CC_TYPE_LABELS = {
-    protagonist: '主角', heroine: '女主', villain: '反派',
+    protagonist: '主角', co_protagonist: '主角团核心', heroine: '女主', villain: '反派',
     supporting: '配角', mentor: '导师', comic_relief: '搞笑担当',
-    love_interest: '恋爱对象', rival: '对手', sidekick: '跟班'
+    love_interest: '恋爱对象', rival: '对手', sidekick: '跟班', minor: '龙套'
 };
 
 function renderCharacterCards(data) {
@@ -413,8 +413,8 @@ function renderCharacterCards(data) {
         if (!grouped[type]) grouped[type] = [];
         grouped[type].push(ch);
     });
-    // 排序：主角 > 女主 > 反派 > 其他
-    const typeOrder = ['protagonist', 'heroine', 'villain', 'mentor', 'supporting', 'rival', 'love_interest', 'sidekick', 'comic_relief'];
+    // 排序：主角 > 主角团核心 > 女主 > 反派 > 配角 > 龙套 > 其他
+    const typeOrder = ['protagonist', 'co_protagonist', 'heroine', 'villain', 'mentor', 'supporting', 'rival', 'love_interest', 'sidekick', 'comic_relief', 'minor'];
     const sortedTypes = Object.keys(grouped).sort((a, b) => {
         const ia = typeOrder.indexOf(a); const ib = typeOrder.indexOf(b);
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
@@ -530,6 +530,26 @@ function renderCharacterCards(data) {
                 if (powerItems) {
                     html += `<div class="cc-subsection"><div class="cc-subsection-title"><i class="fas fa-fist-raised"></i> 战力信息</div>${powerItems}</div>`;
                 }
+            }
+
+            // 随身物品（只读展示，由事实记录阶段维护；持有中正常显示，已失去置灰）
+            const items = ch.items || [];
+            if (items.length > 0) {
+                const ITEM_STATUS_LABELS = { lost: '已失去', destroyed: '已损毁', gifted: '已赠出' };
+                const held = items.filter(i => i.status === 'held');
+                const gone = items.filter(i => i.status !== 'held')
+                    .sort((a, b) => (a.lost_chapter || 0) - (b.lost_chapter || 0));
+                const itemChips = [...held, ...gone].map(i => {
+                    const tip = [
+                        i.item_desc || i.change_note,
+                        i.source ? `来源:${i.source}` : '',
+                        i.acquired_chapter ? `获得于第${i.acquired_chapter}章` : '',
+                        (i.status !== 'held' && i.lost_chapter) ? `失去于第${i.lost_chapter}章` : '',
+                    ].filter(Boolean).join(' | ');
+                    const statusTag = i.status !== 'held' ? ` · ${ITEM_STATUS_LABELS[i.status] || i.status}` : '';
+                    return `<span class="cc-item-chip${i.status !== 'held' ? ' cc-item-lost' : ''}" title="${tip}">${i.item_name}${statusTag}</span>`;
+                }).join('');
+                html += `<div class="cc-subsection"><div class="cc-subsection-title"><i class="fas fa-box-open"></i> 随身物品 (${held.length})</div><div class="cc-items-wrap">${itemChips}</div></div>`;
             }
 
             html += `</div>`; // cc-character-card end

@@ -66,6 +66,17 @@ function openCapabilityTest(capabilityType) {
                 <textarea class="form-control" id="test-input-text" rows="4" placeholder="请输入要转向量的文本..."></textarea>
             </div>
         `;
+    } else if (capabilityType === 'text_rerank') {
+        inputAreaHtml = `
+            <div class="mb-3">
+                <label class="form-label">查询文本</label>
+                <textarea class="form-control" id="test-rerank-query" rows="2" placeholder="请输入查询文本..."></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">候选片段（每行一个）</label>
+                <textarea class="form-control" id="test-rerank-documents" rows="6" placeholder="每行输入一个候选片段..."></textarea>
+            </div>
+        `;
     }
 
     const modalHtml = `
@@ -178,6 +189,13 @@ async function runCapabilityTest(capabilityType) {
         inputData = {
             text: document.getElementById('test-input-text')?.value || ''
         };
+    } else if (capabilityType === 'text_rerank') {
+        const docsText = document.getElementById('test-rerank-documents')?.value || '';
+        inputData = {
+            query: document.getElementById('test-rerank-query')?.value || '',
+            documents: docsText.split('\n').map(s => s.trim()).filter(s => s),
+            top_k: 5
+        };
     }
 
     if (capabilityType === 'text_to_speech') {
@@ -221,6 +239,17 @@ async function runGenericCapabilityTest(capabilityType, capabilityId, inputData,
                 const vec = data.output || [];
                 resultHtml += `<div class="mb-3"><strong>向量维度:</strong> ${vec.length}</div>`;
                 resultHtml += `<div class="mb-3"><strong>向量前10个值:</strong></div><pre style="white-space: pre-wrap; word-wrap: break-word; background: #f8f9fa; padding: 12px; border-radius: 6px; font-size: 12px;">${vec.slice(0, 10).join(', ')}</pre>`;
+            } else if (capabilityType === 'text_rerank') {
+                const rerankResults = (data.result && data.result.results) || (data.output && data.output.results) || [];
+                resultHtml += `<div class="mb-3"><strong>重排序结果（共 ${rerankResults.length} 条）:</strong></div>`;
+                resultHtml += rerankResults.map((item, i) => `
+                    <div style="margin-bottom: 8px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                        <div style="font-size: 12px; color: #6c757d; margin-bottom: 4px;">
+                            #${i + 1} &nbsp;分数: <strong>${(item.score || 0).toFixed(4)}</strong> &nbsp;原始索引: ${item.index}
+                        </div>
+                        <div style="font-size: 13px;">${escapeHtml(item.document || '')}</div>
+                    </div>
+                `).join('');
             }
             
             resultContent.innerHTML = resultHtml;

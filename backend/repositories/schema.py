@@ -441,6 +441,7 @@ def _init_schema(conn: sqlite3.Connection):
             project_id INTEGER NOT NULL,
             character_type TEXT NOT NULL,
             name TEXT DEFAULT '',
+            alias TEXT DEFAULT '',
             age INTEGER DEFAULT 0,
             identity TEXT DEFAULT '',
             starting_state TEXT DEFAULT '',
@@ -509,6 +510,29 @@ def _init_schema(conn: sqlite3.Connection):
         );
 
         CREATE INDEX IF NOT EXISTS idx_webnovel_char_power ON webnovel_character_power(character_id);
+
+        -- 角色物品表：动态维护角色当前持有的物品（事实记录阶段增减），
+        -- 防止写文时出现"凭空掉出未持有物品"的不一致。
+        -- status: held（持有）/ lost（丢失）/ destroyed（损毁）/ gifted（赠出）；
+        -- 每人每件物品一条记录，重新获得时复用原记录翻转状态。
+        CREATE TABLE IF NOT EXISTS webnovel_character_item (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            character_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            item_desc TEXT DEFAULT '',
+            source TEXT DEFAULT '',
+            acquired_chapter INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'held',
+            lost_chapter INTEGER DEFAULT 0,
+            change_note TEXT DEFAULT '',
+            created_at REAL,
+            updated_at REAL,
+            FOREIGN KEY (character_id) REFERENCES webnovel_character_card(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_webnovel_char_item ON webnovel_character_item(character_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_webnovel_char_item_unique
+            ON webnovel_character_item(character_id, item_name);
 
         CREATE TABLE IF NOT EXISTS webnovel_character_group (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1515,6 +1539,16 @@ def _init_schema(conn: sqlite3.Connection):
             pass
 
     conn.commit()
+
+    # 迁移：webnovel_character_card 新增 alias 列（保存曾用名/别名，用于身份揭露时的角色卡合并）
+    try:
+        cursor = conn.execute("PRAGMA table_info(webnovel_character_card)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "alias" not in columns:
+            conn.execute("ALTER TABLE webnovel_character_card ADD COLUMN alias TEXT DEFAULT ''")
+            logger.info("[Database] Added alias column to webnovel_character_card")
+    except Exception as e:
+        logger.warning(f"[Database] Failed to add alias column to webnovel_character_card: {e}")
 
     # 迁移：清理重复角色名并创建唯一索引
     try:

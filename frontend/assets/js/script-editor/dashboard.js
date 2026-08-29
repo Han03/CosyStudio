@@ -71,7 +71,7 @@ function renderDashboard(data) {
                 <div class="dashboard-list-item-title">
                     ${c.name || '未知角色'}
                     <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; margin-left: 8px;">
-                        ${c.character_type === 'protagonist' ? '主角' : c.character_type === 'villain' ? '反派' : '配角'}
+                        ${({protagonist: '主角', co_protagonist: '主角团核心', heroine: '女主', villain: '反派', supporting: '配角', minor: '龙套'})[c.character_type] || '配角'}
                     </span>
                 </div>
                 <div class="dashboard-list-item-content">${escapeHtml(c.core_personality || c.identity || '').substring(0, 100)}...</div>

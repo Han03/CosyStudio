@@ -174,3 +174,292 @@
 .constraint-package-card.selected .constraint-package-select {
     color: var(--neu-accent);
 }
+
+/* ========== AI 智能生成占位区域 ========== */
+.ai-gen-zone {
+    margin-bottom: 16px;
+}
+
+.ai-gen-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.04) 0%, rgba(108, 92, 231, 0.08) 100%);
+    border: 1.5px dashed rgba(108, 92, 231, 0.25);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.ai-gen-placeholder:hover {
+    border-color: rgba(108, 92, 231, 0.4);
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.06) 0%, rgba(108, 92, 231, 0.10) 100%);
+}
+
+.ai-gen-placeholder-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--neu-accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.ai-gen-placeholder-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-gen-placeholder-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--neu-text);
+    margin-bottom: 2px;
+}
+
+.ai-gen-placeholder-desc {
+    font-size: 12px;
+    color: var(--neu-text-muted);
+    line-height: 1.4;
+}
+
+.btn-ai-generate {
+    flex-shrink: 0;
+    padding: 8px 20px;
+    background: var(--neu-accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.btn-ai-generate:hover {
+    background: var(--neu-accent-hover, #5b7be2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.25);
+}
+
+.btn-ai-generate:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.ai-gen-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px 20px;
+    background: rgba(108, 92, 231, 0.03);
+    border: 1.5px solid rgba(108, 92, 231, 0.12);
+    border-radius: 12px;
+    color: var(--neu-accent);
+    font-size: 13px;
+}
+
+.ai-gen-spinner {
+    width: 22px;
+    height: 22px;
+    border: 2.5px solid rgba(108, 92, 231, 0.2);
+    border-top-color: var(--neu-accent);
+    border-radius: 50%;
+    animation: aiSpin 0.8s linear infinite;
+}
+
+@keyframes aiSpin {
+    to { transform: rotate(360deg); }
+}
+
+.ai-gen-result {
+    margin-bottom: 0;
+}
+
+.ai-gen-result .btn-regenerate {
+    display: none;
+}
+
+/* ========== 步骤 2-6 紧凑摘要行样式 ========== */
+.step-options-container {
+    margin-bottom: 12px;
+}
+
+.option-summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.option-summary-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1.5px solid rgba(0,0,0,0.08);
+    background: rgba(0,0,0,0.015);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.option-summary-row:hover {
+    background: rgba(108, 92, 231, 0.04);
+    border-color: var(--neu-accent-light);
+}
+
+.option-summary-row.selected {
+    border-color: var(--neu-accent);
+    background: rgba(108, 92, 231, 0.06);
+    box-shadow: 0 0 0 3px var(--neu-accent-light);
+}
+
+.option-summary-row .summary-check {
+    width: 20px;
+    flex-shrink: 0;
+    color: var(--neu-text-muted);
+    font-size: 14px;
+}
+
+.option-summary-row.selected .summary-check {
+    color: var(--neu-accent);
+}
+
+.option-summary-row .summary-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--neu-text);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.option-summary-row .summary-text {
+    font-size: 12px;
+    color: var(--neu-text-muted);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.option-summary-row .summary-score {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 3px 10px;
+    background: var(--neu-accent);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.option-summary-row .summary-score .score-num {
+    font-size: 14px;
+}
+
+.option-summary-row .summary-action {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--neu-accent);
+    opacity: 0.7;
+}
+
+.option-summary-row:hover .summary-action {
+    opacity: 1;
+}
+
+.option-summary-row .summary-detail-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid rgba(108, 92, 231, 0.25);
+    color: var(--neu-accent);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    opacity: 0.7;
+}
+
+.option-summary-row .summary-detail-btn:hover {
+    opacity: 1;
+    background: rgba(108, 92, 231, 0.08);
+    border-color: var(--neu-accent);
+}
+
+.option-hint {
+    margin-top: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--neu-accent);
+    background: rgba(108, 92, 231, 0.04);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.option-hint > span {
+    flex: 1;
+    min-width: 0;
+}
+
+.option-hint .btn-regenerate {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid rgba(108, 92, 231, 0.25);
+    border-radius: 5px;
+    padding: 2px 10px;
+    font-size: 11px;
+    color: var(--neu-accent);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.option-hint .btn-regenerate:hover {
+    background: rgba(108, 92, 231, 0.08);
+    border-color: var(--neu-accent);
+}
+
+/* ========== 选项详情浮层（复用标准 modal 样式，仅补充特有元素） ========== */
+.option-detail-score {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    background: var(--neu-accent);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.option-detail-modal .modal-body .constraint-package-item {
+    margin-bottom: 8px;
+}
+
+.option-detail-modal .modal-body .constraint-package-scoring {
+    margin-top: 12px;
+}
+
+.option-detail-modal .modal-body .constraint-package-three-questions {
+    margin-top: 12px;
+}

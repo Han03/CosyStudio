@@ -19,6 +19,13 @@ from utils.logger import log_manager
 
 _logger = log_manager.get_logger("model_executor")
 
+# 🔴 本地模型推理全局串行锁（模块级，跨 ModelExecutor 实例共享）。
+# 本地 Qwen/Embedding/Reranker/CosyVoice/DreamLite 均为单实例模型，不支持多线程并发推理：
+# 多个创作任务（如同时打开两个剧本编辑器做智能创作）若并发调用会导致
+# CUDA 状态竞争、显存 OOM 或输出串流。此锁确保本地推理严格串行；
+# 云端能力（httpx 请求）不受此锁限制，仍可并行。
+_LOCAL_INFERENCE_LOCK = asyncio.Lock()
+
 
 class ModelExecutor:
     def __init__(self):
@@ -373,9 +380,16 @@ class ModelExecutor:
     async def execute_text_to_vector(
         self,
         texts: list,
-        capability_id: str = None
+        capability_id: str = None,
+        is_query: bool = False
     ) -> Dict[str, Any]:
-        """执行文本转向量能力（同步）"""
+        """执行文本转向量能力（同步）
+        
+        Args:
+            texts: 文本列表
+            capability_id: 可选的能力 ID
+            is_query: 是否为查询文本（True 时添加 instruction prefix 以提升检索效果）
+        """
         capabilities = capability_manager.get_capabilities_by_type("text_to_vector")
         
         if capability_id:
@@ -387,12 +401,45 @@ class ModelExecutor:
         for capability in capabilities:
             try:
                 _logger.info(f"尝试使用文本转向量能力: {capability.get('id')}")
-                return await self._execute_t2v_capability(capability, texts, capability_id is not None)
+                return await self._execute_t2v_capability(capability, texts, capability_id is not None, is_query=is_query)
             except Exception as e:
                 _logger.error(f"文本转向量能力 {capability.get('id')} 执行失败: {e}")
                 continue
         
         return {"error": "没有可用的文本转向量能力"}
+
+    async def execute_rerank(
+        self,
+        query: str,
+        documents: list,
+        top_k: int = 5,
+        capability_id: str = None
+    ) -> Dict[str, Any]:
+        """执行片段重排序能力（同步）
+        
+        Args:
+            query: 查询文本
+            documents: 候选片段列表
+            top_k: 返回前k个结果
+            capability_id: 可选的能力 ID
+        """
+        capabilities = capability_manager.get_capabilities_by_type("text_rerank")
+        
+        if capability_id:
+            all_capabilities = get_model_capabilities().get("text_rerank", [])
+            capability = next((c for c in all_capabilities if c.get("id") == capability_id), None)
+            if capability:
+                capabilities = [capability]
+        
+        for capability in capabilities:
+            try:
+                _logger.info(f"尝试使用片段重排序能力: {capability.get('id')}")
+                return await self._execute_rerank_capability(capability, query, documents, top_k, capability_id is not None)
+            except Exception as e:
+                _logger.error(f"片段重排序能力 {capability.get('id')} 执行失败: {e}")
+                continue
+        
+        return {"error": "没有可用的片段重排序能力"}
 
     async def _execute_text_predict_capability(
         self,
@@ -457,16 +504,34 @@ class ModelExecutor:
         self,
         capability: Dict[str, Any],
         texts: list,
-        skip_enabled_check: bool = False
+        skip_enabled_check: bool = False,
+        is_query: bool = False
     ) -> Dict[str, Any]:
         """执行具体的文本转向量能力"""
         platform_code = capability.get("platform_code")
         model_code = capability.get("model_code")
         
         if platform_code == "local":
-            return await self._call_local_t2v(model_code, texts)
+            return await self._call_local_t2v(model_code, texts, is_query=is_query)
         else:
             return await self._call_cloud_t2v(platform_code, model_code, texts, skip_enabled_check)
+
+    async def _execute_rerank_capability(
+        self,
+        capability: Dict[str, Any],
+        query: str,
+        documents: list,
+        top_k: int,
+        skip_enabled_check: bool = False
+    ) -> Dict[str, Any]:
+        """执行具体的片段重排序能力"""
+        platform_code = capability.get("platform_code")
+        model_code = capability.get("model_code")
+        
+        if platform_code == "local":
+            return await self._call_local_rerank(model_code, query, documents, top_k)
+        else:
+            return await self._call_cloud_rerank(platform_code, model_code, query, documents, top_k, skip_enabled_check)
 
     async def _call_local_text_predict(
         self,
@@ -500,70 +565,73 @@ class ModelExecutor:
         if max_tokens is not None:
             qwen_params = {**qwen_params, "max_new_tokens": max_tokens}
         
-        if stream:
-            generator = qwen_model.generate_stream(
-                processed_text,
-                agent_description=system_prompt.strip() if system_prompt else None,
-                generate_params=qwen_params
-            )
+        # 🔴 本地模型不支持并发推理，整个本地调用（含流式消费）必须串行，
+        # 否则多个创作任务会同时对同一模型实例 generate/encode 导致崩溃或输出串流。
+        async with _LOCAL_INFERENCE_LOCK:
+            if stream:
+                generator = qwen_model.generate_stream(
+                    processed_text,
+                    agent_description=system_prompt.strip() if system_prompt else None,
+                    generate_params=qwen_params
+                )
 
-            # 🔴 同步生成器必须在独立线程中迭代，否则会阻塞 asyncio 事件循环，
-            # 导致 WebSocket / API 请求全部卡死。
-            # 使用 asyncio.Queue + loop.call_soon_threadsafe 桥接为异步流。
-            queue: asyncio.Queue = asyncio.Queue()
-            _SENTINEL = object()  # 线程结束标记
-            loop = asyncio.get_running_loop()
+                # 🔴 同步生成器必须在独立线程中迭代，否则会阻塞 asyncio 事件循环，
+                # 导致 WebSocket / API 请求全部卡死。
+                # 使用 asyncio.Queue + loop.call_soon_threadsafe 桥接为异步流。
+                queue: asyncio.Queue = asyncio.Queue()
+                _SENTINEL = object()  # 线程结束标记
+                loop = asyncio.get_running_loop()
 
-            def _sync_generator_to_queue(sync_gen):
-                """在独立线程中迭代同步生成器，将 chunk 推入 asyncio.Queue。"""
-                try:
-                    for chunk in sync_gen:
-                        loop.call_soon_threadsafe(queue.put_nowait, chunk)
-                except Exception as exc:
-                    loop.call_soon_threadsafe(queue.put_nowait, {"type": "_error", "content": str(exc)})
-                finally:
-                    loop.call_soon_threadsafe(queue.put_nowait, _SENTINEL)
+                def _sync_generator_to_queue(sync_gen):
+                    """在独立线程中迭代同步生成器，将 chunk 推入 asyncio.Queue。"""
+                    try:
+                        for chunk in sync_gen:
+                            loop.call_soon_threadsafe(queue.put_nowait, chunk)
+                    except Exception as exc:
+                        loop.call_soon_threadsafe(queue.put_nowait, {"type": "_error", "content": str(exc)})
+                    finally:
+                        loop.call_soon_threadsafe(queue.put_nowait, _SENTINEL)
 
-            async def _read_queue():
-                """从 Queue 异步读取 chunk 并 yield，保持流式传输效果。"""
-                while True:
-                    item = await queue.get()
-                    if item is _SENTINEL:
-                        break
-                    if isinstance(item, dict) and item.get("type") == "_error":
-                        raise ValueError(item.get("content", "生成错误"))
-                    if item.get("type") == "text":
-                        yield {"type": "text", "content": item.get("content", ""), "done": False}
-                    elif item.get("type") == "correction":
-                        yield {"type": "correction", "content": item.get("content", "")}
-                    elif item.get("type") == "finish":
-                        yield {
-                            "type": "finish",
-                            "model_name": model_code or "local_qwen",
-                            "input_tokens": int(item.get("input_tokens", 0) or 0),
-                            "output_tokens": int(item.get("output_tokens", 0) or 0),
-                        }
-                        break
-                    elif item.get("type") == "error":
-                        raise ValueError(item.get("content", "生成错误"))
+                async def _read_queue():
+                    """从 Queue 异步读取 chunk 并 yield，保持流式传输效果。"""
+                    while True:
+                        item = await queue.get()
+                        if item is _SENTINEL:
+                            break
+                        if isinstance(item, dict) and item.get("type") == "_error":
+                            raise ValueError(item.get("content", "生成错误"))
+                        if item.get("type") == "text":
+                            yield {"type": "text", "content": item.get("content", ""), "done": False}
+                        elif item.get("type") == "correction":
+                            yield {"type": "correction", "content": item.get("content", "")}
+                        elif item.get("type") == "finish":
+                            yield {
+                                "type": "finish",
+                                "model_name": model_code or "local_qwen",
+                                "input_tokens": int(item.get("input_tokens", 0) or 0),
+                                "output_tokens": int(item.get("output_tokens", 0) or 0),
+                            }
+                            break
+                        elif item.get("type") == "error":
+                            raise ValueError(item.get("content", "生成错误"))
 
-            asyncio.create_task(asyncio.to_thread(_sync_generator_to_queue, generator))
-            async for chunk in _read_queue():
-                yield chunk
-        else:
-            result = await asyncio.to_thread(
-                qwen_model.generate,
-                processed_text,
-                agent_description=system_prompt.strip() if system_prompt else None,
-                generate_params=qwen_params
-            )
-            yield {"type": "text", "content": result, "done": True}
-            yield {
-                "type": "finish",
-                "model_name": model_code or "local_qwen",
-                "input_tokens": 0,
-                "output_tokens": 0,
-            }
+                asyncio.create_task(asyncio.to_thread(_sync_generator_to_queue, generator))
+                async for chunk in _read_queue():
+                    yield chunk
+            else:
+                result = await asyncio.to_thread(
+                    qwen_model.generate,
+                    processed_text,
+                    agent_description=system_prompt.strip() if system_prompt else None,
+                    generate_params=qwen_params
+                )
+                yield {"type": "text", "content": result, "done": True}
+                yield {
+                    "type": "finish",
+                    "model_name": model_code or "local_qwen",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
 
     async def _request_with_retry(
         self,
@@ -723,8 +791,12 @@ class ModelExecutor:
                 }
             else:
                 if response.status_code != 200:
-                    result = response.json()
-                    raise ValueError(result.get("message", "API调用失败"))
+                    try:
+                        result = response.json()
+                        error_msg = self._extract_api_error(response, result)
+                    except Exception:
+                        error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                    raise ValueError(f"API调用失败(HTTP {response.status_code}): {error_msg}")
 
                 result = response.json()
                 choices = result.get("choices", [])
@@ -810,40 +882,42 @@ class ModelExecutor:
             "text": text[:200],
         }
         
-        audio_iter = cosyvoice_model.synthesize_pcm(text, speaker_id=speaker_id, speed=speed, instruction=instruction, seed=seed)
+        # 🔴 本地 CosyVoice 单实例，合成过程须与其他本地推理串行（见 _LOCAL_INFERENCE_LOCK）
+        async with _LOCAL_INFERENCE_LOCK:
+            audio_iter = cosyvoice_model.synthesize_pcm(text, speaker_id=speaker_id, speed=speed, instruction=instruction, seed=seed)
         
-        sample_rate = None
-        chunk_count = 0
-        try:
-            for audio_chunk in audio_iter:
-                if audio_chunk["type"] == "pcm_chunk":
-                    pcm_data = audio_chunk["data"]
-                    sample_rate = audio_chunk["sample_rate"]
-                    pcm_data = np.clip(pcm_data, -1.0, 1.0)
-                    pcm_bytes = (pcm_data * 32767).astype(np.int16).tobytes()
-                    pcm_b64 = base64.b64encode(pcm_bytes).decode("ascii")
-                    yield {
-                        "type": "pcm_chunk",
-                        "sample_rate": sample_rate,
-                        "chunk_index": chunk_count,
-                        "data": pcm_b64,
-                    }
-                    chunk_count += 1
-                elif audio_chunk["type"] == "pcm_finish":
-                    yield {
-                        "type": "finish",
-                        "sample_rate": sample_rate,
-                        "chunk_count": chunk_count,
-                    }
-                    break
-                elif audio_chunk["type"] == "error":
-                    yield {"type": "error", "message": audio_chunk["content"]}
-                    break
-        except Exception as e:
-            _logger.error(f"[ModelExecutor] TTS流式合成异常: {e}")
-            import traceback
-            _logger.error(traceback.format_exc())
-            yield {"type": "error", "message": str(e)}
+            sample_rate = None
+            chunk_count = 0
+            try:
+                for audio_chunk in audio_iter:
+                    if audio_chunk["type"] == "pcm_chunk":
+                        pcm_data = audio_chunk["data"]
+                        sample_rate = audio_chunk["sample_rate"]
+                        pcm_data = np.clip(pcm_data, -1.0, 1.0)
+                        pcm_bytes = (pcm_data * 32767).astype(np.int16).tobytes()
+                        pcm_b64 = base64.b64encode(pcm_bytes).decode("ascii")
+                        yield {
+                            "type": "pcm_chunk",
+                            "sample_rate": sample_rate,
+                            "chunk_index": chunk_count,
+                            "data": pcm_b64,
+                        }
+                        chunk_count += 1
+                    elif audio_chunk["type"] == "pcm_finish":
+                        yield {
+                            "type": "finish",
+                            "sample_rate": sample_rate,
+                            "chunk_count": chunk_count,
+                        }
+                        break
+                    elif audio_chunk["type"] == "error":
+                        yield {"type": "error", "message": audio_chunk["content"]}
+                        break
+            except Exception as e:
+                _logger.error(f"[ModelExecutor] TTS流式合成异常: {e}")
+                import traceback
+                _logger.error(traceback.format_exc())
+                yield {"type": "error", "message": str(e)}
     
     def _resolve_voice_by_tone(self, agent: dict, tone: str = "") -> str:
         """根据语气选择已注册的 speaker_id。"""
@@ -1065,7 +1139,9 @@ class ModelExecutor:
                 seed=config.get("seed", 42),
             )
         
-        result = await asyncio.get_event_loop().run_in_executor(None, _generate_sync)
+        # 🔴 本地 DreamLite 单实例，推理须与其他本地推理串行（见 _LOCAL_INFERENCE_LOCK）
+        async with _LOCAL_INFERENCE_LOCK:
+            result = await asyncio.get_event_loop().run_in_executor(None, _generate_sync)
         
         if result is None:
             raise ValueError("模型生成返回空结果")
@@ -1125,8 +1201,12 @@ class ModelExecutor:
         try:
             response = await self._request_with_retry(client, "POST", url, json=payload, headers=headers)
             if response.status_code != 200:
-                result = response.json()
-                raise ValueError(result.get("message", "API调用失败"))
+                try:
+                    result = response.json()
+                    error_msg = self._extract_api_error(response, result)
+                except Exception:
+                    error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                raise ValueError(f"API调用失败(HTTP {response.status_code}): {error_msg}")
             
             result = response.json()
             images = result.get("data", [])
@@ -1139,7 +1219,8 @@ class ModelExecutor:
     async def _call_local_t2v(
         self,
         model_code: str,
-        texts: list
+        texts: list,
+        is_query: bool = False
     ) -> Dict[str, Any]:
         """调用本地文本转向量模型"""
         from core.model_manager import ensure_qwen_embedding_loaded
@@ -1153,13 +1234,31 @@ class ModelExecutor:
         
         config = global_manager.qwen_embedding_config
         
-        embeddings = await asyncio.to_thread(
-            embedding_model.encode,
-            texts,
-            batch_size=config.get("batch_size", 32)
-        )
+        # 🔴 本地 Embedding 单实例，encode 须与其他本地推理串行（见 _LOCAL_INFERENCE_LOCK）
+        async with _LOCAL_INFERENCE_LOCK:
+            embeddings = await asyncio.to_thread(
+                embedding_model.encode,
+                texts,
+                batch_size=config.get("batch_size", 32),
+                is_query=is_query,
+            )
         
         return {"type": "vector", "embeddings": embeddings, "dim": len(embeddings[0]) if embeddings else 0}
+
+    @staticmethod
+    def _extract_api_error(response, result) -> str:
+        """从 API 错误响应中提取可读错误信息。
+        
+        兼容两种格式：顶层 message（部分平台）与嵌套 error.message（OpenAI 兼容格式，
+        如阿里云百炼返回 {"error": {"message": ..., "code": ...}}）。
+        """
+        try:
+            err = result.get("error")
+            if isinstance(err, dict):
+                return str(err.get("message") or err) or "API调用失败"
+            return result.get("message") or str(result) or "API调用失败"
+        except Exception:
+            return f"API调用失败，状态码: {response.status_code}"
 
     async def _call_cloud_t2v(
         self,
@@ -1170,6 +1269,10 @@ class ModelExecutor:
     ) -> Dict[str, Any]:
         """调用云端文本转向量API"""
         import httpx
+        
+        # 云端 embedding 接口单次请求条数上限（阿里云百炼 OpenAI 兼容端点为 20），
+        # 超出会返回 400，故此处分批发送；批量索引场景一次可能传入上百条文本。
+        CLOUD_T2V_BATCH_SIZE = 20
         
         config = get_config()
         platform_keys = config.get("platform_keys", {})
@@ -1190,21 +1293,138 @@ class ModelExecutor:
             "Content-Type": "application/json",
         }
         
-        payload = {
-            "model": model_code,
-            "input": texts,
+        client = httpx.AsyncClient(timeout=60.0)
+        try:
+            embeddings = []
+            for i in range(0, len(texts), CLOUD_T2V_BATCH_SIZE):
+                batch = texts[i:i + CLOUD_T2V_BATCH_SIZE]
+                payload = {
+                    "model": model_code,
+                    "input": batch,
+                }
+                response = await self._request_with_retry(client, "POST", url, json=payload, headers=headers)
+                if response.status_code != 200:
+                    try:
+                        result = response.json()
+                        error_msg = self._extract_api_error(response, result)
+                    except Exception:
+                        error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                    raise ValueError(f"API调用失败(HTTP {response.status_code}): {error_msg}")
+                
+                result = response.json()
+                # 按 index 排序，防止云端返回顺序与输入不一致导致向量错位
+                data = sorted(result.get("data", []), key=lambda item: item.get("index", 0))
+                embeddings.extend(item.get("embedding") for item in data)
+            return {"type": "vector", "embeddings": embeddings, "dim": len(embeddings[0]) if embeddings else 0}
+        finally:
+            await client.aclose()
+
+    async def _call_local_rerank(
+        self,
+        model_code: str,
+        query: str,
+        documents: list,
+        top_k: int
+    ) -> Dict[str, Any]:
+        """调用本地片段重排序模型"""
+        from core.model_manager import ensure_qwen_reranker_loaded
+        
+        if not await asyncio.to_thread(ensure_qwen_reranker_loaded):
+            raise ValueError("本地Qwen-Reranker模型未加载")
+        
+        reranker_model = global_manager.qwen_reranker_model
+        if reranker_model is None:
+            raise ValueError("本地Qwen-Reranker模型不可用")
+        
+        config = global_manager.qwen_reranker_config
+        
+        # 🔴 本地 Reranker 单实例，打分须与其他本地推理串行（见 _LOCAL_INFERENCE_LOCK）
+        async with _LOCAL_INFERENCE_LOCK:
+            results = await asyncio.to_thread(
+                reranker_model.rerank,
+                query,
+                documents,
+                top_k,
+                max_length=config.get("max_length", 1024),
+            )
+        
+        return {"type": "rerank", "results": results}
+
+    async def _call_cloud_rerank(
+        self,
+        platform_code: str,
+        model_code: str,
+        query: str,
+        documents: list,
+        top_k: int,
+        skip_enabled_check: bool = False
+    ) -> Dict[str, Any]:
+        """调用云端片段重排序API。
+        
+        路由逻辑（与云端 TTS 一致）：
+        - aliyun 平台 → DashScope 原生 rerank API（OpenAI 兼容模式下不存在 /rerank 端点，会 404）
+        - 其他平台 → OpenAI 兼容格式 {base_url}/rerank
+        """
+        import httpx
+        
+        config = get_config()
+        platform_keys = config.get("platform_keys", {})
+        platform_config = platform_keys.get(platform_code, {})
+        
+        if not skip_enabled_check and not platform_config.get("enabled", False):
+            raise ValueError(f"平台{platform_code}未启用")
+        
+        api_key = platform_config.get("api_key")
+        base_url = platform_config.get("base_url")
+        
+        if not api_key or not base_url:
+            raise ValueError(f"平台{platform_code}配置不完整")
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
         }
+        
+        if platform_code == "aliyun":
+            # DashScope 原生接口：query/documents 嵌套在 input 中，top_n 在 parameters 中
+            url = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
+            payload = {
+                "model": model_code,
+                "input": {"query": query, "documents": documents},
+                "parameters": {"top_n": top_k},
+            }
+        else:
+            url = f"{base_url}/rerank"
+            payload = {
+                "model": model_code,
+                "query": query,
+                "documents": documents,
+                "top_n": top_k,
+            }
         
         client = httpx.AsyncClient(timeout=60.0)
         try:
             response = await self._request_with_retry(client, "POST", url, json=payload, headers=headers)
             if response.status_code != 200:
-                result = response.json()
-                raise ValueError(result.get("message", "API调用失败"))
+                try:
+                    result = response.json()
+                    error_msg = self._extract_api_error(response, result)
+                except Exception:
+                    error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                raise ValueError(f"API调用失败(HTTP {response.status_code}): {error_msg}")
             
             result = response.json()
-            embeddings = [item.get("embedding") for item in result.get("data", [])]
-            return {"type": "vector", "embeddings": embeddings, "dim": len(embeddings[0]) if embeddings else 0}
+            # 兼容 OpenAI 风格与 DashScope 风格两种返回结构
+            raw_results = result.get("results") or result.get("output", {}).get("results", [])
+            results = []
+            for item in raw_results:
+                idx = item.get("index", 0)
+                results.append({
+                    "document": item.get("document") or (documents[idx] if 0 <= idx < len(documents) else ""),
+                    "score": float(item.get("relevance_score", item.get("score", 0.0))),
+                    "index": idx
+                })
+            return {"type": "rerank", "results": results}
         finally:
             await client.aclose()
 

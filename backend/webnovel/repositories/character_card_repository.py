@@ -26,7 +26,7 @@ def add_character_card(project_id: int, character_type: str, **kwargs) -> dict:
         now = time.time()
         cursor = conn.execute(
             """
-            INSERT INTO webnovel_character_card (project_id, character_type, name, age, identity,
+            INSERT INTO webnovel_character_card (project_id, character_type, name, alias, age, identity,
                                                  starting_state, core_tags, first_impression,
                                                  core_personality, behavior_bottom_line, emotion_triggers,
                                                  easy_to_anger, easy_to_soften, short_term_goal,
@@ -35,10 +35,10 @@ def add_character_card(project_id: int, character_type: str, **kwargs) -> dict:
                                                  cost_tolerance, behavior_pattern, failure_reaction,
                                                  breakthrough_strength, ooc_warnings, need_foreshadowing,
                                                  created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (safe_int(project_id), safe_str(character_type),
-             safe_str(kwargs.get("name", "")), safe_int(kwargs.get("age", 0)), safe_str(kwargs.get("identity", "")),
+             safe_str(kwargs.get("name", "")), safe_str(kwargs.get("alias", "")), safe_int(kwargs.get("age", 0)), safe_str(kwargs.get("identity", "")),
              safe_str(kwargs.get("starting_state", "")), safe_str(kwargs.get("core_tags", "")),
              safe_str(kwargs.get("first_impression", "")),
              safe_str(kwargs.get("core_personality", "")), safe_str(kwargs.get("behavior_bottom_line", "")),
@@ -100,6 +100,53 @@ def update_character_card(char_id: int, **kwargs) -> bool:
         )
         conn.commit()
         return True
+
+
+def delete_character_card(char_id: int) -> bool:
+    """删除角色卡（关系/成长/能力等关联数据经外键级联删除）。"""
+    with _lock:
+        conn = _get_conn()
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("DELETE FROM webnovel_character_card WHERE id = ?", (safe_int(char_id),))
+        conn.commit()
+        return True
+
+
+def reassign_character_data(old_char_id: int, new_char_id: int) -> None:
+    """将旧角色卡的关系/成长/能力/物品数据迁移到新卡（身份揭露合并时调用）。"""
+    with _lock:
+        conn = _get_conn()
+        old_id, new_id = safe_int(old_char_id), safe_int(new_char_id)
+        conn.execute(
+            "UPDATE webnovel_character_relationship SET character_id = ? WHERE character_id = ?",
+            (new_id, old_id)
+        )
+        conn.execute(
+            "UPDATE webnovel_character_relationship SET target_character_id = ? WHERE target_character_id = ?",
+            (new_id, old_id)
+        )
+        conn.execute(
+            "UPDATE webnovel_character_growth SET character_id = ? WHERE character_id = ?",
+            (new_id, old_id)
+        )
+        conn.execute(
+            "UPDATE webnovel_character_power SET character_id = ? WHERE character_id = ?",
+            (new_id, old_id)
+        )
+        # 物品随角色卡合并迁移：同名冲突时保留新卡的记录，删除旧卡的重复项，
+        # 避免触发 (character_id, item_name) 唯一索引冲突
+        conn.execute(
+            """DELETE FROM webnovel_character_item
+               WHERE character_id = ? AND item_name IN (
+                   SELECT item_name FROM webnovel_character_item WHERE character_id = ?
+               )""",
+            (old_id, new_id)
+        )
+        conn.execute(
+            "UPDATE webnovel_character_item SET character_id = ? WHERE character_id = ?",
+            (new_id, old_id)
+        )
+        conn.commit()
 
 
 def add_character_relationship(character_id: int, relation_type: str, target_character_id: int = None, target_name: str = "", description: str = "") -> dict:
@@ -181,10 +228,129 @@ def get_character_power(character_id: int) -> Optional[dict]:
         return dict(row) if row else None
 
 
+# ==============================================================================
+# 角色物品（动态持有清单，事实记录阶段增减，防止写文出现未持有物品）
+# ==============================================================================
+
+def upsert_character_item(
+    character_id: int, item_name: str, item_desc: str = "",
+    source: str = "", chapter: int = 0, note: str = ""
+) -> dict:
+    """获得物品：同名记录存在则复用（状态复位 held 并刷新信息），否则新增。"""
+    item_name = safe_str(item_name)
+    if not item_name:
+        return {}
+    now = time.time()
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "SELECT id FROM webnovel_character_item WHERE character_id = ? AND item_name = ?",
+            (safe_int(character_id), item_name)
+        )
+        existing = cursor.fetchone()
+        if existing:
+            conn.execute(
+                """UPDATE webnovel_character_item
+                   SET item_desc = ?, source = ?, acquired_chapter = ?, status = 'held',
+                       lost_chapter = 0, change_note = ?, updated_at = ?
+                   WHERE id = ?""",
+                (safe_str(item_desc), safe_str(source), safe_int(chapter),
+                 safe_str(note), now, existing["id"])
+            )
+            conn.commit()
+            return {"id": existing["id"], "character_id": character_id, "item_name": item_name,
+                    "status": "held", "acquired_chapter": safe_int(chapter)}
+        cursor = conn.execute(
+            """INSERT INTO webnovel_character_item
+               (character_id, item_name, item_desc, source, acquired_chapter,
+                status, lost_chapter, change_note, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, 'held', 0, ?, ?, ?)""",
+            (safe_int(character_id), item_name, safe_str(item_desc), safe_str(source),
+             safe_int(chapter), safe_str(note), now, now)
+        )
+        conn.commit()
+        return {"id": cursor.lastrowid, "character_id": character_id, "item_name": item_name,
+                "status": "held", "acquired_chapter": safe_int(chapter)}
+
+
+def mark_character_item_lost(
+    character_id: int, item_name: str, status: str = "lost",
+    chapter: int = 0, note: str = ""
+) -> bool:
+    """失去物品：精确匹配优先，子串匹配兜底（对齐身份揭露的匹配策略）。
+
+    未命中返回 False（角色没有该物品却"失去"，属于不一致信号，由调用方记日志，
+    不凭空建记录）。
+    """
+    item_name = safe_str(item_name)
+    if not item_name:
+        return False
+    if status not in ("lost", "destroyed", "gifted"):
+        return False
+    now = time.time()
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "SELECT id, item_name FROM webnovel_character_item WHERE character_id = ?",
+            (safe_int(character_id),)
+        )
+        rows = cursor.fetchall()
+        target_id = None
+        for row in rows:
+            if row["item_name"] == item_name:
+                target_id = row["id"]
+                break
+        if target_id is None:
+            for row in rows:
+                if item_name in row["item_name"] or row["item_name"] in item_name:
+                    target_id = row["id"]
+                    break
+        if target_id is None:
+            return False
+        conn.execute(
+            """UPDATE webnovel_character_item
+               SET status = ?, lost_chapter = ?, change_note = ?, updated_at = ?
+               WHERE id = ?""",
+            (status, safe_int(chapter), safe_str(note), now, target_id)
+        )
+        conn.commit()
+        return True
+
+
+def get_character_items(character_id: int, only_held: bool = True) -> List[dict]:
+    """获取角色的物品列表（默认仅持有中）。"""
+    with _lock:
+        conn = _get_conn()
+        sql = "SELECT * FROM webnovel_character_item WHERE character_id = ?"
+        if only_held:
+            sql += " AND status = 'held'"
+        cursor = conn.execute(sql, (safe_int(character_id),))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_character_items_by_project(project_id: int, only_held: bool = True) -> Dict[int, List[dict]]:
+    """批量获取项目下所有角色的持有物品，按 character_id 分组。
+
+    供上下文构建器一次性加载，避免逐角色查询。
+    """
+    with _lock:
+        conn = _get_conn()
+        sql = """SELECT i.* FROM webnovel_character_item i
+                 JOIN webnovel_character_card c ON i.character_id = c.id
+                 WHERE c.project_id = ?"""
+        if only_held:
+            sql += " AND i.status = 'held'"
+        cursor = conn.execute(sql, (safe_int(project_id),))
+        grouped: Dict[int, List[dict]] = {}
+        for row in cursor.fetchall():
+            grouped.setdefault(row["character_id"], []).append(dict(row))
+        return grouped
+
+
 def get_active_character_ids(project_id: int, chapter_index: int, recent_window: int = 3) -> Set[int]:
     """获取活跃角色ID集合：核心角色 + 最近N章剧情中出场的角色。
 
-    核心角色（protagonist/heroine/villain）始终活跃。
+    核心角色（protagonist/co_protagonist/heroine/villain）始终活跃。
     近期出场角色从 webnovel_chapter_plot 的 characters 列提取（逗号分隔）。
     """
     ids = set()
@@ -193,7 +359,7 @@ def get_active_character_ids(project_id: int, chapter_index: int, recent_window:
     with _lock:
         conn = _get_conn()
         cursor = conn.execute(
-            "SELECT id FROM webnovel_character_card WHERE project_id = ? AND character_type IN ('protagonist','heroine','villain')",
+            "SELECT id FROM webnovel_character_card WHERE project_id = ? AND character_type IN ('protagonist','co_protagonist','heroine','villain')",
             (project_id,)
         )
         for row in cursor.fetchall():

@@ -176,6 +176,7 @@ class SettingsRequest:
     cosyvoice_config: dict = None
     dreamlite_config: dict = None
     qwen_embedding_config: dict = None
+    qwen_reranker_config: dict = None
     platform_keys: dict = None
     model_capabilities: dict = None
     call_point_models: dict = None
@@ -196,6 +197,7 @@ async def update_settings(request: Request):
         settings.cosyvoice_config = data.get("cosyvoice_config")
         settings.dreamlite_config = data.get("dreamlite_config")
         settings.qwen_embedding_config = data.get("qwen_embedding_config")
+        settings.qwen_reranker_config = data.get("qwen_reranker_config")
         settings.platform_keys = data.get("platform_keys")
         settings.model_capabilities = data.get("model_capabilities")
         settings.call_point_models = data.get("call_point_models")
@@ -233,6 +235,11 @@ async def update_settings(request: Request):
                 current_config["qwen_embedding_config"] = {}
             current_config["qwen_embedding_config"].update(settings.qwen_embedding_config)
 
+        if settings.qwen_reranker_config:
+            if "qwen_reranker_config" not in current_config:
+                current_config["qwen_reranker_config"] = {}
+            current_config["qwen_reranker_config"].update(settings.qwen_reranker_config)
+
         if settings.platform_keys:
             if "platform_keys" not in current_config:
                 current_config["platform_keys"] = {}
@@ -261,6 +268,10 @@ async def update_settings(request: Request):
         global_manager.update_qwen_embedding_config(
             batch_size=qwen_embedding_cfg.get("batch_size"),
             max_length=qwen_embedding_cfg.get("max_length")
+        )
+        qwen_reranker_cfg = current_config.get("qwen_reranker_config", {})
+        global_manager.update_qwen_reranker_config(
+            max_length=qwen_reranker_cfg.get("max_length")
         )
 
         return {"success": True, "message": "设置更新成功", "config": current_config}
@@ -309,6 +320,11 @@ async def save_model_params(request: Request):
             cfg = current_config.get("qwen_embedding_config", {})
             global_manager.update_qwen_embedding_config(
                 batch_size=cfg.get("batch_size"),
+                max_length=cfg.get("max_length")
+            )
+        elif category == "qwen_reranker":
+            cfg = current_config.get("qwen_reranker_config", {})
+            global_manager.update_qwen_reranker_config(
                 max_length=cfg.get("max_length")
             )
 
