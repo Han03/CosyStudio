@@ -11,12 +11,12 @@ user_prompt: |
   卷名：{volume_outline.volume_name}
   全卷章节范围：{volume_outline.chapter_start}-{volume_outline.chapter_end}
   本批章节范围：{batch_chapter_start}-{batch_chapter_end}
-  核心冲突：{volume_outline.core_conflict}
-  卷末高潮：{volume_outline.volume_climax}
-  开卷承诺：{volume_outline.promise_description}
-  催化事件：{volume_outline.catalyst_event}
+  核心冲突：{volume_outline.core_conflict_desc}
+  卷末高潮：{volume_outline.volume_climax_desc}
+  开卷承诺：{volume_outline.promise_description_desc}
+  催化事件：{volume_outline.catalyst_event_desc}
   危机链：{volume_outline.crises}
-  中段反转：{volume_outline.mid_reversal}
+  中段反转：{volume_outline.mid_reversal_desc}
 
   【主角信息】
   姓名：{protagonist.name}

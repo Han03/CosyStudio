@@ -23,7 +23,7 @@ from webnovel.repositories import (
     get_cool_points_by_chapter, get_cool_points_count_by_type,
     get_master_setting, get_anti_patterns,
     get_all_chapter_plans_for_project,
-    get_chapter_plan, delete_chapter_plan, get_chapter_plans_by_volume,
+    get_chapter_plan, delete_chapter_plan, delete_chapter_plans_by_volume, get_chapter_plans_by_volume,
     update_chapter_plan, add_chapter_plan,
     get_character_cards_by_project, get_character_relationships,
     get_character_growths, get_character_power, get_character_items,
@@ -465,7 +465,7 @@ async def split_volume_to_chapters(
     from webnovel.repositories import (
         get_character_cards_by_project, delete_chapter_plans_in_range,
         get_chapter_plans_by_volume, get_character_group_by_project,
-        get_character_group_members
+        get_character_group_members, get_timelines_by_project
     )
 
     project = get_webnovel_project_by_script(script_id)
@@ -489,10 +489,52 @@ async def split_volume_to_chapters(
             detail=f"章节范围无效：{actual_start}-{actual_end}，卷纲范围为 {vo_start}-{vo_end}"
         )
 
-    # 校验起始章节的连续性：必须是卷首、已规划章节、或已规划章节+1
+    # 校验起始章节前所有前序卷 + 当前卷前序章节均已规划，保证剧情完整性
     existing_plans = get_chapter_plans_by_volume(outline_id)
-    if existing_plans:
-        planned_indices = {p.get("chapter_index") for p in existing_plans}
+    planned_indices = {p.get("chapter_index") for p in existing_plans} if existing_plans else set()
+
+    all_volumes = get_volume_outlines_by_project(project["id"])
+    missing_all = []
+    for vol in all_volumes:
+        vol_id = vol["id"]
+        vol_s = int(vol.get("chapter_start", 1))
+        vol_e = int(vol.get("chapter_end", vol_s + 29))
+
+        if vol_id == outline_id:
+            # 当前卷：检查卷首到 actual_start-1
+            check_end = actual_start - 1
+        elif vol_e < vo_start:
+            # 前序卷：整卷所有章节都必须已规划
+            check_end = vol_e
+        else:
+            continue
+
+        if check_end < vol_s:
+            continue
+
+        if vol_id == outline_id:
+            vol_planned = planned_indices
+        else:
+            vol_plans = get_chapter_plans_by_volume(vol_id)
+            vol_planned = {p.get("chapter_index") for p in vol_plans} if vol_plans else set()
+
+        for i in range(vol_s, check_end + 1):
+            if i not in vol_planned:
+                missing_all.append(i)
+
+    if missing_all:
+        missing_str = ", ".join(f"第{m}章" for m in missing_all[:5])
+        suffix = f"等{len(missing_all)}章" if len(missing_all) > 5 else ""
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"无法从第{actual_start}章开始拆章："
+                f"前面有{missing_str}{suffix}尚未规划，请先补全前面的章节规划以保证剧情完整性"
+            )
+        )
+
+    # 校验起始章节连续性：必须是卷首、已规划章节、或已规划最大章节+1
+    if planned_indices:
         max_planned = max(planned_indices)
         valid_start = (actual_start == vo_start
                        or actual_start in planned_indices
@@ -506,14 +548,29 @@ async def split_volume_to_chapters(
                 )
             )
 
+    # 检查当前剧本是否已有进行中的智能拆章任务（不限卷纲）
+    active_tasks = get_writing_tasks(script_id, 0, "pending") + get_writing_tasks(script_id, 0, "running")
+    running_split = [t for t in active_tasks if t.get("task_type") == "split"]
+    if running_split:
+        raise HTTPException(status_code=400, detail="当前剧本已有智能拆章任务正在进行，请等待完成后再试")
+
     # 只删除指定范围内的章节规划，保留范围外的旧数据（合并模式）
     delete_chapter_plans_in_range(outline_id, actual_start, actual_end)
+
+    # 创建全局写作任务，使智能拆章可在任务管理中追踪
+    task = add_writing_task(script_id, 0, "split", context=str(outline_id))
+    task_id = task["id"]
 
     async def _do_generate():
         from webnovel.pipeline.executors.plan_executor import PlanExecutor
         from infrastructure.websocket_broadcast import ws_broadcast_manager
 
-        executor = PlanExecutor(script_id, 0, 0)
+        update_writing_task(
+            task_id, status="running", progress=10,
+            progress_message=f"开始智能拆章：第{actual_start}-{actual_end}章..."
+        )
+
+        executor = PlanExecutor(script_id, 0, task_id)
         protagonist_list = get_character_cards_by_project(project["id"], "protagonist")
         protagonist = protagonist_list[0] if protagonist_list else {}
         volume_number = outline.get("volume_number", 1)
@@ -525,6 +582,11 @@ async def split_volume_to_chapters(
             char_group_members = get_character_group_members(char_group["id"])
 
         try:
+            update_writing_task(
+                task_id, progress=30,
+                progress_message=f"正在调用 LLM 生成第{actual_start}-{actual_end}章规划..."
+            )
+
             chapter_plans = await executor._generate_chapter_plans(
                 project, outline, protagonist, volume_number,
                 start_chapter=actual_start, end_chapter=actual_end,
@@ -537,12 +599,66 @@ async def split_volume_to_chapters(
             success = plan_count > 0
             message = f"智能拆章完成：生成{plan_count}章规划" if success else "智能拆章失败：未生成有效章节规划"
 
+            # 章纲生成成功后，检查该卷是否已有时间线，若无则补充生成
+            if success:
+                try:
+                    existing_timelines = get_timelines_by_project(project["id"])
+                    has_volume_timeline = any(
+                        tl.get("volume_number") == volume_number for tl in existing_timelines
+                    )
+                    if not has_volume_timeline:
+                        from utils.logger import logger
+                        logger.info(
+                            f"[split-chapter] 第{volume_number}卷无时间线，开始补充生成..."
+                        )
+                        update_writing_task(
+                            task_id, progress=90,
+                            progress_message=f"章纲生成完成，正在补充生成时间线..."
+                        )
+                        timeline = await executor._generate_timeline(
+                            project, outline, protagonist, volume_number,
+                            chapter_plans=chapter_plans
+                        )
+                        if timeline:
+                            tl_id = executor._save_timeline(project["id"], volume_number, timeline)
+                            message += f"，时间线ID={tl_id}"
+                            from utils.logger import logger
+                            logger.info(
+                                f"[split-chapter] 时间线生成成功，tl_id={tl_id}"
+                            )
+                        else:
+                            from utils.logger import logger
+                            logger.warning(
+                                f"[split-chapter] 时间线生成返回空数据"
+                            )
+                except Exception as tl_err:
+                    from utils.logger import logger
+                    logger.warning(
+                        f"[split-chapter] 补充时间线失败（不影响章纲）: {tl_err}"
+                    )
+
+            if success:
+                update_writing_task(
+                    task_id, status="completed", progress=100,
+                    progress_message=message
+                )
+            else:
+                update_writing_task(
+                    task_id, status="failed", progress=0,
+                    progress_message=message
+                )
+
             await ws_broadcast_manager.broadcast_chapter_plans_generated(
                 script_id, outline_id, success, message, plan_count
             )
         except Exception as e:
             from utils.logger import logger
             logger.error(f"[split-chapter] 异步生成章节规划失败: {e}")
+            update_writing_task(
+                task_id, status="failed", progress=0,
+                progress_message=f"智能拆章异常: {str(e)[:100]}",
+                error_message=str(e)
+            )
             await ws_broadcast_manager.broadcast_chapter_plans_generated(
                 script_id, outline_id, False, f"智能拆章异常: {str(e)}", 0
             )
@@ -551,6 +667,7 @@ async def split_volume_to_chapters(
 
     return {
         "success": True,
+        "task_id": task_id,
         "message": f"智能拆章已启动，正在生成第{actual_start}-{actual_end}章规划",
         "start_chapter": actual_start,
         "end_chapter": actual_end
@@ -741,17 +858,20 @@ def update_chapter_plan_detail(script_id: int, outline_id: int = Query(None), pl
 
 @router.delete("/chapter-plans")
 def remove_chapter_plan(script_id: int, outline_id: int = Query(None), plan_id: int = Query(None)):
-    """删除章节规划。"""
+    """删除章节规划。传入 plan_id 删除单条；仅传 outline_id 则清空该卷所有章节规划。"""
     project = get_webnovel_project_by_script(script_id)
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    if not plan_id:
-        raise HTTPException(status_code=400, detail="缺少 plan_id 参数")
-    plan = get_chapter_plan(plan_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="章节规划不存在")
-    delete_chapter_plan(plan_id)
-    return {"success": True}
+    if plan_id:
+        plan = get_chapter_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="章节规划不存在")
+        delete_chapter_plan(plan_id)
+        return {"success": True}
+    if outline_id:
+        delete_chapter_plans_by_volume(outline_id)
+        return {"success": True}
+    raise HTTPException(status_code=400, detail="缺少 plan_id 或 outline_id 参数")
 
 
 # ========== 写作任务 ==========
@@ -839,7 +959,7 @@ async def get_continue_status(script_id: int, chapter_index: int, task_id: int):
 
 
 @router.post("/chapters/continue/cancel")
-async def cancel_continue_task(script_id: int, chapter_index: int, task_id: int):
+async def cancel_continue_task(script_id: int, task_id: int):
     """取消创作任务。"""
     service = get_webnovel_service()
     result = await service.cancel_task(script_id, task_id)
@@ -853,20 +973,31 @@ class ApplyContinueResultRequest(BaseModel):
     chapter_index: int
 
 
-@router.post("/chapters/continue/apply")
-async def apply_continue_result(script_id: int, data: ApplyContinueResultRequest):
-    """应用创作结果到章节。
+class RetryPostProcessRequest(BaseModel):
+    chapter_index: int
 
-    后端统一处理：
-    - 过滤章节标题行和尾部非正文内容
-    - 提取实际章节标题并回写
-    - 章节不存在时自动创建
-    - 完成后通过 WebSocket 通知前端刷新
+
+@router.post("/chapters/continue/apply-task")
+async def apply_continue_result_as_task(script_id: int, data: ApplyContinueResultRequest):
+    """将应用创作结果作为异步任务执行。
+
+    流程：创建 apply 类型任务 → 保存章节内容 → 执行后处理（事实记录/伏笔提取/RAG索引）
+    通过 WebSocket 广播进度更新。
     """
     service = get_webnovel_service()
-    result = await service.apply_continue_result(script_id, data.chapter_index, data.task_id)
+    result = await service.apply_continue_result_as_task(script_id, data.chapter_index, data.task_id)
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "应用失败"))
+    return result
+
+
+@router.post("/chapters/continue/retry-post-process")
+async def retry_post_process(script_id: int, data: RetryPostProcessRequest):
+    """对已有内容的章节重新执行后处理（事实记录 + 伏笔爽点提取 + 结尾钩子 + RAG 索引）。"""
+    service = get_webnovel_service()
+    result = await service.retry_post_process(script_id, data.chapter_index)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "重试失败"))
     return result
 
 

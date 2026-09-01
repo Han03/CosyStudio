@@ -11,11 +11,37 @@ function renderChapterList() {
         item.className = 'chapter-item';
         if (ch.chapter_index === state.currentChapterIndex) item.classList.add('active');
         item.dataset.index = ch.chapter_index;
+
+        // 检查章节是否处于处理中状态
+        const isProcessing = ch.chapter_index === state.applyingChapterIndex
+                          || ch.apply_status === 'processing';
+        const isApplyFailed = ch.apply_status === 'apply_failed';
+
+        if (isProcessing) {
+            item.classList.add('processing');
+        }
+        if (isApplyFailed) {
+            item.classList.add('apply-failed');
+        }
+
         const countBadge = ch.line_count > 0
                 ? `<span class="line-count">${ch.line_count}句</span>` : '';
-        const editBtn = `<button class="chapter-item-edit-btn" onclick="event.stopPropagation(); editChapterTitle(${ch.chapter_index})" title="编辑标题"><i class="fas fa-pen"></i></button>`;
-        const deleteBtn = `<button class="chapter-item-delete-btn" onclick="event.stopPropagation(); deleteChapter(${ch.chapter_index})" title="删除章节"><i class="fas fa-trash"></i></button>`;
-        item.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ch.chapter_title)}</span>${countBadge}${editBtn}${deleteBtn}`;
+
+        let actionBtns = '';
+        if (isProcessing) {
+            // 处理中：显示 spinner，隐藏编辑/删除按钮
+            actionBtns = '<span class="chapter-item-spinner"><i class="fas fa-spinner fa-spin"></i></span>';
+        } else if (isApplyFailed) {
+            // 后处理失败：显示重试按钮，隐藏编辑/删除按钮
+            actionBtns = `<button class="chapter-item-retry-btn" onclick="event.stopPropagation(); retryPostProcess(${ch.chapter_index})" title="重试后处理"><i class="fas fa-redo"></i></button>`;
+        } else {
+            // 正常状态：显示编辑/删除按钮
+            const editBtn = `<button class="chapter-item-edit-btn" onclick="event.stopPropagation(); editChapterTitle(${ch.chapter_index})" title="编辑标题"><i class="fas fa-pen"></i></button>`;
+            const deleteBtn = `<button class="chapter-item-delete-btn" onclick="event.stopPropagation(); deleteChapter(${ch.chapter_index})" title="删除章节"><i class="fas fa-trash"></i></button>`;
+            actionBtns = editBtn + deleteBtn;
+        }
+
+        item.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ch.chapter_title)}</span>${countBadge}${actionBtns}`;
         item.onclick = () => selectChapter(ch.chapter_index);
         list.appendChild(item);
     });
@@ -46,6 +72,7 @@ async function clearCurrentChapter() {
             state.currentLines = [];
             renderLines();
             updateClearButton();
+            await loadCharacters();
         } else {
             showToast(data.detail || data.message || '清空失败', 'error');
         }

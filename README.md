@@ -1,4 +1,4 @@
-# CosyWritter
+# CosyStudio
 
 > 一站式本地 AI 网文创作与有声书生成平台 —— 从大纲构建到章节写作、从语音合成到整章配音，全流程本地化运行。
 
@@ -133,7 +133,7 @@
 ## 项目结构
 
 ```
-CosyWritter/
+CosyStudio/
 ├── backend/                     # 后端服务
 │   ├── api/                     #   REST API 路由
 │   ├── agents/                  #   智能体管理
@@ -222,11 +222,11 @@ CosyWritter/
 ```bash
 # 克隆项目
 git clone <repo-url>
-cd CosyWritter
+cd CosyStudio
 
 # 创建 conda 环境
-conda create -n cosy_writter python=3.10
-conda activate cosy_writter
+conda create -n cosy_studio python=3.10
+conda activate cosy_studio
 
 # 安装依赖
 pip install -r backend/requirements.txt

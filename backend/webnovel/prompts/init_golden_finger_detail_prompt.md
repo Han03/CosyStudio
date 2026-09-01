@@ -7,7 +7,7 @@ user_prompt: |
   书名：{project.title}
   题材：{project.genre_label}
   一句话故事：{project.one_liner}
-  故事梗概：{project.story_summary}
+  故事梗概：{project.story_summary_desc}
   核心冲突：{project.core_conflict}
   目标章节数：{project.target_chapters}
   反套路规则：{project.anti_trope_rules}

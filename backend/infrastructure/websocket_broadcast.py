@@ -202,6 +202,36 @@ class WebSocketBroadcastManager:
         for conn in disconnected:
             self.unregister_connection(script_id, conn)
 
+    async def broadcast_apply_task_update(self, script_id: int, update_data: dict):
+        """广播应用创作结果任务的状态更新。
+
+        update_data 包含:
+            task_id: 任务ID
+            chapter_index: 目标章节
+            phase: started|content_saved|processing|completed|failed
+            message: 进度描述
+            error: 错误信息（仅 failed 时）
+        """
+        connections = self._script_connections.get(script_id, set())
+        if not connections:
+            return
+
+        message = {
+            "type": "apply_task_update",
+            "script_id": script_id,
+            "update": update_data,
+        }
+
+        disconnected = []
+        for conn in connections:
+            try:
+                await conn.send_json(message)
+            except Exception:
+                disconnected.append(conn)
+
+        for conn in disconnected:
+            self.unregister_connection(script_id, conn)
+
     async def broadcast_chapter_plans_generated(self, script_id: int, outline_id: int, success: bool, message: str, plan_count: int = 0):
         """广播章节规划生成完成通知。
 
@@ -249,6 +279,38 @@ class WebSocketBroadcastManager:
             "status": status,
             "message": message,
             "progress": progress,
+        }
+
+        disconnected = []
+        for conn in connections:
+            try:
+                await conn.send_json(message_data)
+            except Exception:
+                disconnected.append(conn)
+
+        for conn in disconnected:
+            self.unregister_connection(script_id, conn)
+
+    async def broadcast_script_progress(self, script_id: int, progress: int, message: str,
+                                        chapter_index: int = -1):
+        """广播台词生成进度
+
+        Args:
+            script_id: 剧本ID
+            progress: 进度百分比 0-100
+            message: 进度描述消息
+            chapter_index: 当前章节序号
+        """
+        connections = self._script_connections.get(script_id, set())
+        if not connections:
+            return
+
+        message_data = {
+            "type": "script_progress",
+            "script_id": script_id,
+            "progress": progress,
+            "message": message,
+            "chapter_index": chapter_index,
         }
 
         disconnected = []

@@ -188,13 +188,13 @@ def main():
     parser.add_argument(
         "--model_path",
         type=str,
-        default=r"C:\MyProjects\ai\CosyWritter\pretrained_models\cosyvoice\CosyVoice2-0.5B",
+        default=r"C:\MyProjects\ai\CosyStudio\pretrained_models\cosyvoice\CosyVoice2-0.5B",
         help="源模型目录路径",
     )
     parser.add_argument(
         "--output_path",
         type=str,
-        default=r"C:\MyProjects\ai\CosyWritter\pretrained_models\cosyvoice\CosyVoice2-0.5B-4bit",
+        default=r"C:\MyProjects\ai\CosyStudio\pretrained_models\cosyvoice\CosyVoice2-0.5B-4bit",
         help="量化后模型输出目录",
     )
 

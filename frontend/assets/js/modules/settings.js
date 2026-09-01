@@ -145,6 +145,9 @@ const CAPABILITY_TYPE_DETAILS = {
 let currentPlatformKey = 'aliyun';
 let currentSettingsTab = 'platform';
 let currentCapabilityType = 'text_predict';
+let currentCallPointCategory = '';
+let _callPointCategoriesData = null;
+let _callPointCapOptions = '';
 let draggedElement = null;
 
 async function loadSettingsNav() {
@@ -939,76 +942,65 @@ async function loadCallPointConfig() {
 
     try {
         const cpData = await apiRequest('/api/capabilities/call-points', { silent: true });
-        const callPoints = cpData.call_points || [];
+        const categories = cpData.categories || [];
         const availableCaps = cpData.available_capabilities || [];
 
-        // 构建能力选项 HTML
-        const capOptions = availableCaps.map(cap => {
+        // 缓存分类数据和能力选项
+        _callPointCategoriesData = categories;
+        _callPointCapOptions = availableCaps.map(cap => {
             const label = `${cap.platform_code} / ${cap.model_code}` + (cap.description && cap.description !== cap.model_code ? ` (${cap.description})` : '');
             return `<option value="${cap.id}">${label}</option>`;
         }).join('');
 
+        // 默认选中第一个分类
+        if (categories.length > 0 && !currentCallPointCategory) {
+            currentCallPointCategory = categories[0].category;
+        }
+
+        // 分类 Tab 按钮
+        let tabsHtml = '<nav class="nav nav-tabs mb-4" id="callPointCatNav">';
+        categories.forEach(cat => {
+            const activeClass = cat.category === currentCallPointCategory ? 'active' : '';
+            const configuredCount = cat.call_points.filter(cp => cp.capability_id).length;
+            tabsHtml += `
+                <button class="nav-link ${activeClass}" onclick="switchCallPointCategory('${cat.category}')"
+                        style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 600;">
+                    <i class="${cat.icon}" style="color: ${cat.color};"></i>
+                    <span>${cat.category}</span>
+                    ${configuredCount > 0 ? `<span class="badge" style="font-size: 9px; background: rgba(245, 158, 11, 0.15); color: #d97706;">${configuredCount}</span>` : ''}
+                </button>
+            `;
+        });
+        tabsHtml += '</nav>';
+
+        // 说明卡片 + 保存按钮 + 分类内容容器
         let html = `
             <div class="card mb-4" style="border-radius: 12px;">
                 <div class="card-body">
                     <p style="font-size: 13px; color: var(--neu-text-muted); margin: 0;">
                         <i class="fas fa-info-circle"></i>
-                        为不同的调用点分配已配置的模型能力。未配置的调用点将使用"模型能力"中优先级最高的默认模型。
+                        为不同的调用点分配已配置的模型能力。未配置的调用点将使用“模型能力”中优先级最高的默认模型。
                         配置后，指定调用点的 LLM 调用将优先使用所选能力，失败时自动回退到默认模型。
                     </p>
                 </div>
             </div>
+            ${tabsHtml}
             <div class="card" style="border-radius: 12px;">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 600;"><i class="fas fa-sliders" style="color: #f59e0b;"></i> 调用点模型分配</span>
+                    <span style="font-weight: 600;" id="callPointCatTitle"></span>
                     <button class="btn btn-sm btn-primary" onclick="saveCallPointConfig()">
                         <i class="fas fa-save"></i> 保存配置
                     </button>
                 </div>
                 <div class="card-body">
-                    <div class="model-list" id="callPointList">
-        `;
-        
-        callPoints.forEach(cp => {
-            const hasOverride = !!cp.capability_id;
-            const itemShadow = hasOverride ? 'var(--neu-shadow-inset)' : 'var(--neu-shadow-small)';
-            const overrideBadge = hasOverride
-                ? `<span class="badge" style="font-size: 9px; background: rgba(245, 158, 11, 0.15); color: #d97706; margin-left: 4px;">已配置</span>`
-                : `<span class="badge" style="font-size: 9px; background: rgba(0,0,0,0.05); color: var(--neu-text-muted);">默认</span>`;
-            html += `
-                <div class="model-item" id="cp-row-${cp.name}" style="box-shadow: ${itemShadow}; gap: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 600; font-size: 14px; color: var(--neu-text); display: flex; align-items: center; margin-bottom: 4px;">
-                            ${cp.display_name} ${overrideBadge}
-                        </div>
-                        <div style="font-size: 12px; color: var(--neu-text-muted);">${cp.description}</div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
-                        <select class="form-select form-select-sm cp-capability-select" id="cp-cap-${cp.name}" 
-                                onchange="updateCallPointItemStyle('${cp.name}')"
-                                style="font-size: 13px; border-radius: 10px; border: none; background: var(--neu-bg); box-shadow: var(--neu-shadow-inset); min-width: 260px;">
-                            <option value="">使用默认模型</option>
-                            ${capOptions}
-                        </select>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="resetCallPoint('${cp.name}')" 
-                                title="重置为默认模型"
-                                style="font-size: 12px; padding: 4px 10px; border-radius: 8px;">
-                            <i class="fas fa-undo"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += `
-                    </div>
+                    <div class="model-list" id="callPointList"></div>
         `;
 
         if (availableCaps.length === 0) {
             html += `
                     <div class="alert alert-warning" style="margin: 16px; font-size: 13px;">
                         <i class="fas fa-exclamation-triangle"></i>
-                        暂无已启用的文本预测能力配置。请先在"模型能力"页面添加并启用至少一个能力。
+                        暂无已启用的文本预测能力配置。请先在“模型能力”页面添加并启用至少一个能力。
                     </div>
             `;
         }
@@ -1020,17 +1012,79 @@ async function loadCallPointConfig() {
 
         content.innerHTML = html;
 
-        // 回填已配置的能力
-        callPoints.forEach(cp => {
-            if (cp.capability_id) {
-                const capSelect = document.getElementById(`cp-cap-${cp.name}`);
-                if (capSelect) capSelect.value = cp.capability_id;
-            }
-        });
+        // 渲染当前分类的调用点
+        renderCallPointCategory(currentCallPointCategory);
     } catch (e) {
         content.innerHTML = '<div class="text-center text-danger">加载调用点配置失败</div>';
         console.error('loadCallPointConfig error:', e);
     }
+}
+
+function switchCallPointCategory(category) {
+    currentCallPointCategory = category;
+    // 更新 Tab 激活状态
+    const tabs = document.querySelectorAll('#callPointCatNav .nav-link');
+    tabs.forEach(tab => {
+        tab.classList.toggle('active', tab.textContent.trim().startsWith(category));
+    });
+    renderCallPointCategory(category);
+}
+
+function renderCallPointCategory(category) {
+    const listEl = document.getElementById('callPointList');
+    const titleEl = document.getElementById('callPointCatTitle');
+    if (!listEl || !_callPointCategoriesData) return;
+
+    const catData = _callPointCategoriesData.find(c => c.category === category);
+    if (!catData) return;
+
+    if (titleEl) {
+        titleEl.innerHTML = `<i class="${catData.icon}" style="color: ${catData.color};"></i> ${catData.category} · 调用点模型分配`;
+    }
+
+    const capOptions = _callPointCapOptions;
+    let html = '';
+
+    catData.call_points.forEach(cp => {
+        const hasOverride = !!cp.capability_id;
+        const itemShadow = hasOverride ? 'var(--neu-shadow-inset)' : 'var(--neu-shadow-small)';
+        const overrideBadge = hasOverride
+            ? `<span class="badge" style="font-size: 9px; background: rgba(245, 158, 11, 0.15); color: #d97706; margin-left: 4px;">已配置</span>`
+            : `<span class="badge" style="font-size: 9px; background: rgba(0,0,0,0.05); color: var(--neu-text-muted);">默认</span>`;
+        html += `
+            <div class="model-item" id="cp-row-${cp.name}" style="box-shadow: ${itemShadow}; gap: 12px;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; font-size: 14px; color: var(--neu-text); display: flex; align-items: center; margin-bottom: 4px;">
+                        ${cp.display_name} ${overrideBadge}
+                    </div>
+                    <div style="font-size: 12px; color: var(--neu-text-muted);">${cp.description}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                    <select class="form-select form-select-sm cp-capability-select" id="cp-cap-${cp.name}" 
+                            onchange="updateCallPointItemStyle('${cp.name}')"
+                            style="font-size: 13px; border-radius: 10px; border: none; background: var(--neu-bg); box-shadow: var(--neu-shadow-inset); min-width: 260px;">
+                        <option value="">使用默认模型</option>
+                        ${capOptions}
+                    </select>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="resetCallPoint('${cp.name}')" 
+                            title="重置为默认模型"
+                            style="font-size: 12px; padding: 4px 10px; border-radius: 8px;">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    listEl.innerHTML = html;
+
+    // 回填已配置的能力
+    catData.call_points.forEach(cp => {
+        if (cp.capability_id) {
+            const capSelect = document.getElementById(`cp-cap-${cp.name}`);
+            if (capSelect) capSelect.value = cp.capability_id;
+        }
+    });
 }
 
 function updateCallPointItemStyle(callPointName) {
@@ -1063,18 +1117,17 @@ function resetCallPoint(callPointName) {
 }
 
 async function saveCallPointConfig() {
-    // 收集所有调用点的配置
-    const rows = document.querySelectorAll('[id^="cp-row-"]');
+    // 收集当前显示的分类下所有调用点的配置
+    // 后端 update_call_point_models 是 merge 操作，不会影响其他分类的已有配置
     const configs = {};
+    const rows = document.querySelectorAll('#callPointList [id^="cp-row-"]');
 
     rows.forEach(row => {
         const cpName = row.id.replace('cp-row-', '');
         const capId = document.getElementById(`cp-cap-${cpName}`)?.value || '';
-
         if (capId) {
             configs[cpName] = { capability_id: capId };
         } else {
-            // 空值视为删除
             configs[cpName] = { capability_id: '' };
         }
     });

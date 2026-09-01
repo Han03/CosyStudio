@@ -1311,3 +1311,27 @@ async def download_chapter_history(history_id: int):
         }
     )
 
+
+@router.post("/api/audio/auto-match-agents")
+async def auto_match_agents(request: Request):
+    """自动为未配置智能体的角色匹配配音智能体。
+
+    请求体:
+    - script_id: 剧本 ID
+
+    返回:
+    - success: bool
+    - matched: [{role, agent_id, agent_name, reason}, ...]
+    - unmatched: [role, ...]
+    - narration_agent: {agent_id, agent_name} | null
+    """
+    body = await request.json()
+    script_id = body.get("script_id")
+    if not script_id:
+        raise HTTPException(status_code=400, detail="缺少 script_id")
+
+    from services.script_service import get_script_service
+    service = get_script_service()
+    result = await service.auto_match_agents(int(script_id))
+    return result
+

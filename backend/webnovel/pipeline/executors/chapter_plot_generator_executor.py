@@ -86,11 +86,8 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
                     break
 
             volume_name = current_volume.get("volume_name", "") if current_volume else ""
-            volume_conflict = current_volume.get("core_conflict", "")[:200] if current_volume else ""
-            volume_goal = current_volume.get("protagonist_goal", "")[:200] if current_volume else ""
-
-            # 故事摘要（从项目数据加载）
-            story_summary = project.get("story_summary", "")
+            volume_conflict = (current_volume.get("core_conflict", "") or "（未设定）")[:200] if current_volume else ""
+            volume_goal = (current_volume.get("protagonist_goal", "") or "（未设定）")[:200] if current_volume else ""
 
             # 前文回顾：剧情生成是策划层，上一章取头尾各 1000 字兼顾起因与断点；
             # 更早章节为结构化摘要（自带标题）或开头截取回退。
@@ -238,7 +235,6 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
                 volume_name=volume_name,
                 volume_conflict=volume_conflict,
                 volume_goal=volume_goal,
-                story_summary=story_summary,
                 previous_chapters=previous_chapters_text,
                 previous_hook=previous_hook_text,
                 protagonist_info=protagonist_info,

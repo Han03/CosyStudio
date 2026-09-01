@@ -69,6 +69,11 @@ class AIGenerateRequest(BaseModel):
     current_data: Dict[str, Any]
 
 
+class AIGenerateAllRequest(BaseModel):
+    script_id: int
+    current_data: Dict[str, Any]
+
+
 class ConfirmRequest(BaseModel):
     script_id: int
 
@@ -153,15 +158,21 @@ async def ai_generate_endpoint(step: int, data: AIGenerateRequest):
             6: _get_constraints_prompt
         }
 
+        # 每个步骤对应独立的调用点 key，用于调用点模型覆盖配置
+        step_executor_names = {
+            2: "init_ai_project",
+            3: "init_ai_protagonist",
+            4: "init_ai_golden_finger",
+            5: "init_ai_world",
+            6: "init_ai_constraints",
+        }
+
         prompt_fn = prompts.get(step)
         if not prompt_fn:
             raise HTTPException(status_code=400, detail=f"步骤{step}不支持AI生成")
 
         system_prompt, user_prompt = prompt_fn(data.current_data, genre)
         
-        _init_logger.info(f"[AI生成] 步骤{step} - 系统提示: {system_prompt[:100]}...")
-        _init_logger.info(f"[AI生成] 步骤{step} - 用户提示: {user_prompt[:100]}...")
-
         # 🔴 提前解析 project_id，确保 execute_text_chat 统一入口写日志时能关联到项目
         # （如果等到 parse_llm_json 阶段才解析，统一入口那条日志的 script_id/project_id 会是空/0）
         project_id = 0
@@ -184,15 +195,13 @@ async def ai_generate_endpoint(step: int, data: AIGenerateRequest):
             max_tokens=4000,
             script_id=data.script_id,
             project_id=project_id,
-            executor_name="webnovel_init_api",
+            executor_name=step_executor_names.get(step, "webnovel_init_api"),
             prompt_name=f"step_{step}_ai_generate",
         )
         _latency_ms = int((_time.time() - _call_start) * 1000)
 
         content = result.get("content", "")
         content = content.strip()
-
-        _init_logger.info(f"[AI生成] 步骤{step} - AI输出: {content[:200]}...")
 
         if not content:
             _init_logger.error(f"[AI生成] 步骤{step} - AI返回空内容，尝试使用模拟数据")
@@ -207,7 +216,7 @@ async def ai_generate_endpoint(step: int, data: AIGenerateRequest):
             content,
             script_id=data.script_id,
             project_id=project_id,
-            executor_name="webnovel_init_api",
+            executor_name=step_executor_names.get(step, "webnovel_init_api"),
             prompt_name=f"step_{step}_ai_generate",
             model_name=result.get("model_name", "") if isinstance(result, dict) else "",
             system_prompt=system_prompt,
@@ -218,7 +227,7 @@ async def ai_generate_endpoint(step: int, data: AIGenerateRequest):
         )
         
         if ai_result is None:
-            _init_logger.error(f"[AI生成] 步骤{step} - JSON解析失败，原始内容: {content[:500]}")
+            _init_logger.error(f"[AI生成] 步骤{step} - JSON解析失败")
             ai_result = _parse_invalid_json(content)
         
         # ── 多选项模式：步骤 2-5 返回 3 套方案 ──
@@ -261,6 +270,148 @@ async def ai_generate_endpoint(step: int, data: AIGenerateRequest):
             raise HTTPException(status_code=500, detail=f"AI生成失败: {str(e)}")
 
 
+@router.post("/ai/generate-all")
+async def ai_generate_all_endpoint(data: AIGenerateAllRequest):
+    """一键模式：一次性生成 3 套完整方案（含故事核+角色+金手指+世界观+约束包）。"""
+    session = get_init_session(data.script_id)
+    if not session:
+        raise HTTPException(status_code=400, detail="没有活跃的初始化会话")
+
+    try:
+        executor = get_model_executor()
+        genre = data.current_data.get("project", {}).get("genre", "") or data.current_data.get("genre", "")
+
+        system_prompt, user_prompt = _get_all_in_one_prompt(data.current_data, genre)
+
+        project_id = 0
+        try:
+            from webnovel.repositories import get_webnovel_project_by_script
+            _proj = get_webnovel_project_by_script(data.script_id)
+            if _proj:
+                project_id = _proj.get("id", 0)
+        except Exception:
+            pass
+
+        import time as _time
+        _call_start = _time.time()
+        result = await executor.execute_text_chat(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            max_tokens=8000,
+            script_id=data.script_id,
+            project_id=project_id,
+            executor_name="init_ai_all_in_one",
+            prompt_name="init_all_in_one_ai_generate",
+        )
+        _latency_ms = int((_time.time() - _call_start) * 1000)
+
+        content = result.get("content", "").strip()
+        if not content:
+            _init_logger.error("[AI生成-一键] AI返回空内容，使用模拟数据")
+            mock_data = _generate_mock_all_in_one_sets(data.current_data, genre)
+            save_ai_generated_data(session["id"], {"all_in_one": mock_data})
+            return {"success": True, "data": mock_data, "is_all_in_one": True}
+
+        ai_result = parse_llm_json(
+            content,
+            script_id=data.script_id,
+            project_id=project_id,
+            executor_name="init_ai_all_in_one",
+            prompt_name="init_all_in_one_ai_generate",
+            model_name=result.get("model_name", "") if isinstance(result, dict) else "",
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            input_tokens=result.get("input_tokens", 0) if isinstance(result, dict) else 0,
+            output_tokens=result.get("output_tokens", 0) if isinstance(result, dict) else 0,
+            latency_ms=_latency_ms,
+        )
+
+        if ai_result is None:
+            _init_logger.error(f"[AI生成-一键] JSON解析失败")
+            ai_result = _parse_invalid_json(content)
+
+        # 确保返回格式为 {"sets": [...]}
+        if "sets" in ai_result and isinstance(ai_result["sets"], list):
+            _init_logger.info(f"[AI生成-一键] 生成{len(ai_result['sets'])}套完整方案")
+            save_ai_generated_data(session["id"], {"all_in_one": ai_result})
+            return {"success": True, "data": ai_result, "is_all_in_one": True}
+
+        # 兼容：如果 AI 返回了 options 格式（不应该但容错）
+        _init_logger.warning(f"[AI生成-一键] 返回格式不含sets，尝试包装: {list(ai_result.keys())}")
+        wrapped = {"sets": [ai_result]}
+        save_ai_generated_data(session["id"], {"all_in_one": wrapped})
+        return {"success": True, "data": wrapped, "is_all_in_one": True}
+
+    except Exception as e:
+        _init_logger.error(f"[AI生成-一键] AI服务失败，使用模拟数据: {str(e)}")
+        mock_data = _generate_mock_all_in_one_sets(data.current_data, genre)
+        save_ai_generated_data(session["id"], {"all_in_one": mock_data})
+        return {"success": True, "data": mock_data, "is_all_in_one": True}
+
+
+def _get_all_in_one_prompt(current_data: Dict, genre: str) -> tuple:
+    """加载一键模式整合 prompt 并填充所有变量。"""
+    tpl = _load_init_prompt('init_all_in_one')
+    project = current_data.get('project', current_data)
+    title = project.get('title', '')
+    existing_one_liner = project.get('one_liner', '')
+    existing_core_conflict = project.get('core_conflict', '')
+
+    available_genres = _get_available_genres()
+    genre_list_str = '、'.join(available_genres) if available_genres else '修仙、科幻、都市异能等'
+    example_genre = available_genres[0] if available_genres else '修仙'
+
+    user_prompt = tpl['user_prompt'].format(
+        title=title,
+        genre_display=genre if genre else '未选择',
+        one_liner_display=existing_one_liner if existing_one_liner else '未填写',
+        core_conflict_display=existing_core_conflict if existing_core_conflict else '未填写',
+        genre_list_str=genre_list_str,
+        example_genre=example_genre,
+    )
+    return tpl['system_prompt'], user_prompt
+
+
+def _generate_mock_all_in_one_sets(current_data: Dict, genre: str) -> Dict:
+    """一键模式的模拟数据（AI 返回空内容或异常时的 fallback）。"""
+    available_genres = _get_available_genres()
+    g1 = genre or (available_genres[0] if available_genres else '修仙')
+    g2 = available_genres[1] if len(available_genres) > 1 else '科幻'
+    g3 = available_genres[2] if len(available_genres) > 2 else '都市'
+
+    return {
+        "sets": [
+            {
+                "set_name": "方案A：经典燃文路线",
+                "project": {"genre": g1, "one_liner": "废柴少年偶得逆天传承，以不屈意志踏上巅峰之路", "core_conflict": "天赋被夺后如何在绝境中逆袭", "target_words": 1200000, "target_chapters": 300, "target_reader": "18-30岁男性读者", "platform": "起点中文网"},
+                "protagonist": {"name": "林逸", "archetype": "废柴逆袭", "desire": "夺回被夺走的天赋，成为最强者", "flaw": "过度执着于复仇，容易失去理智", "structure": "单主角", "villain_mirror": "反派曾是天才，却因贪婪堕入魔道", "heroine_config": "无女主", "antagonist_level": "多级反派"},
+                "golden_finger": {"type": "传承", "name": "太古传承", "style": "战斗型", "visibility": "隐藏", "irreversible_cost": "每次突破境界会失去一段珍贵记忆"},
+                "world": {"scale": "大陆", "power_system_type": "修仙", "factions": "正道三宗 vs 魔道四门", "social_class": "修士为尊，凡人如蝼蚁", "currency_system": "灵石", "cultivation_chain": "练气-筑基-金丹-元婴-化神-大乘", "sect_hierarchy": "外门-内门-核心-长老-掌门"},
+                "constraints": {"anti_trope_rule": "主角不靠嘴炮说服敌人，每次冲突必须用行动解决", "hard_constraints": ["主角每章必须面临至少一个生死抉择", "禁止出现无缘无故的善意NPC"], "core_selling_points": "每次突破都伴随不可逆的失去，变强与失去的两难构成核心张力", "opening_hook": "主角在宗门大比中被当众夺走天赋，却在濒死之际唤醒了体内沉睡的太古传承"},
+                "scoring": {"creativity": {"score": 7, "reason": "传承流经典路线，记忆失去机制增添新意"}, "feasibility": {"score": 9, "reason": "经典框架成熟稳定，易于把控节奏"}, "market_appeal": {"score": 9, "reason": "废柴逆袭流拥有最广泛的读者基础"}, "sustainability": {"score": 8, "reason": "多级反派体系支撑长篇连载"}, "emotional_impact": {"score": 8, "reason": "记忆失去机制天然制造情感冲击"}}
+            },
+            {
+                "set_name": "方案B：智斗悬疑路线",
+                "project": {"genre": g2, "one_liner": "星际考古学家发现远古文明的毁灭预言，必须在倒计时中解开真相", "core_conflict": "已知文明将毁灭的情况下如何逆转命运", "target_words": 800000, "target_chapters": 200, "target_reader": "20-35岁科幻悬疑爱好者", "platform": "起点中文网"},
+                "protagonist": {"name": "苏晨", "archetype": "智者破局", "desire": "揭开远古文明毁灭的真相并拯救当下", "flaw": "过度理性导致忽视身边人的感受", "structure": "单主角", "villain_mirror": "反派同样追求真相，但选择牺牲当下文明来验证理论", "heroine_config": "单女主", "antagonist_level": "BOSS级"},
+                "golden_finger": {"type": "其他", "name": "文明共鸣器", "style": "信息型", "visibility": "半公开", "irreversible_cost": "每次解读远古信息都会加速毁灭倒计时"},
+                "world": {"scale": "多界", "power_system_type": "科技", "factions": "星际联邦 vs 独立星系联盟 vs 远古遗产守护者", "social_class": "以科技贡献度划分社会等级", "currency_system": "信用点", "cultivation_chain": "", "sect_hierarchy": "研究员-高级研究员-首席-院长-联邦议会"},
+                "constraints": {"anti_trope_rule": "所有谜题必须有符合科学逻辑的解答，禁止机械降神", "hard_constraints": ["每10章必须揭示一层真相", "主角不能直接战斗，只能通过智慧和信息差取胜"], "core_selling_points": "科幻+悬疑+倒计时三重张力，每次解谜都让危机更进一步", "opening_hook": "主角在考古现场发现一块石碑，上面刻着太阳系毁灭的日期——正是三千年后"},
+                "scoring": {"creativity": {"score": 9, "reason": "科幻考古+悬疑解谜的组合极为新颖"}, "feasibility": {"score": 6, "reason": "对作者科幻功底要求较高"}, "market_appeal": {"score": 7, "reason": "科幻悬疑有稳定但较小的受众"}, "sustainability": {"score": 7, "reason": "层层揭秘结构天然支撑中期节奏"}, "emotional_impact": {"score": 8, "reason": "倒计时机制持续制造紧迫感"}}
+            },
+            {
+                "set_name": "方案C：都市情感路线",
+                "project": {"genre": g3, "one_liner": "落魄厨师凭借味觉天赋重振家族老店，在美食江湖中找回自我", "core_conflict": "传统手艺在资本碾压下如何生存", "target_words": 600000, "target_chapters": 150, "target_reader": "22-40岁都市白领", "platform": "番茄小说"},
+                "protagonist": {"name": "陈平安", "archetype": "匠心回归", "desire": "重振家族老店，证明传统手艺的价值", "flaw": "固执守旧，抗拒任何创新", "structure": "单主角", "villain_mirror": "反派是主角的发小，放弃传统投身连锁餐饮资本化", "heroine_config": "单女主", "antagonist_level": "多级反派"},
+                "golden_finger": {"type": "其他", "name": "绝对味觉", "style": "辅助型", "visibility": "隐藏", "irreversible_cost": "无金手指，主角依靠的是与生俱来的味觉天赋和多年苦练"},
+                "world": {"scale": "多城", "power_system_type": "职场", "factions": "老字号联盟 vs 新派餐饮集团 vs 美食评论家协会", "social_class": "餐饮行业内的师徒传承体系", "currency_system": "人民币", "cultivation_chain": "", "sect_hierarchy": "学徒-帮厨-主厨-行政总厨-餐饮总监"},
+                "constraints": {"anti_trope_rule": "美食描写必须基于真实烹饪逻辑，禁止夸张玄学化", "hard_constraints": ["每道菜的制作过程必须符合真实烹饪原理", "主角不能一夜暴富，必须逐步积累口碑"], "core_selling_points": "以真实美食文化为底色，用匠心精神对抗快餐时代的浮躁", "opening_hook": "主角在父亲葬礼上尝到一碗面，发现父亲隐藏了三十年的秘方——就在这碗面的汤底里"},
+                "scoring": {"creativity": {"score": 8, "reason": "美食+匠心题材在网文中较为稀缺"}, "feasibility": {"score": 8, "reason": "都市题材写作门槛相对较低"}, "market_appeal": {"score": 8, "reason": "美食题材受众广泛且黏性高"}, "sustainability": {"score": 7, "reason": "美食探索天然支持持续创新"}, "emotional_impact": {"score": 9, "reason": "亲情+匠心的情感共鸣极强"}}
+            }
+        ]
+    }
+
+
 def _generate_mock_constraint_packages(current_data: Dict, genre: str) -> Dict:
     packages = [
         {
@@ -271,7 +422,14 @@ def _generate_mock_constraint_packages(current_data: Dict, genre: str) -> Dict:
                 "世界规则对主角不利，他没有任何主角特权"
             ],
             "core_selling_points": "每次变强都是一场赌博，代价与抉择构成故事核心张力",
-            "opening_hook": "主角在濒死之际激活金手指，却发现代价是寿命——他必须在变强和生存之间做出抉择"
+            "opening_hook": "主角在濒死之际激活金手指，却发现代价是寿命——他必须在变强和生存之间做出抉择",
+            "scoring": {
+                "creativity": {"score": 8, "reason": "寿命代价机制打破传统升级流无代价设定"},
+                "feasibility": {"score": 7, "reason": "冷却和次数限制便于控制节奏"},
+                "market_appeal": {"score": 8, "reason": "代价流在读者群体中有稳定受众"},
+                "sustainability": {"score": 7, "reason": "寿命倒计时天然制造紧迫感"},
+                "emotional_impact": {"score": 9, "reason": "生存与变强的两难抉择极具张力"}
+            }
         },
         {
             "anti_trope_rule": "主角无法直接战斗，只能通过理解和利用世界规则来达成目标",
@@ -281,7 +439,14 @@ def _generate_mock_constraint_packages(current_data: Dict, genre: str) -> Dict:
                 "主角的知识是他唯一的武器，但知识也可能过时"
             ],
             "core_selling_points": "完全摒弃传统战斗升级模式，采用智斗和规则博弈，强调知识就是力量",
-            "opening_hook": "主角发现世界存在规则漏洞，却在利用漏洞时发现自己早已身在规则之中"
+            "opening_hook": "主角发现世界存在规则漏洞，却在利用漏洞时发现自己早已身在规则之中",
+            "scoring": {
+                "creativity": {"score": 9, "reason": "规则博弈模式在网文中极为罕见"},
+                "feasibility": {"score": 6, "reason": "智斗写法对作者逻辑能力要求极高"},
+                "market_appeal": {"score": 7, "reason": "小众但黏性极高的读者群"},
+                "sustainability": {"score": 6, "reason": "规则迭代需要持续创新，后期易疲劳"},
+                "emotional_impact": {"score": 7, "reason": "发现真相的反转感强烈"}
+            }
         },
         {
             "anti_trope_rule": "主角的成长以失去重要的人为代价，每升一级就失去一段关系",
@@ -291,7 +456,14 @@ def _generate_mock_constraint_packages(current_data: Dict, genre: str) -> Dict:
                 "主角最终可能成为最强者，但身边空无一人"
             ],
             "core_selling_points": "不同于传统升级流的收获式成长，本作强调成长的代价和孤独",
-            "opening_hook": "主角第一次突破后，发现母亲消失了——这才是修炼的真相"
+            "opening_hook": "主角第一次突破后，发现母亲消失了——这才是修炼的真相",
+            "scoring": {
+                "creativity": {"score": 8, "reason": "失去机制将升级与情感深度绑定"},
+                "feasibility": {"score": 7, "reason": "每次突破都是天然的剧情转折点"},
+                "market_appeal": {"score": 8, "reason": "虐心流有大量忠实读者"},
+                "sustainability": {"score": 6, "reason": "人际关系有限，后期需要新的情感锚点"},
+                "emotional_impact": {"score": 10, "reason": "每次升级都是一次情感暴击"}
+            }
         }
     ]
     
@@ -371,8 +543,18 @@ async def confirm_init_endpoint(data: ConfirmRequest):
     if not script:
         raise HTTPException(status_code=404, detail="剧本不存在")
 
+    # 检查是否正在初始化中
     if script.get("status") == "initializing":
-        raise HTTPException(status_code=400, detail="项目正在初始化中，请勿重复提交")
+        # 检查内存中是否真的有运行中的任务
+        with _init_tasks_lock:
+            has_running_task = data.script_id in _init_tasks
+        if has_running_task:
+            raise HTTPException(status_code=400, detail="项目正在初始化中，请勿重复提交")
+        # 僵尸状态：服务器重启后内存任务丢失，但数据库状态残留为 initializing
+        # 允许重新初始化，先清理僵尸状态
+        _init_logger.warning(
+            f"[深度初始化] script_id={data.script_id} 检测到僵尸状态（状态为initializing但无运行任务），允许重新初始化"
+        )
 
     # ============= 容错与重复初始化：清理旧数据 =============
     script_status = script.get("status") or ""
@@ -687,6 +869,7 @@ def _get_protagonist_prompt(current_data: Dict, genre: str) -> tuple:
     tpl = _load_init_prompt('init_protagonist')
     project = current_data.get('project', current_data)
     protagonist = current_data.get('protagonist', {})
+    relationship = current_data.get('relationship', {})
 
     def _or_unset(val):
         return val if val else '未填写'
@@ -696,11 +879,18 @@ def _get_protagonist_prompt(current_data: Dict, genre: str) -> tuple:
         genre=genre,
         one_liner=project.get('one_liner', ''),
         core_conflict=project.get('core_conflict', ''),
+        target_words=project.get('target_words', '') or '未填写',
+        target_chapters=project.get('target_chapters', '') or '未填写',
+        target_reader=_or_unset(project.get('target_reader', '')),
+        platform=_or_unset(project.get('platform', '')),
         protagonist_name=_or_unset(protagonist.get('name', '')),
         protagonist_desire=_or_unset(protagonist.get('desire', '')),
         protagonist_flaw=_or_unset(protagonist.get('flaw', '')),
         protagonist_archetype=_or_unset(protagonist.get('archetype', '')),
         protagonist_villain_mirror=_or_unset(protagonist.get('villain_mirror', '')),
+        heroine_config=_or_unset(relationship.get('heroine_config', '')),
+        antagonist_level=_or_unset(relationship.get('antagonist_level', '')),
+        antagonist_mirror=_or_unset(relationship.get('antagonist_mirror', '')),
     )
     return tpl['system_prompt'], user_prompt
 
@@ -709,6 +899,7 @@ def _get_golden_finger_prompt(current_data: Dict, genre: str) -> tuple:
     tpl = _load_init_prompt('init_golden_finger')
     project = current_data.get('project', current_data)
     protagonist = current_data.get('protagonist', {})
+    relationship = current_data.get('relationship', {})
     golden_finger = current_data.get('golden_finger', {})
 
     def _or_unset(val):
@@ -719,9 +910,18 @@ def _get_golden_finger_prompt(current_data: Dict, genre: str) -> tuple:
         genre=genre,
         one_liner=project.get('one_liner', ''),
         core_conflict=project.get('core_conflict', ''),
-        protagonist_name=protagonist.get('name', ''),
-        protagonist_desire=protagonist.get('desire', ''),
-        protagonist_flaw=protagonist.get('flaw', ''),
+        target_words=project.get('target_words', '') or '未填写',
+        target_chapters=project.get('target_chapters', '') or '未填写',
+        target_reader=_or_unset(project.get('target_reader', '')),
+        platform=_or_unset(project.get('platform', '')),
+        protagonist_name=protagonist.get('name', '') or '未填写',
+        protagonist_desire=_or_unset(protagonist.get('desire', '')),
+        protagonist_flaw=_or_unset(protagonist.get('flaw', '')),
+        protagonist_archetype=_or_unset(protagonist.get('archetype', '')),
+        protagonist_structure=_or_unset(protagonist.get('structure', '')),
+        heroine_config=_or_unset(relationship.get('heroine_config', '')),
+        antagonist_level=_or_unset(relationship.get('antagonist_level', '')),
+        antagonist_mirror=_or_unset(relationship.get('antagonist_mirror', '')),
         gf_type=_or_unset(golden_finger.get('type', '')),
         gf_name=_or_unset(golden_finger.get('name', '')),
         gf_style=_or_unset(golden_finger.get('style', '')),
@@ -735,6 +935,7 @@ def _get_world_prompt(current_data: Dict, genre: str) -> tuple:
     tpl = _load_init_prompt('init_world')
     project = current_data.get('project', current_data)
     protagonist = current_data.get('protagonist', {})
+    relationship = current_data.get('relationship', {})
     golden_finger = current_data.get('golden_finger', {})
     world = current_data.get('world', {})
 
@@ -746,10 +947,22 @@ def _get_world_prompt(current_data: Dict, genre: str) -> tuple:
         genre=genre,
         one_liner=project.get('one_liner', ''),
         core_conflict=project.get('core_conflict', ''),
-        protagonist_name=protagonist.get('name', ''),
-        protagonist_desire=protagonist.get('desire', ''),
-        gf_type=golden_finger.get('type', ''),
-        gf_name=golden_finger.get('name', ''),
+        target_words=project.get('target_words', '') or '未填写',
+        target_chapters=project.get('target_chapters', '') or '未填写',
+        target_reader=_or_unset(project.get('target_reader', '')),
+        platform=_or_unset(project.get('platform', '')),
+        protagonist_name=protagonist.get('name', '') or '未填写',
+        protagonist_desire=_or_unset(protagonist.get('desire', '')),
+        protagonist_flaw=_or_unset(protagonist.get('flaw', '')),
+        protagonist_archetype=_or_unset(protagonist.get('archetype', '')),
+        protagonist_structure=_or_unset(protagonist.get('structure', '')),
+        heroine_config=_or_unset(relationship.get('heroine_config', '')),
+        antagonist_level=_or_unset(relationship.get('antagonist_level', '')),
+        antagonist_mirror=_or_unset(relationship.get('antagonist_mirror', '')),
+        gf_type=golden_finger.get('type', '') or '未填写',
+        gf_name=golden_finger.get('name', '') or '未填写',
+        gf_style=_or_unset(golden_finger.get('style', '')),
+        gf_visibility=_or_unset(golden_finger.get('visibility', '')),
         world_complexity=_or_unset(world.get('worldview_level', '')),
         power_system=_or_unset(world.get('power_system', '')),
         geography=_or_unset(world.get('geography', '')),
@@ -763,6 +976,7 @@ def _get_constraints_prompt(current_data: Dict, genre: str) -> tuple:
     tpl = _load_init_prompt('init_constraints')
     project = current_data.get('project', current_data)
     protagonist = current_data.get('protagonist', {})
+    relationship = current_data.get('relationship', {})
     golden_finger = current_data.get('golden_finger', {})
     world = current_data.get('world', {})
     constraints = current_data.get('constraints', {})
@@ -775,18 +989,36 @@ def _get_constraints_prompt(current_data: Dict, genre: str) -> tuple:
         genre=genre,
         one_liner=project.get('one_liner', ''),
         core_conflict=project.get('core_conflict', ''),
-        protagonist_name=protagonist.get('name', ''),
-        protagonist_desire=protagonist.get('desire', ''),
-        protagonist_flaw=protagonist.get('flaw', ''),
-        gf_type=golden_finger.get('type', ''),
-        gf_name=golden_finger.get('name', ''),
-        world_scale=world.get('scale', '') or world.get('worldview_level', ''),
-        power_system_type=world.get('power_system_type', '') or world.get('power_system', ''),
-        word_count_chapter=_or_unset(constraints.get('word_count_chapter', '')),
-        prologue=_or_unset(constraints.get('prologue', '')),
-        first_chapter=_or_unset(constraints.get('first_chapter', '')),
-        style=_or_unset(constraints.get('style', '')),
-        tropes=_or_unset(constraints.get('tropes', '')),
+        target_words=project.get('target_words', '') or '未填写',
+        target_chapters=project.get('target_chapters', '') or '未填写',
+        target_reader=_or_unset(project.get('target_reader', '')),
+        platform=_or_unset(project.get('platform', '')),
+        protagonist_name=protagonist.get('name', '') or '未填写',
+        protagonist_desire=_or_unset(protagonist.get('desire', '')),
+        protagonist_flaw=_or_unset(protagonist.get('flaw', '')),
+        protagonist_archetype=_or_unset(protagonist.get('archetype', '')),
+        protagonist_structure=_or_unset(protagonist.get('structure', '')),
+        heroine_config=_or_unset(relationship.get('heroine_config', '')),
+        antagonist_level=_or_unset(relationship.get('antagonist_level', '')),
+        antagonist_mirror=_or_unset(relationship.get('antagonist_mirror', '')),
+        gf_type=golden_finger.get('type', '') or '未填写',
+        gf_name=golden_finger.get('name', '') or '未填写',
+        gf_style=_or_unset(golden_finger.get('style', '')),
+        gf_visibility=_or_unset(golden_finger.get('visibility', '')),
+        world_scale=world.get('scale', '') or world.get('worldview_level', '') or '未填写',
+        power_system_type=world.get('power_system_type', '') or world.get('power_system', '') or '未填写',
+        factions=_or_unset(world.get('factions', '')),
+        social_class=_or_unset(world.get('social_class', '')),
+        currency_system=_or_unset(world.get('currency_system', '')),
+        cultivation_chain=_or_unset(world.get('cultivation_chain', '')),
+        sect_hierarchy=_or_unset(world.get('sect_hierarchy', '')),
+        anti_trope=_or_unset(constraints.get('anti_trope', '')),
+        hard_constraints=_or_unset(
+            '\n'.join(constraints['hard_constraints']) if isinstance(constraints.get('hard_constraints'), list)
+            else constraints.get('hard_constraints', '')
+        ),
+        core_selling_points=_or_unset(constraints.get('core_selling_points', '')),
+        opening_hook=_or_unset(constraints.get('opening_hook', '')),
     )
     return tpl['system_prompt'], user_prompt
 

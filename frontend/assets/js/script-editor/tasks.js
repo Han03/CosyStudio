@@ -40,7 +40,7 @@ function renderTasks() {
     container.innerHTML = filtered.map(task => `
         <div class="task-card ${task.status}">
             <div class="task-card-header">
-                <div class="task-card-title">第${task.chapter_index}章 - ${getTaskTypeText(task.task_type)}</div>
+                <div class="task-card-title">${getTaskTitle(task)}</div>
                 <span class="task-card-status ${task.status}">${getTaskStatusText(task.status)}</span>
             </div>
             <div class="task-card-meta">
@@ -53,14 +53,15 @@ function renderTasks() {
                 </div>
                 <div class="task-card-message">${task.progress_message || '处理中...'}</div>
             ` : ''}
-            ${task.status === 'completed' && task.polished ? `
-                <div class="task-card-message">已生成 ${task.polished.length} 字</div>
-            ` : ''}
+            ${task.status === 'completed' ? (
+                task.polished ? `<div class="task-card-message">已生成 ${task.polished.length} 字</div>` :
+                task.progress_message ? `<div class="task-card-message">${task.progress_message}</div>` : ''
+            ) : ''}
             ${task.status === 'failed' && task.error_message ? `
                 <div class="task-card-message" style="color: #ef4444;">${task.error_message}</div>
             ` : ''}
             ${task.status === 'cancelled' ? `
-                <div class="task-card-message" style="color: #f59e0b;">创作已取消</div>
+                <div class="task-card-message" style="color: #a1a1aa;">${task.progress_message || '任务已取消'}</div>
             ` : ''}
             <div class="task-card-actions">
                 ${task.status === 'completed' && task.polished && task.polished.trim() ? `
@@ -75,8 +76,29 @@ function renderTasks() {
     `).join('');
 }
 
+/** 项目级任务（chapter_index=0 且非章节写作），不显示章节号 */
+const PROJECT_TASK_TYPES = new Set(['init', 'plan', 'reindex', 'split']);
+
+function getTaskTitle(task) {
+    const type = task.task_type;
+    if (PROJECT_TASK_TYPES.has(type)) {
+        return getTaskTypeText(type);
+    }
+    return `第${task.chapter_index}章 - ${getTaskTypeText(type)}`;
+}
+
 function getTaskTypeText(type) {
-    const map = { 'continue': '创作', 'draft': '起草', 'polish': '润色', 'review': '审查' };
+    const map = {
+        'init': '🔧 深度初始化',
+        'plan': '📋 卷纲规划',
+        'reindex': '🔄 RAG 索引重建',
+        'split': '✂️ 智能拆章',
+        'write': '✍️ 写作',
+        'continue': '✍️ 创作',
+        'draft': '📝 起草',
+        'polish': '✨ 润色',
+        'review': '🔍 审查'
+    };
     return map[type] || type;
 }
 

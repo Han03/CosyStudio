@@ -12,7 +12,7 @@ user_prompt: |
   
   【用户反派设定】
   反派分层级别：{project.antagonist_level}
-  反派分层详情：{project.antagonist_tiers}
+  反派分层详情：{project.antagonist_tiers_desc}
   镜像对抗：{project.villain_mirror}
   （注：以上为用户已确定的反派基础设定，请在此基础上展开详细反派设计）
   

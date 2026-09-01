@@ -111,9 +111,14 @@ function createCharacterAvatarElement(ch) {
     const bg = ch.role === '旁白'
         ? 'linear-gradient(135deg, #94a3b8, #475569)'
         : AVATAR_COLORS[colorIdx >= 0 ? colorIdx : 0];
+    
+    // 配音状态点
+    const hasAgent = state.characterVoiceMap[ch.role]?.agent_id || state.characterVoiceMap[ch.role]?.tts_capability_id;
+    const agentStatus = hasAgent ? '<span class="char-agent-dot" title="已配置配音"></span>' : '<span class="char-agent-dot char-agent-dot-empty" title="未配置配音"></span>';
+    
     div.innerHTML = `
         <div class="avatar-circle" style="background: ${bg};">${escapeHtml(ch.role.charAt(0))}</div>
-        <div class="avatar-name">${escapeHtml(ch.role)}</div>
+        <div class="avatar-name">${escapeHtml(ch.role)}${agentStatus}</div>
         <div class="avatar-count">${ch.line_count}句</div>
     `;
     div.onclick = () => selectCharacter(ch.role);
@@ -189,9 +194,44 @@ function renderCharacterSettings() {
         el.innerHTML = '<div class="settings-empty"><i class="fas fa-hand-pointer"></i><p>点击上方角色头像进行设置</p></div>';
         return;
     }
+    const charData = state.characters.find(c => c.role === state.selectedRole) || {};
     const config = state.characterVoiceMap[state.selectedRole] || {
         agent_id: '', speed: 1.0, seed: 0, tts_capability_id: '', cloud_extra_params: '{}'
     };
+
+    // 角色详情区域（性别/年龄/描述，可编辑）
+    const profileSectionHtml = `
+        <div class="setting-group char-profile-section">
+            <label><i class="fas fa-id-card"></i> 角色详情</label>
+            <div class="char-profile-fields">
+                <div class="char-profile-row">
+                    <label>性别</label>
+                    <select id="charProfileGender" onchange="saveCharacterProfile()">
+                        <option value="" ${!charData.gender ? 'selected' : ''}>未设定</option>
+                        <option value="男" ${charData.gender === '男' ? 'selected' : ''}>男</option>
+                        <option value="女" ${charData.gender === '女' ? 'selected' : ''}>女</option>
+                    </select>
+                </div>
+                <div class="char-profile-row">
+                    <label>年龄</label>
+                    <select id="charProfileAge" onchange="saveCharacterProfile()">
+                        <option value="" ${!charData.age ? 'selected' : ''}>未设定</option>
+                        <option value="幼儿" ${charData.age === '幼儿' ? 'selected' : ''}>幼儿</option>
+                        <option value="儿童" ${charData.age === '儿童' ? 'selected' : ''}>儿童</option>
+                        <option value="少年" ${charData.age === '少年' ? 'selected' : ''}>少年</option>
+                        <option value="青年" ${charData.age === '青年' ? 'selected' : ''}>青年</option>
+                        <option value="中年" ${charData.age === '中年' ? 'selected' : ''}>中年</option>
+                        <option value="老年" ${charData.age === '老年' ? 'selected' : ''}>老年</option>
+                    </select>
+                </div>
+            </div>
+            <div class="char-profile-row char-profile-desc-row">
+                <label>描述</label>
+                <textarea id="charProfileDesc" rows="2" placeholder="角色简介，如：性格、身份等"
+                          oninput="scheduleSaveCharacterProfile()">${escapeHtml(charData.description || '')}</textarea>
+            </div>
+        </div>
+    `;
 
     // 构建模型能力下拉选项（包含所有能力，不再过滤本地）
     const allCaps = state.ttsCapabilities || [];
@@ -295,6 +335,7 @@ function renderCharacterSettings() {
     }
 
     el.innerHTML = `
+        ${profileSectionHtml}
         ${capabilitySectionHtml}
         ${localSectionHtml}
         ${cloudSectionHtml}
@@ -396,6 +437,39 @@ async function saveCharacterConfig() {
         });
     } catch (e) {
         console.error('保存角色配置失败:', e);
+    }
+}
+
+function scheduleSaveCharacterProfile() {
+    if (state._saveProfileTimer) clearTimeout(state._saveProfileTimer);
+    state._saveProfileTimer = setTimeout(() => saveCharacterProfile(), 500);
+}
+
+async function saveCharacterProfile() {
+    if (!state.selectedRole || !state.scriptId) return;
+    const genderEl = document.getElementById('charProfileGender');
+    const ageEl = document.getElementById('charProfileAge');
+    const descEl = document.getElementById('charProfileDesc');
+    if (!genderEl || !ageEl || !descEl) return;
+    const gender = genderEl.value;
+    const age = ageEl.value;
+    const description = descEl.value;
+    // 同步到前端状态
+    const charData = state.characters.find(c => c.role === state.selectedRole);
+    if (charData) {
+        charData.gender = gender;
+        charData.age = age;
+        charData.description = description;
+    }
+    try {
+        await apiRequest(`/api/books/scripts/characters/profile?script_id=${state.scriptId}&role=${encodeURIComponent(state.selectedRole)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gender, age, description }),
+            silent: true
+        });
+    } catch (e) {
+        console.error('保存角色属性失败:', e);
     }
 }
 
@@ -850,7 +924,7 @@ async function addRoleFromPicker() {
             errorPrefix: '添加角色失败'
         });
         if (data.success) {
-            showToast(`角色"${role}"已添加`, 'success');
+            showToast(`角色“${role}”已添加`, 'success');
             await loadCharacters();
             selectRolePicker(role);
         } else {
@@ -859,4 +933,89 @@ async function addRoleFromPicker() {
     } catch (e) {
         showToast('添加失败: ' + e.message, 'error');
     }
+}
+
+// ===================== 智能匹配 =====================
+
+async function autoMatchAgents() {
+    if (!state.scriptId) {
+        showToast('请先加载剧本', 'warning');
+        return;
+    }
+    
+    const modal = document.getElementById('autoMatchModal');
+    const content = document.getElementById('autoMatchContent');
+    modal.style.display = 'flex';
+    content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p class="mt-2">正在分析角色并匹配智能体...</p></div>';
+    
+    try {
+        const data = await apiRequest('/api/audio/auto-match-agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ script_id: state.scriptId }),
+            errorPrefix: '智能匹配失败'
+        });
+        
+        if (data.success) {
+            renderAutoMatchResult(data);
+            // 刷新角色列表
+            await loadCharacters();
+        } else {
+            content.innerHTML = `<div class="settings-empty"><p>匹配失败：${escapeHtml(data.message || '未知错误')}</p></div>`;
+        }
+    } catch (e) {
+        content.innerHTML = `<div class="settings-empty"><p>匹配失败：${escapeHtml(e.message)}</p></div>`;
+    }
+}
+
+function renderAutoMatchResult(data) {
+    const content = document.getElementById('autoMatchContent');
+    const matched = data.matched || [];
+    const unmatched = data.unmatched || [];
+    
+    if (matched.length === 0 && unmatched.length === 0) {
+        content.innerHTML = '<div class="settings-empty"><i class="fas fa-check-circle"></i><p>所有角色已配置智能体</p></div>';
+        return;
+    }
+    
+    let html = '';
+    
+    if (matched.length > 0) {
+        html += '<div class="auto-match-section"><h4 style="margin-bottom: 12px;"><i class="fas fa-check" style="color: #22c55e;"></i> 已匹配 (' + matched.length + ')</h4>';
+        html += '<div class="auto-match-list">';
+        for (const m of matched) {
+            const agent = state.agents.find(a => a.id === m.agent_id);
+            const agentName = m.agent_name || (agent ? agent.name : m.agent_id);
+            const agentGender = agent ? (agent.gender || '') : '';
+            const agentAge = agent ? (agent.age || '') : '';
+            const agentMeta = [agentGender, agentAge].filter(Boolean).join('/');
+            html += `
+                <div class="auto-match-item">
+                    <div class="auto-match-role">
+                        <strong>${escapeHtml(m.role)}</strong>
+                    </div>
+                    <div class="auto-match-arrow"><i class="fas fa-arrow-right"></i></div>
+                    <div class="auto-match-agent">
+                        <span class="auto-match-agent-name">${escapeHtml(agentName)}</span>
+                        ${agentMeta ? `<span class="auto-match-agent-meta">(${escapeHtml(agentMeta)})</span>` : ''}
+                    </div>
+                    <div class="auto-match-reason">${escapeHtml(m.reason || '')}</div>
+                </div>
+            `;
+        }
+        html += '</div></div>';
+    }
+    
+    if (unmatched.length > 0) {
+        html += '<div class="auto-match-section" style="margin-top: 16px;"><h4 style="margin-bottom: 12px;"><i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> 未匹配 (' + unmatched.length + ')</h4>';
+        html += '<p class="text-muted" style="font-size: 13px;">以下角色未找到合适的智能体，请手动配置：' + unmatched.map(r => escapeHtml(r)).join('、') + '</p>';
+        html += '</div>';
+    }
+    
+    content.innerHTML = html;
+}
+
+function closeAutoMatchModal() {
+    const modal = document.getElementById('autoMatchModal');
+    modal.style.display = 'none';
 }

@@ -411,6 +411,67 @@
 .chapter-item:hover .chapter-item-edit-btn { display: inline-flex; }
 .chapter-item-edit-btn:hover { background: var(--neu-accent-light); color: var(--neu-accent); }
 
+/* 章节处理中效果 */
+.chapter-item.processing {
+    opacity: 0.7;
+    background: rgba(108, 92, 231, 0.05);
+}
+.chapter-item.processing .chapter-item-edit-btn,
+.chapter-item.processing .chapter-item-delete-btn {
+    display: none !important;
+}
+.chapter-item-spinner {
+    margin-left: auto;
+    color: var(--neu-accent);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+/* 章节后处理失败效果 */
+.chapter-item.apply-failed {
+    background: rgba(239, 68, 68, 0.05);
+}
+.chapter-item.apply-failed .chapter-item-edit-btn,
+.chapter-item.apply-failed .chapter-item-delete-btn {
+    display: none !important;
+}
+.chapter-item-retry-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.chapter-item-retry-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* 应用进度横幅 */
+.apply-banner {
+    display: none;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.08), rgba(108, 92, 231, 0.04));
+    border-bottom: 1px solid rgba(108, 92, 231, 0.15);
+    color: var(--neu-accent);
+    font-size: 13px;
+    font-weight: 500;
+}
+.apply-banner i {
+    margin-right: 8px;
+}
+
+/* 编辑器只读效果 */
+#originalTextBody.readonly {
+    background: rgba(0, 0, 0, 0.02);
+    color: var(--neu-text);
+    cursor: default;
+}
+
 .lines-list {
     flex: 1;
     overflow-y: auto;

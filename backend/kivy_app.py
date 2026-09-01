@@ -1,4 +1,4 @@
-"""CosyWritter Kivy 服务端日志界面。
+"""CosyStudio Kivy 服务端日志界面。
 
 布局(水平):
   - 右侧:ScreenManager 内容区域
@@ -90,8 +90,8 @@ class HomePage(Screen):
         self._bg_rect.size = instance.size
 
 
-class CosyWritterApp(App):
-    """CosyWritter 服务端日志界面 - 暗色系界面。
+class CosyStudioApp(App):
+    """CosyStudio 服务端日志界面 - 暗色系界面。
     """
 
     def __init__(self, server_thread=None, **kwargs):
@@ -135,5 +135,5 @@ class CosyWritterApp(App):
 
 def run_kivy_app(server_thread=None):
     """启动 Kivy 应用。"""
-    app = CosyWritterApp(server_thread=server_thread)
+    app = CosyStudioApp(server_thread=server_thread)
     app.run()

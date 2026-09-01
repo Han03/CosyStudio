@@ -118,7 +118,7 @@ class SettingRecorderExecutor(BaseExecutor):
                 max_tokens=300,
                 script_id=self.script_id,
                 project_id=project_id,
-                executor_name="setting_recorder_executor",
+                executor_name=self.step_name,
                 prompt_name="knowledge_explain",
             )
             

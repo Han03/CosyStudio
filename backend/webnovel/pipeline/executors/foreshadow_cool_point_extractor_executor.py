@@ -10,7 +10,8 @@ from typing import Dict, Any, List
 from ..base_executor import BaseExecutor, ExecutorResult
 from webnovel.repositories import (
     get_webnovel_project_by_script, add_open_loop, add_cool_point,
-    get_active_open_loops, update_open_loop_resolved, update_open_loop_urgency
+    get_active_open_loops, update_open_loop_resolved, update_open_loop_urgency,
+    get_open_loops_by_project
 )
 
 
@@ -57,8 +58,12 @@ class ForeshadowCoolPointExtractorExecutor(BaseExecutor):
                 polished_content, chapter_index, project.get("genre", ""), project
             )
 
+            # 跨章去重：与已有伏笔比对，避免重复埋线（如“灰布袋”在前章已埋过）
+            open_loops = self._deduplicate_against_existing(open_loops, project_id)
+
             saved_loops = []
             saved_cool_points = []
+            newly_planted_ids = set()
 
             for loop in open_loops:
                 saved = add_open_loop(
@@ -70,6 +75,8 @@ class ForeshadowCoolPointExtractorExecutor(BaseExecutor):
                     evidence=loop.get("evidence", "")
                 )
                 saved_loops.append(saved)
+                if saved and saved.get("id"):
+                    newly_planted_ids.add(saved["id"])
 
             for cp in cool_points:
                 saved = add_cool_point(
@@ -87,7 +94,7 @@ class ForeshadowCoolPointExtractorExecutor(BaseExecutor):
                 )
                 saved_cool_points.append(saved)
 
-            await self._check_resolved_loops(project_id, chapter_index, polished_content)
+            await self._check_resolved_loops(project_id, chapter_index, polished_content, exclude_ids=newly_planted_ids)
 
             update_open_loop_urgency(project_id, chapter_index)
 
@@ -230,6 +237,33 @@ class ForeshadowCoolPointExtractorExecutor(BaseExecutor):
                 result.append(loop)
         return result
 
+    def _deduplicate_against_existing(self, loops: List[Dict], project_id: int) -> List[Dict]:
+        """跨章去重：与数据库中已有伏笔比对，过滤重复埋线。
+
+        采用关键词包含策略：若新伏笔的核心关键词（前 50 字）已存在于
+        任意已有伏笔的 content 中，则视为重复，跳过入库。
+        """
+        if not loops or not project_id:
+            return loops
+        try:
+            existing = get_open_loops_by_project(project_id)
+        except Exception:
+            return loops
+        if not existing:
+            return loops
+
+        existing_contents = [e.get("content", "") for e in existing if e.get("content")]
+        result = []
+        for loop in loops:
+            new_key = loop.get("content", "")[:50]
+            if not new_key:
+                continue
+            # 检查新伏笔关键词是否已被已有伏笔覆盖
+            is_dup = any(new_key in ec or ec[:50] in new_key for ec in existing_contents)
+            if not is_dup:
+                result.append(loop)
+        return result
+
     def _deduplicate_cool_points(self, cool_points: List[Dict]) -> List[Dict]:
         """去重爽点列表。"""
         seen = set()
@@ -241,11 +275,21 @@ class ForeshadowCoolPointExtractorExecutor(BaseExecutor):
                 result.append(cp)
         return result
 
-    async def _check_resolved_loops(self, project_id: int, chapter_index: int, content: str):
-        """检查是否有伏笔在本章被回收。"""
+    async def _check_resolved_loops(self, project_id: int, chapter_index: int, content: str, exclude_ids: set = None):
+        """检查是否有伏笔在本章被回收。
+
+        exclude_ids: 本章新埋的伏笔 ID 集合，这些伏笔不可能在本章被回收，
+        必须排除以避免“同章埋设+回收”的矛盾。
+        """
         active_loops = get_active_open_loops(project_id)
         if not active_loops:
             return
+
+        # 排除本章刚埋下的伏笔（它们不可能在同一章被回收）
+        if exclude_ids:
+            active_loops = [lp for lp in active_loops if lp.get("id") not in exclude_ids]
+            if not active_loops:
+                return
 
         from core.model_executor import get_model_executor
 

@@ -30,7 +30,9 @@ from repositories import (
     get_script_characters, add_script_characters, get_script_line_count,
     get_script_lines, get_script_lines_paged, get_script_chapters_with_lines,
     update_script_line, insert_line_at_position, delete_script_line,
-    delete_script_lines, delete_script, _get_conn, _lock
+    delete_script_lines, delete_script, _get_conn, _lock,
+    get_lines_by_role, batch_update_character_profiles, upsert_character_config,
+    get_character_configs
 )
 from services.ebook_library import get_ebook_library_service
 from services.media_manager import get_media_manager
@@ -49,6 +51,7 @@ class ScriptService:
         self._stop_flags: dict = {}
         self._generation_queues: dict = {}
         self._generation_listeners: dict = {}
+        self._script_prompt_data: Optional[Dict[str, str]] = None  # 台词生成 prompt 缓存
 
     def register_task(self, script_id: int, task: asyncio.Task):
         self._running_tasks[script_id] = task
@@ -131,12 +134,59 @@ class ScriptService:
 
     # ===================== Qwen 调用 =====================
 
-    # 剧本生成专用身份描述（会通过 agent_role 模板包装为系统提示）
-    _SCRIPT_AGENT_DESC = (
-        "你是一位专业的有声书剧本编剧，擅长将小说章节内容逐句拆分为演播剧本。"
-        "你必须严格按照用户要求的格式输出：每行一个JSON对象，不要输出JSON数组，"
-        "不要输出任何解释文字，不要使用markdown代码块。"
-    )
+    @staticmethod
+    def _load_script_prompt() -> Dict[str, str]:
+        """从 .md 文件加载台词生成 prompt 模板。
+
+        与 base_executor._load_prompt 逻辑一致，解析 YAML front matter 格式。
+        """
+        prompt_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "webnovel", "prompts", "script_line_generate_prompt.md"
+        )
+        if not os.path.exists(prompt_path):
+            return {"system_prompt": "", "user_prompt": ""}
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        if content.startswith("---"):
+            content = content[3:].strip()
+        if content.endswith("---"):
+            content = content[:-3].strip()
+        lines = content.split("\n")
+        system_prompt = ""
+        user_prompt = ""
+        in_user_prompt = False
+        in_multiline = False
+        for line in lines:
+            if line.startswith("system_prompt:"):
+                in_user_prompt = False
+                in_multiline = False
+                value = line.replace("system_prompt:", "").strip()
+                if value.startswith("|"):
+                    in_multiline = True
+                    system_prompt = ""
+                else:
+                    system_prompt = value
+            elif line.startswith("user_prompt:"):
+                in_user_prompt = True
+                in_multiline = False
+                value = line.replace("user_prompt:", "").strip()
+                if value.startswith("|"):
+                    in_multiline = True
+                    user_prompt = ""
+                else:
+                    user_prompt = value
+            elif in_user_prompt and in_multiline:
+                user_prompt += line + "\n"
+            elif not in_user_prompt and in_multiline:
+                system_prompt += line + "\n"
+        return {"system_prompt": system_prompt.strip(), "user_prompt": user_prompt.strip()}
+
+    def _get_script_system_prompt(self) -> str:
+        """获取台词生成的 system_prompt（从 .md 文件加载）。"""
+        if self._script_prompt_data is None:
+            self._script_prompt_data = self._load_script_prompt()
+        return self._script_prompt_data.get("system_prompt", "")
 
     # 剧本生成专用生成参数
     _SCRIPT_GENERATE_PARAMS = {
@@ -148,7 +198,8 @@ class ScriptService:
         "max_new_tokens": 3072,
     }
 
-    async def _call_qwen_json(self, prompt: str, context: str, retries: int = 2) -> Any:
+    async def _call_qwen_json(self, prompt: str, context: str, retries: int = 2,
+                               executor_name: str = "") -> Any:
         """调用 Qwen 并解析 JSON，失败跳过"""
         from core.model_executor import ModelExecutor
         
@@ -158,9 +209,10 @@ class ScriptService:
             result = ""
             async for chunk in executor.execute_text_predict(
                 prompt,
-                system_prompt=self._SCRIPT_AGENT_DESC,
+                system_prompt=self._get_script_system_prompt(),
                 stream=False,
-                generate_params=self._SCRIPT_GENERATE_PARAMS
+                generate_params=self._SCRIPT_GENERATE_PARAMS,
+                executor_name=executor_name,
             ):
                 if chunk.get("error"):
                     self._logger.warning(f"[QWEN_SCRIPT] 生成失败: {chunk['error']}")
@@ -168,7 +220,6 @@ class ScriptService:
                 if chunk.get("type") == "text":
                     result += chunk.get("content", "")
             
-            self._logger.info(f"[QWEN_SCRIPT] {context} , 返回长度={len(result) if result else 0}")
 
             parsed = parse_json_response(result)
             if parsed is not None:
@@ -557,11 +608,21 @@ class ScriptService:
         update_script(script_id, status="running")
         total_lines = 0
         has_error = False
+        chapter_new_roles: List[str] = []  # 累积本章新发现的角色，用于属性提取
+        _current_chapter_idx = 0  # 用于逐行进度计算
+        # 预计算原文总字数，用于进度百分比（已生成台词字数 / 原文字数）
+        _total_original_chars = 0
+        for _ch in chapters:
+            _ch_text = self._get_chapter_content_with_fallback(script_id, book_id, _ch["chapter_index"])
+            if _ch_text:
+                _total_original_chars += len(_ch_text)
+        _generated_chars = 0  # 已生成台词的累计字数
 
         async def _on_line_added(sid: int, lines: List[Dict[str, Any]]):
-            nonlocal total_lines
+            nonlocal total_lines, _current_chapter_idx, _generated_chars
 
             new_roles = await asyncio.to_thread(self._save_new_characters, sid, lines)
+            chapter_new_roles.extend(new_roles)
 
             inserted = await asyncio.to_thread(add_script_lines, sid, lines)
             total_lines += len(inserted)
@@ -589,6 +650,22 @@ class ScriptService:
             except Exception as e:
                 self._logger.warning(f"[ScriptService] WebSocket通知失败: {e}")
 
+            # 逐行广播进度：已生成台词字数 / 原文字数（上限 99%）
+            try:
+                _generated_chars += sum(len(ln.get("content", "")) for ln in inserted)
+                from infrastructure.websocket_broadcast import ws_broadcast_manager
+                if _total_original_chars > 0:
+                    _pct = min(99, int(_generated_chars / _total_original_chars * 100))
+                else:
+                    _pct = 0
+                asyncio.create_task(ws_broadcast_manager.broadcast_script_progress(
+                    sid, _pct,
+                    f"正在生成第 {chapter_idx} 章台词 (已生成 {total_lines} 条)",
+                    chapter_idx,
+                ))
+            except Exception:
+                pass
+
             if new_roles and on_character_added:
                 try:
                     on_character_added(sid, new_roles)
@@ -608,6 +685,7 @@ class ScriptService:
 
             chapter_index = chapter["chapter_index"]
             chapter_title = chapter["title"]
+            _current_chapter_idx = i  # 更新当前章节索引，用于逐行进度计算
 
             if task_id:
                 agent_task_manager.update_task(
@@ -616,6 +694,15 @@ class ScriptService:
                     message=f"正在生成第 {i+1}/{total} 章: {chapter_title}",
                 )
             update_script(script_id, progress_message=f"正在生成第 {i+1}/{total} 章: {chapter_title}", generating_chapter_index=chapter_index)
+            try:
+                from infrastructure.websocket_broadcast import ws_broadcast_manager
+                asyncio.create_task(ws_broadcast_manager.broadcast_script_progress(
+                    script_id, int(i / total * 100),
+                    f"正在生成第 {i+1}/{total} 章: {chapter_title}",
+                    chapter_index,
+                ))
+            except Exception:
+                pass
 
             try:
                 chapter_text = self._get_chapter_content_with_fallback(script_id, book_id, chapter_index)
@@ -635,10 +722,30 @@ class ScriptService:
                     self._logger.info(
                         f"[ScriptService] 章节{chapter_index} 生成 {len(lines)} 条台词"
                     )
+                    # 章节完成后，提取新角色的属性（性别/年龄/描述）
+                    if chapter_new_roles:
+                        try:
+                            profiles = await self._extract_character_profiles(
+                                script_id, chapter_text, chapter_new_roles
+                            )
+                            if profiles:
+                                # 广播角色属性更新到前端
+                                try:
+                                    from infrastructure.websocket_broadcast import ws_broadcast_manager
+                                    all_chars = await asyncio.to_thread(get_script_characters, script_id)
+                                    updated_chars = [c for c in all_chars if c.get("role") in [p["role"] for p in profiles]]
+                                    if updated_chars:
+                                        asyncio.create_task(ws_broadcast_manager.broadcast_characters_updated(script_id, updated_chars))
+                                except Exception as e:
+                                    self._logger.warning(f"[ScriptService] 广播角色属性失败: {e}")
+                        except Exception as e:
+                            self._logger.warning(f"[ScriptService] 角色属性提取失败: {e}")
+                        chapter_new_roles.clear()
                 else:
                     self._logger.warning(
                         f"[ScriptService] 章节{chapter_index} 未生成台词"
                     )
+                    chapter_new_roles.clear()
 
             except Exception as e:
                 has_error = True
@@ -668,6 +775,14 @@ class ScriptService:
             return True
 
         update_script(script_id, status="ready", chapter_count=total, progress_message="", generating_chapter_index=0)
+        try:
+            from infrastructure.websocket_broadcast import ws_broadcast_manager
+            asyncio.create_task(ws_broadcast_manager.broadcast_script_progress(
+                script_id, 100,
+                f"剧本生成完成，共 {total} 章 {total_lines} 条台词",
+            ))
+        except Exception:
+            pass
         if task_id:
             agent_task_manager.update_task(
                 task_id,
@@ -761,9 +876,10 @@ class ScriptService:
             try:
                 async for chunk in executor.execute_text_predict(
                     prompt,
-                    system_prompt=self._SCRIPT_AGENT_DESC,
+                    system_prompt=self._get_script_system_prompt(),
                     stream=True,
-                    generate_params=self._SCRIPT_GENERATE_PARAMS
+                    generate_params=self._SCRIPT_GENERATE_PARAMS,
+                    executor_name="script_line_generator",
                 ):
                     if self.is_stopped(script_id):
                         self._logger.info(f"[QWEN_SCRIPT_STREAM] 检测到停止标志，中断消费: script_id={script_id}")
@@ -839,6 +955,8 @@ class ScriptService:
                     f"[ScriptService] 章节{chapter_index}第{seg_idx+1}段 生成 {len(seg_lines)} 条台词"
                 )
 
+            # 段级进度广播已移除，改为由 _on_line_added 回调中逐行广播更精细的进度
+
         # 重新编号 line_no（后处理已在逐条中完成，无需批量处理）
         line_no = 0
         for line in all_lines:
@@ -846,6 +964,13 @@ class ScriptService:
             line["line_no"] = line_no
 
         return all_lines
+
+    # 无效的 role 值集合：AI 可能输出的模糊词，后处理时必须替换
+    _INVALID_ROLES = {"未知", "不清楚", "未提及", "不明", "unknown", ""}
+    # 内心独白思维动词模式（用于后处理兜底检测）
+    _THOUGHT_PATTERN = re.compile(r'(暗想|暗道|暗自|心想|心中|自问|琢磨|思忖|心道|暗忖|心下|暗思|默想)')
+    # 纯叙述开头模式（排除误判，如"只听得一声巨响"不是内心独白）
+    _NARRATION_START_PATTERN = re.compile(r'^(只听得|只听见|传来|响起|响起一阵|忽听|忽闻|但见)')
 
     def _post_process_line(self, line: Dict[str, Any],
                            recent_lines: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -861,9 +986,14 @@ class ScriptService:
         role = line.get("role", "旁白").strip() or "旁白"
         content = line.get("content", "").strip()
         line_type = line.get("type", "")
+        instruction = line.get("instruction", "").strip()
 
         if not content:
             return None
+
+        # 旁白 instruction 强制规范化
+        if role == "旁白":
+            instruction = "用平静自然的语气朗读"
 
         is_dialogue = False
         quote_chars = '"\'\u2018\u2019\u201c\u201d'
@@ -875,20 +1005,43 @@ class ScriptService:
         elif len(content) >= 2 and content[0] in quote_chars and content[-1] in quote_chars:
             is_dialogue = True
 
-        if is_dialogue and role in ("旁白", "效果音", ""):
+        if is_dialogue and (role in ("旁白", "效果音", "") or role in self._INVALID_ROLES):
             inferred = self._infer_speaker_from_recent(recent_lines)
             if inferred:
                 line["role"] = inferred
                 role = inferred
             else:
-                line["role"] = "未知"
-                role = "未知"
+                # 回退到最近一个对话角色的名字，绝不用「未知」
+                fallback = self._find_last_dialogue_speaker(recent_lines)
+                line["role"] = fallback
+                role = fallback
+
+        # 内心独白检测：无引号的叙述行含思维动词 → 尝试分配给上一个说话角色
+        if not is_dialogue and role in ("旁白",) and line_type != "dialogue":
+            if self._THOUGHT_PATTERN.search(content) and not self._NARRATION_START_PATTERN.match(content):
+                inferred = self._find_last_dialogue_speaker(recent_lines)
+                if inferred and inferred != "旁白":
+                    line["role"] = inferred
+                    role = inferred
+                    line["type"] = "dialogue"
+                    is_dialogue = True
 
         if is_dialogue:
             content = self._strip_quotes(content)
             line["content"] = content
 
+        line["instruction"] = instruction
         return line if content else None
+
+    @staticmethod
+    def _find_last_dialogue_speaker(recent_lines: List[Dict[str, Any]]) -> str:
+        """从最近的语句列表中找到最后一个有效的对话角色名。"""
+        for line in reversed(recent_lines):
+            r = line.get("role", "").strip()
+            lt = line.get("type", "")
+            if r and r not in ("旁白", "效果音", "") and lt != "narration":
+                return r
+        return "旁白"  # 最终回退：至少不是「未知」
 
     @staticmethod
     def _infer_speaker_from_recent(recent_lines: List[Dict[str, Any]]) -> str:
@@ -915,15 +1068,20 @@ class ScriptService:
 
         result = []
         last_speaker = "旁白"
-        last_dialogue_speaker = "未知"
+        last_dialogue_speaker = "旁白"  # 回退角色，不用「未知」
 
         for line in lines:
             role = line.get("role", "旁白").strip() or "旁白"
             content = line.get("content", "").strip()
             line_type = line.get("type", "")
+            instruction = line.get("instruction", "").strip()
 
             if not content:
                 continue
+
+            # 旁白 instruction 强制规范化
+            if role == "旁白":
+                instruction = "用平静自然的语气朗读"
 
             is_dialogue = False
             quote_chars = '"\'\u2018\u2019\u201c\u201d'
@@ -935,19 +1093,31 @@ class ScriptService:
             elif len(content) >= 2 and content[0] in quote_chars and content[-1] in quote_chars:
                 is_dialogue = True
 
-            if is_dialogue and role in ("旁白", "效果音", ""):
+            if is_dialogue and (role in ("旁白", "效果音", "") or role in self._INVALID_ROLES):
                 inferred = self._infer_speaker(lines, len(result))
                 if inferred:
                     line["role"] = inferred
                     role = inferred
                 else:
-                    line["role"] = "未知"
-                    role = "未知"
+                    # 回退到上一个对话角色，绝不用「未知」
+                    line["role"] = last_dialogue_speaker
+                    role = last_dialogue_speaker
+
+            # 内心独白检测：无引号的叙述行含思维动词 → 尝试分配给上一个说话角色
+            if not is_dialogue and role in ("旁白",) and line_type != "dialogue":
+                if self._THOUGHT_PATTERN.search(content) and not self._NARRATION_START_PATTERN.match(content):
+                    if last_dialogue_speaker and last_dialogue_speaker != "旁白":
+                        line["role"] = last_dialogue_speaker
+                        role = last_dialogue_speaker
+                        line["type"] = "dialogue"
+                        is_dialogue = True
 
             if is_dialogue:
                 last_dialogue_speaker = role
                 content = self._strip_quotes(content)
                 line["content"] = content
+
+            line["instruction"] = instruction
 
             if content:
                 result.append(line)
@@ -1006,7 +1176,7 @@ class ScriptService:
             prompt = self._build_prompt(chapter_title, segment, seg_idx, len(segments))
             context = f"剧本生成 script={script_id} chapter={chapter_index} seg={seg_idx+1}/{len(segments)}"
 
-            result = await self._call_qwen_json(prompt, context)
+            result = await self._call_qwen_json(prompt, context, executor_name="script_line_generator")
             if result is None:
                 continue
 
@@ -1099,50 +1269,16 @@ class ScriptService:
 
     def _build_prompt(self, chapter_title: str, chapter_text: str,
                       seg_idx: int = 0, seg_total: int = 1) -> str:
-        """构造 Qwen 提示词（NDJSON 格式：每行一个 JSON 对象）。"""
+        """从 .md 模板构造 Qwen 提示词（NDJSON 格式：每行一个 JSON 对象）。"""
+        if self._script_prompt_data is None:
+            self._script_prompt_data = self._load_script_prompt()
         seg_info = ""
         if seg_total > 1:
             seg_info = f"（本段为该章节的第 {seg_idx+1}/{seg_total} 段，只处理本段）"
-
-        example = (
-            '{"role":"旁白","instruction":"用平静自然的语气朗读","content":"夜色渐深，树林里传来一阵脚步声。","type":"narration"}\n'
-            '{"role":"张三","instruction":"非常愤怒地说这句话","content":"你为什么要这么做？","type":"dialogue"}\n'
-            '{"role":"旁白","instruction":"用平静自然的语气朗读","content":"张三指着李四的鼻子骂道。","type":"narration"}\n'
-            '{"role":"李四","instruction":"用疑惑的语气提问","content":"我怎么了？","type":"dialogue"}'
-        )
-
-        return (
-            "小说转演播剧本，逐行输出JSON。" + seg_info + "\n\n"
-            "字段：role(角色名/旁白) instruction(语气指令) content(原文) type(narration/dialogue)\n\n"
-            "【对话识别】\n"
-            "所有「」“”''引号包裹的文字=对话，type=dialogue，role=说话人名，绝对不能是旁白！\n"
-            "哪怕只有一个字、一个叹词，只要在引号里就是对话！\n\n"
-            "【说话人判断】\n"
-            "1. 附近有「XX说/道/问/答/喊/叫/骂/吩咐/冷笑/叹」→ XX\n"
-            "2. 「XX：『...』」→ XX\n"
-            "3. 两人交替对话，上句A说这句就是B说\n"
-            "4. 只有两人在场景里，根据对话内容判断是谁说的\n"
-            "5. 实在不确定填「未知」，但尽量从上下文推断\n"
-            "6. 同一角色用同一名字（最先出现的称呼）\n\n"
-            "【语气指令instruction】根据对话内容和上下文情绪，生成自然语言指令，指导TTS语音合成的语气表达。\n"
-            "要求：简明描述该句应有的语气情绪。例如：\n"
-            "  - 旁白：用平静自然的语气朗读\n"
-            "  - 愤怒：非常愤怒地说这句话 / 用生气的语气说话\n"
-            "  - 疑惑：用疑惑的语气提问\n"
-            "  - 悲伤：用悲伤低沉的语气说话\n"
-            "  - 开心：请非常开心地说这句话\n"
-            "  - 惊讶：用惊讶的语气说话\n"
-            "  - 紧张：用紧张急促的语气说话\n"
-            "  - 恐惧：用害怕恐惧的语气说话\n\n"
-            "【格式】\n"
-            "- 对话content=引号内纯文字，去掉引号\n"
-            "- 「XX说/道」等描述单独做旁白，放在对话后面\n"
-            "- 按原文顺序，一句一条，不概括，不漏句，不改写，不添加原文没有的内容\n"
-            "- 每行输出一个JSON对象，不要输出JSON数组，不要使用markdown代码块\n\n"
-            "示例（每行一个JSON）：\n" + example + "\n\n"
-            f"章节：{chapter_title}\n\n"
-            f"内容：\n{chapter_text}\n\n"
-            "开始输出（每行一个JSON）："
+        return self._script_prompt_data["user_prompt"].format(
+            seg_info=seg_info,
+            chapter_title=chapter_title,
+            chapter_text=chapter_text,
         )
 
     # ===================== 查询 =====================
@@ -1308,6 +1444,324 @@ class ScriptService:
             self._logger.info(f"[ScriptService] 新增角色已入库: script_id={script_id}, roles={new_roles}")
         return new_roles
 
+    # ===================== 角色属性提取 =====================
+
+    async def _call_llm_json(self, prompt: str, system_prompt: str,
+                             context: str, max_new_tokens: int = 2048,
+                             executor_name: str = "") -> Any:
+        """通用 LLM JSON 调用方法（用于角色属性提取、智能体匹配等辅助任务）。"""
+        from core.model_executor import ModelExecutor
+        executor = ModelExecutor()
+        try:
+            result = ""
+            async for chunk in executor.execute_text_predict(
+                prompt,
+                system_prompt=system_prompt,
+                stream=False,
+                generate_params={"temperature": 0.2, "top_p": 0.9, "max_new_tokens": max_new_tokens},
+                executor_name=executor_name,
+            ):
+                if chunk.get("error"):
+                    self._logger.warning(f"[LLM_JSON] {context} 失败: {chunk['error']}")
+                    return None
+                if chunk.get("type") == "text":
+                    result += chunk.get("content", "")
+            parsed = parse_json_response(result)
+            return parsed
+        except Exception as e:
+            self._logger.warning(f"[LLM_JSON] {context} 异常: {e}")
+            return None
+
+    async def _extract_character_profiles(self, script_id: int, chapter_text: str,
+                                          new_roles: List[str]) -> List[Dict[str, Any]]:
+        """调用 LLM 推断新角色的性别、年龄、描述属性。
+
+        Args:
+            script_id: 剧本 ID
+            chapter_text: 章节原文
+            new_roles: 本次新发现的角色名列表
+
+        Returns:
+            成功提取的属性列表 [{role, gender, age, description}, ...]
+        """
+        if not new_roles:
+            return []
+
+        # 过滤旁白（旁白不需要提取属性）
+        roles_to_extract = [r for r in new_roles if r != "旁白"]
+        if not roles_to_extract:
+            return []
+
+        # 收集每个角色的台词样本
+        role_samples = {}
+        for role in roles_to_extract:
+            lines = await asyncio.to_thread(get_lines_by_role, script_id, role, 5)
+            role_samples[role] = lines
+
+        # 构建 prompt
+        samples_text = ""
+        for role in roles_to_extract:
+            lines = role_samples.get(role, [])
+            samples_text += f"\n角色「{role}」:\n"
+            if lines:
+                for l in lines:
+                    instruction = l.get("instruction", "")
+                    content = l.get("content", "")
+                    samples_text += f"- \"{content}\""
+                    if instruction:
+                        samples_text += f" (语气: {instruction})"
+                    samples_text += "\n"
+            else:
+                samples_text += "- (暂无台词样本)\n"
+
+        chapter_summary = chapter_text[:3000] if chapter_text else "(无章节内容)"
+
+        prompt = (
+            "根据以下小说章节内容和角色台词，推断每个角色的性别、年龄段和外貌/性格特征描述。\n\n"
+            f"## 章节内容摘要\n{chapter_summary}\n\n"
+            f"## 角色及其台词{samples_text}\n"
+            "## 输出要求\n"
+            "输出 JSON 数组，每个元素包含:\n"
+            "- role: 角色名\n"
+            "- gender: \"男\" 或 \"女\" 或 \"未知\"\n"
+            "- age: \"儿童\"/\"少年\"/\"青年\"/\"中年\"/\"老年\"\n"
+            "- description: 15字以内的角色特征描述（如\"中年男性，沉稳威严\"）\n\n"
+            "只输出 JSON 数组，不要其他内容。"
+        )
+
+        system_prompt = "你是专业的有声书配音导演，擅长根据角色特征推断适合的配音属性。"
+
+        result = await self._call_llm_json(
+            prompt, system_prompt,
+            f"角色属性提取 script_id={script_id}, roles={roles_to_extract}",
+            executor_name="character_profile_extractor",
+        )
+
+        if not result:
+            return []
+
+        # 解析结果
+        profiles = []
+        items = result if isinstance(result, list) else result.get("characters", result.get("profiles", []))
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            role = item.get("role", "").strip()
+            if role not in roles_to_extract:
+                continue
+            profiles.append({
+                "role": role,
+                "gender": item.get("gender", "未知"),
+                "age": item.get("age", ""),
+                "description": item.get("description", ""),
+            })
+
+        # 写入数据库
+        if profiles:
+            await asyncio.to_thread(batch_update_character_profiles, script_id, profiles)
+            self._logger.info(f"[ScriptService] 角色属性已更新: script_id={script_id}, profiles={profiles}")
+
+        return profiles
+
+    # ===================== 智能体自动匹配 =====================
+
+    def _resolve_narration_agent(self) -> Optional[Dict]:
+        """解析旁白默认智能体。
+
+        优先使用 system_config.json 中的 default_narration_agent_id，
+        否则选择第一个有 voice_tones 的智能体。
+        """
+        from core.global_manager import global_manager
+        if global_manager.agent_manager is None:
+            from agents.agent_manager import AgentManager
+            from core.paths import AGENTS_DATA_DIR
+            global_manager.agent_manager = AgentManager(AGENTS_DATA_DIR)
+
+        # 尝试从系统配置读取
+        try:
+            from core.config_manager import get_config
+            config = get_config()
+            narration_id = config.get("default_narration_agent_id", "")
+            if narration_id:
+                agent = global_manager.agent_manager.get_agent(narration_id)
+                if agent:
+                    return agent
+        except Exception:
+            pass
+
+        # 兆底：选第一个有 voice_tones 的智能体
+        for agent in global_manager.agent_manager.get_all_agents():
+            if agent.get("voice_tones"):
+                return agent
+        return None
+
+    async def _llm_match_agents(self, unmatched: List[Dict[str, Any]],
+                                agents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """调用 LLM 做角色-智能体全局匹配。
+
+        Args:
+            unmatched: 未匹配角色列表（含 gender/age/description）
+            agents: 可用智能体列表
+
+        Returns:
+            匹配结果 [{role, agent_id, reason}, ...]
+        """
+        if not unmatched or not agents:
+            return []
+
+        # 构建角色信息
+        roles_text = ""
+        for i, ch in enumerate(unmatched, 1):
+            role = ch.get("role", "")
+            gender = ch.get("gender", "未知")
+            age = ch.get("age", "")
+            desc = ch.get("description", "")
+            roles_text += f"{i}. 角色名={role}, 性别={gender}, 年龄={age}, 描述={desc}\n"
+
+        # 构建智能体列表
+        agents_text = ""
+        for i, agent in enumerate(agents, 1):
+            aid = agent.get("id", "")
+            name = agent.get("name", "")
+            gender = agent.get("gender", "")
+            age = agent.get("age", "")
+            desc = agent.get("description", "")
+            tags = agent.get("tags", [])
+            tags_str = f"[{','.join(tags)}]" if tags else "[]"
+            agents_text += f"{i}. id={aid}, 名称={name}, 性别={gender}, 年龄={age}, 描述={desc}, 标签={tags_str}\n"
+
+        prompt = (
+            "你是有声书配音导演。请为以下角色选择最合适的配音演员（智能体）。\n\n"
+            f"## 角色信息\n\n{roles_text}\n"
+            f"## 配音演员列表\n\n{agents_text}\n"
+            "## 输出要求\n"
+            "- 根据角色的性别、年龄、描述，选择最匹配的配音演员\n"
+            "- 每个角色最多匹配一个智能体\n"
+            "- 如果确实没有合适的，可以不匹配（留空）\n"
+            "- 输出 JSON: {\"matches\": [{\"role\": \"角色名\", \"agent_id\": \"智能体id\", \"reason\": \"匹配理由\"}]}\n"
+            "只输出 JSON，不要其他内容。"
+        )
+
+        system_prompt = "你是专业的有声书配音导演，擅长根据角色特征匹配最合适的配音演员。"
+
+        result = await self._call_llm_json(
+            prompt, system_prompt,
+            f"智能体匹配 unmatched={[c.get('role') for c in unmatched]}",
+            executor_name="agent_matcher",
+        )
+
+        if not result:
+            return []
+
+        matches = result.get("matches", []) if isinstance(result, dict) else []
+        valid_agent_ids = {a["id"] for a in agents}
+        valid_matches = []
+        for m in matches:
+            if not isinstance(m, dict):
+                continue
+            role = m.get("role", "").strip()
+            agent_id = m.get("agent_id", "").strip()
+            if role and agent_id and agent_id in valid_agent_ids:
+                valid_matches.append({
+                    "role": role,
+                    "agent_id": agent_id,
+                    "reason": m.get("reason", ""),
+                })
+        return valid_matches
+
+    async def auto_match_agents(self, script_id: int) -> Dict[str, Any]:
+        """自动为未配置智能体的角色匹配配音智能体。
+
+        流程：
+        1. 获取所有角色及其配置
+        2. 筛选未匹配角色
+        3. 旁白特殊处理（不走 LLM）
+        4. LLM 全局匹配
+        5. 写入配置
+
+        Returns:
+            {success, matched: [...], unmatched: [...], narration_agent: {...}}
+        """
+        from core.global_manager import global_manager
+        if global_manager.agent_manager is None:
+            from agents.agent_manager import AgentManager
+            from core.paths import AGENTS_DATA_DIR
+            global_manager.agent_manager = AgentManager(AGENTS_DATA_DIR)
+
+        characters = get_script_characters(script_id)
+        configs = get_character_configs(script_id)
+        config_map = {c["role"]: c for c in configs}
+
+        # 筛选未匹配角色
+        unmatched = []
+        for ch in characters:
+            cfg = config_map.get(ch["role"], {})
+            if not cfg.get("agent_id") and not cfg.get("tts_capability_id"):
+                unmatched.append(ch)
+
+        if not unmatched:
+            return {"success": True, "matched": [], "unmatched": [], "message": "所有角色已配置智能体"}
+
+        result_matched = []
+        result_unmatched = []
+        narration_agent_info = None
+
+        # 旁白特殊处理
+        narration_agent = self._resolve_narration_agent()
+        narration_roles = [c for c in unmatched if c["role"] == "旁白"]
+        non_narration = [c for c in unmatched if c["role"] != "旁白"]
+
+        if narration_agent and narration_roles:
+            upsert_character_config(script_id, "旁白", agent_id=narration_agent["id"])
+            narration_agent_info = {
+                "agent_id": narration_agent["id"],
+                "agent_name": narration_agent.get("name", ""),
+            }
+            result_matched.append({
+                "role": "旁白",
+                "agent_id": narration_agent["id"],
+                "agent_name": narration_agent.get("name", ""),
+                "reason": "系统默认旁白配音",
+            })
+        elif narration_roles:
+            result_unmatched.append("旁白")
+
+        # LLM 匹配其他角色
+        if non_narration:
+            agents = global_manager.agent_manager.get_all_agents()
+            if agents:
+                matches = await self._llm_match_agents(non_narration, agents)
+                matched_roles = set()
+                for m in matches:
+                    role = m["role"]
+                    agent_id = m["agent_id"]
+                    upsert_character_config(script_id, role, agent_id=agent_id)
+                    agent = next((a for a in agents if a["id"] == agent_id), None)
+                    result_matched.append({
+                        "role": role,
+                        "agent_id": agent_id,
+                        "agent_name": agent.get("name", "") if agent else "",
+                        "reason": m.get("reason", ""),
+                    })
+                    matched_roles.add(role)
+                for ch in non_narration:
+                    if ch["role"] not in matched_roles:
+                        result_unmatched.append(ch["role"])
+            else:
+                result_unmatched.extend([c["role"] for c in non_narration])
+
+        self._logger.info(
+            f"[ScriptService] 智能体匹配完成: script_id={script_id}, "
+            f"matched={len(result_matched)}, unmatched={len(result_unmatched)}"
+        )
+
+        return {
+            "success": True,
+            "matched": result_matched,
+            "unmatched": result_unmatched,
+            "narration_agent": narration_agent_info,
+        }
+
     async def generate_chapter_script_stream(
         self,
         script_id: int,
@@ -1369,12 +1823,16 @@ class ScriptService:
 
         has_error = False
         total_lines = 0
+        chapter_new_roles: List[str] = []
+        _original_chars = len(chapter_text)  # 原文字数，用于进度计算
+        _generated_chars = 0  # 已生成台词的累计字数
         self._logger.info(f"[ScriptService] 开始生成章节{chapter_index} (is_part_of_full={is_part_of_full})")
 
         async def _on_line_added(sid: int, lines: List[Dict[str, Any]]):
-            nonlocal total_lines
+            nonlocal total_lines, _generated_chars
 
             new_roles = await asyncio.to_thread(self._save_new_characters, sid, lines)
+            chapter_new_roles.extend(new_roles)
 
             inserted = await asyncio.to_thread(add_script_lines, sid, lines)
             total_lines += len(inserted)
@@ -1401,6 +1859,20 @@ class ScriptService:
             except Exception as e:
                 self._logger.warning(f"[ScriptService] WebSocket通知失败: {e}")
 
+            # 逐行广播进度：已生成台词字数 / 原文字数（上限 99%）
+            if not is_part_of_full and _original_chars > 0:
+                try:
+                    _generated_chars += sum(len(ln.get("content", "")) for ln in inserted)
+                    from infrastructure.websocket_broadcast import ws_broadcast_manager
+                    _pct = min(99, int(_generated_chars / _original_chars * 100))
+                    asyncio.create_task(ws_broadcast_manager.broadcast_script_progress(
+                        sid, _pct,
+                        f"正在生成第 {chapter_index} 章台词 (已生成 {total_lines} 条)",
+                        chapter_index,
+                    ))
+                except Exception:
+                    pass
+
             if new_roles and on_character_added:
                 try:
                     on_character_added(sid, new_roles)
@@ -1423,6 +1895,24 @@ class ScriptService:
                 self._logger.info(
                     f"[ScriptService] 章节{chapter_index} 生成 {len(lines)} 条台词"
                 )
+                # 提取新角色属性
+                if chapter_new_roles:
+                    try:
+                        profiles = await self._extract_character_profiles(
+                            script_id, chapter_text, chapter_new_roles
+                        )
+                        if profiles:
+                            try:
+                                from infrastructure.websocket_broadcast import ws_broadcast_manager
+                                all_chars = await asyncio.to_thread(get_script_characters, script_id)
+                                updated_chars = [c for c in all_chars if c.get("role") in [p["role"] for p in profiles]]
+                                if updated_chars:
+                                    asyncio.create_task(ws_broadcast_manager.broadcast_characters_updated(script_id, updated_chars))
+                            except Exception as e:
+                                self._logger.warning(f"[ScriptService] 广播角色属性失败: {e}")
+                    except Exception as e:
+                        self._logger.warning(f"[ScriptService] 角色属性提取失败: {e}")
+                    chapter_new_roles.clear()
             else:
                 self._logger.warning(
                     f"[ScriptService] 章节{chapter_index} 未生成台词"
@@ -1445,6 +1935,15 @@ class ScriptService:
 
         if not is_part_of_full:
             update_script(script_id, status="ready", progress_message="", generating_chapter_index=0)
+            try:
+                from infrastructure.websocket_broadcast import ws_broadcast_manager
+                asyncio.create_task(ws_broadcast_manager.broadcast_script_progress(
+                    script_id, 100,
+                    f"第 {chapter_index} 章台词生成完成，共 {total_lines} 条台词",
+                    chapter_index,
+                ))
+            except Exception:
+                pass
         self._logger.info(
             f"[ScriptService] 章节{chapter_index} 生成完成: script_id={script_id}, 句数={total_lines}"
         )

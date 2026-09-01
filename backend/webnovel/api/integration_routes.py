@@ -148,12 +148,34 @@ async def _execute_init_workflow(task_id: int, script_id: int, project_data: dic
 
 
 @router.get("/init/status")
-def get_init_status(script_id: int, task_id: int):
-    """获取初始化任务状态。"""
-    task = get_writing_task(script_id, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    return {"success": True, "task": task}
+def get_init_status(script_id: int, task_id: Optional[int] = None):
+    """获取初始化任务状态。
+
+    - 传 task_id：返回具体任务详情（兼容旧调用方）。
+    - 不传 task_id：返回脚本级初始化状态（页面刷新后降级轮询使用）。
+    """
+    if task_id is not None:
+        task = get_writing_task(script_id, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        return {"success": True, "task": task}
+
+    # 无 task_id 时返回脚本级状态，供前端降级轮询使用
+    script = get_script(script_id)
+    if not script:
+        raise HTTPException(status_code=404, detail="剧本不存在")
+
+    from webnovel.api.init_routes import _init_tasks, _init_tasks_lock
+    with _init_tasks_lock:
+        is_running = script_id in _init_tasks
+
+    return {
+        "success": True,
+        "is_running": is_running,
+        "status": script.get("status", ""),
+        "progress": script.get("progress", 0) or 0,
+        "progress_message": script.get("progress_message", "") or "",
+    }
 
 
 @router.post("/plan")
@@ -486,11 +508,27 @@ def webnovel_dashboard(script_id: int):
     if not script:
         raise HTTPException(status_code=404, detail="剧本不存在")
 
+    # 检测是否正在初始化中：script.status 为 initializing 且内存中有注册的任务
+    is_initializing = False
+    init_progress_message = script.get("progress_message", "") or ""
+    init_progress = script.get("progress", 0) or 0
+    if script.get("status") == "initializing":
+        from webnovel.api.init_routes import _init_tasks, _init_tasks_lock
+        with _init_tasks_lock:
+            is_initializing = script_id in _init_tasks
+        # 服务器重启后内存任务丢失，但 script 状态仍为 initializing：也视为初始化中
+        # （前端可通过轮询 /init/status 进一步确认）
+        if not is_initializing:
+            is_initializing = True  # 状态标记优先，让前端展示遮罩而非步骤向导
+
     project = get_webnovel_project_by_script(script_id)
     if not project:
         return {
             "success": True,
             "initialized": False,
+            "is_initializing": is_initializing,
+            "init_progress": init_progress if is_initializing else 0,
+            "init_progress_message": init_progress_message if is_initializing else "",
             "project": None,
             "characters": [],
             "volume_outlines": [],
@@ -513,6 +551,9 @@ def webnovel_dashboard(script_id: int):
     return {
         "success": True,
         "initialized": True,
+        "is_initializing": is_initializing,
+        "init_progress": init_progress if is_initializing else 0,
+        "init_progress_message": init_progress_message if is_initializing else "",
         "project": project,
         "characters": characters,
         "golden_finger": golden_finger,

@@ -27,7 +27,7 @@ from repositories import (
     get_ebook, get_chapters
 )
 from webnovel.repositories import (
-    get_webnovel_project_by_script, get_volume_outlines_by_project,
+    get_webnovel_project, get_webnovel_project_by_script, get_volume_outlines_by_project,
     get_chapter_meta_list, get_chapter_meta, update_chapter_meta,
     add_review_record, get_review_records, delete_chapter_review_records,
     get_worldview_by_project, get_timelines_by_project, add_timeline, add_timeline_chapter,
@@ -39,6 +39,9 @@ from webnovel.repositories import (
 )
 from core.model_executor import get_model_executor
 from infrastructure.websocket_broadcast import ws_broadcast_manager
+
+# apply 任务超时时间（秒）
+_APPLY_TASK_TIMEOUT = 600
 
 
 # character_type 存储为英文，须翻译为中文以匹配中文查询（与 init_executor._type_label 保持一致）
@@ -103,11 +106,13 @@ def _build_character_chunk_text(char: dict) -> str:
     opener = f"{name}是本作的{type_label}。" if type_label else f"{name}是本作登场的角色。"
     field_specs = [
         ('identity', '其身份是{v}', False),
+        ('protagonist_relation', '与主角的关系是{v}', False),
         ('core_personality', '性格{v}', False),
         ('true_desire', '核心欲望是{v}', False),
         ('personality_flaw', '性格缺陷是{v}', False),
         ('alias', '曾用名是{v}', False),
-        ('age', '年龄为{v}', False),
+        ('age', '年龄为{v}岁', False),
+        ('age_stage', '年龄段为{v}', False),
         ('long_term_goal', '长期目标是{v}', False),
         ('first_impression', '给人的初印象是{v}', False),
         ('core_tags', '核心标签包括{v}', True),
@@ -115,7 +120,11 @@ def _build_character_chunk_text(char: dict) -> str:
         ('ability_limit', '能力上限是{v}', False),
         ('items_text', '随身携带的物品有{v}', False),
     ]
-    body = _join_field_sentences(field_specs, char)
+    # age=0 时无意义，置空避免生成“年龄为0岁”
+    char_for_text = dict(char)
+    if not char_for_text.get('age'):
+        char_for_text['age'] = ''
+    body = _join_field_sentences(field_specs, char_for_text)
     if not body:
         return opener
     return opener + body + "。"
@@ -307,8 +316,9 @@ class WebnovelService:
         6. 起草正文（草稿）
         7. 质量审查（审查）
         8. 润色优化（优化）
-        9. 记录事实
-        10. 更新任务状态
+        9. 更新任务状态
+
+        注：事实记录和伏笔爽点提取已移至“应用创作结果”任务中执行。
         """
         script = get_script(script_id)
         if script is None:
@@ -320,6 +330,17 @@ class WebnovelService:
         stale_tasks = (get_writing_tasks(script_id, None, "running") or []) + \
                       (get_writing_tasks(script_id, None, "pending") or [])
         for rt in stale_tasks:
+            # apply 类型任务单独处理：检查目标章节是否已有内容
+            if rt.get("task_type") == "apply":
+                ch = get_script_chapter(script_id, rt.get("chapter_index", 0))
+                if ch and (ch.get("word_count") or 0) > 0:
+                    update_writing_task(rt["id"], status="completed", progress=100,
+                                       progress_message="服务重启后自动标记为完成（章节内容已保存）",
+                                       current_step="完成")
+                else:
+                    update_writing_task(rt["id"], status="failed",
+                                       error_message="服务中断，应用任务失败")
+                continue
             # 如果任务已有结果（polished或draft），说明已完成但状态未更新，标记为completed
             if rt.get("polished") or rt.get("draft"):
                 update_writing_task(rt["id"], status="completed", progress=100,
@@ -330,9 +351,12 @@ class WebnovelService:
         if chapter_index is None:
             chapter_index = self._determine_continue_chapter(script_id)
 
-        # 再次检查清理后是否还有进行中任务（pending + running）
-        if self._count_active_tasks(script_id) > 0:
-            return {"success": False, "error": "剧本已有正在运行的创作任务"}
+        # 检查剧本级别是否有拆章任务（split）或续写任务（continue），有则拒绝
+        active_tasks = (get_writing_tasks(script_id, None, "pending") or []) + \
+                       (get_writing_tasks(script_id, None, "running") or [])
+        blocking_tasks = [t for t in active_tasks if t.get("task_type") in ("split", "continue")]
+        if blocking_tasks:
+            return {"success": False, "error": "当前剧本已有创作任务正在进行，请等待完成后再试"}
 
         # 🔴 本地模型模式下全局只允许一个创作任务：本地 LLM/Embedding/Reranker 为单实例，
         # 推理层虽已串行锁保护，但多任务排队会导致后续任务长时间无响应，入口处直接拒绝更友好。
@@ -348,9 +372,13 @@ class WebnovelService:
 
         # 🔴 插入后复检：消除"先查后插"竞态（同一剧本双击/两个编辑器并发请求时，
         # 两个请求可能都通过上方检查）。下方均为同步调用，其间无 await，不会被其他协程交错。
-        if self._count_active_tasks(script_id) > 1:
+        # 检查剧本级别是否有重复的创作任务
+        all_active = (get_writing_tasks(script_id, None, "pending") or []) + \
+                     (get_writing_tasks(script_id, None, "running") or [])
+        dup_tasks = [t for t in all_active if t.get("task_type") in ("split", "continue")]
+        if len(dup_tasks) > 1:
             delete_writing_task(task_id)
-            return {"success": False, "error": "剧本已有正在运行的创作任务"}
+            return {"success": False, "error": "当前剧本已有创作任务正在进行，请等待完成后再试"}
 
         asyncio.create_task(self._execute_writing_workflow(task_id, enable_polish=enable_polish, auto_apply=auto_apply))
 
@@ -375,12 +403,6 @@ class WebnovelService:
             return cap.get("platform_code", "local") == "local"
         except Exception:
             return True
-
-    def _count_active_tasks(self, script_id: int) -> int:
-        """统计指定剧本进行中的创作任务数（pending + running）。"""
-        pending = get_writing_tasks(script_id, None, "pending") or []
-        running = get_writing_tasks(script_id, None, "running") or []
-        return len(pending) + len(running)
 
     def _determine_continue_chapter(self, script_id: int) -> int:
         """自动判断创作章节。
@@ -547,30 +569,18 @@ class WebnovelService:
             await self._broadcast_task_status(task_id)
 
             if polished_content and polished_content.strip():
-                # 不再自动覆盖章节内容，等待用户在模态框中点击"应用结果"
-                # 更新 webnovel_state 的当前章节和字数
+                # 事实记录和伏笔爽点提取已移至“应用创作结果”任务中执行
+                # 仅更新 webnovel_state 的当前章节和字数
                 await self._update_state_after_chapter(script_id, chapter_index, polished_content)
-                # 获取 project_id 用于后续操作
-                _project = get_webnovel_project_by_script(script_id)
-                _project_id = _project["id"] if _project else 0
-                if _project_id:
-                    # 提取结尾状态并回写 chapter_meta
-                    await self._extract_and_save_hook(_project_id, chapter_index, polished_content)
-                    # 结尾状态提取完成后，标记章节元数据为已完成
-                    _meta = get_chapter_meta(_project_id, chapter_index)
-                    if _meta:
-                        update_chapter_meta(_meta["id"], hook_type="已完成")
-                    # 存储 RAG 向量片段
-                    await self._store_rag_chunk(_project_id, chapter_index, polished_content)
-
-                # 自动应用创作结果
+            
+                # 自动应用创作结果：创作完成后自动发起 apply 任务
                 if auto_apply:
                     self._logger.info(f"[WebnovelService] 自动应用创作结果，task_id={task_id}, chapter_index={chapter_index}")
-                    apply_result = await self.apply_continue_result(script_id, chapter_index, task_id)
+                    apply_result = await self.apply_continue_result_as_task(script_id, chapter_index, task_id)
                     if not apply_result.get("success"):
                         self._logger.error(f"[WebnovelService] 自动应用失败: {apply_result.get('error')}")
                     else:
-                        self._logger.info(f"[WebnovelService] 自动应用成功，第{chapter_index}章")
+                        self._logger.info(f"[WebnovelService] 自动应用任务已创建，apply_task_id={apply_result.get('apply_task_id')}")
         except Exception as e:
             self._logger.error(f"[WebnovelService] 写作工作流执行失败: {e}")
             # 异常时也检查是否因中断导致
@@ -750,6 +760,28 @@ class WebnovelService:
 
             if plan_count > 0:
                 summary = f"第{chapter_num}章规划已生成：{plan_count}章"
+
+                # 章节规划生成成功后，检查是否需要补充时间线
+                # （单章回退路径不会自动生成时间线，需在此补上）
+                existing_timelines = get_timelines_by_project(project["id"])
+                has_volume_timeline = any(
+                    tl.get("volume_number") == volume_number for tl in existing_timelines
+                )
+                tl_id = None
+                if not has_volume_timeline:
+                    try:
+                        timeline = await executor._generate_timeline(
+                            project, volume_outline, protagonist, volume_number,
+                            chapter_plans=chapter_plans
+                        )
+                        if timeline:
+                            tl_id = executor._save_timeline(project["id"], volume_number, timeline)
+                            summary += f"，时间线ID={tl_id}"
+                    except Exception as tl_err:
+                        self._logger.warning(
+                            f"[WebnovelService] 单章规划后补充时间线失败: {tl_err}"
+                        )
+
                 update_writing_task(
                     task_id, progress=8, progress_message=summary,
                     current_step="章节规划", step_result="章节规划"
@@ -1162,6 +1194,386 @@ class WebnovelService:
             self._logger.error(f"[WebnovelService] 应用创作结果失败: {e}")
             return {"success": False, "error": str(e)}
 
+    # ── 应用创作结果任务 ──────────────────────────────────────
+
+    async def apply_continue_result_as_task(self, script_id: int, chapter_index: int, source_task_id: int) -> Dict[str, Any]:
+        """将应用创作结果作为异步任务执行。
+
+        Args:
+            script_id: 剧本ID
+            chapter_index: 目标章节索引
+            source_task_id: 创作任务ID（包含 polished/draft 内容的任务）
+
+        Returns:
+            {success, apply_task_id, chapter_index} 或 {success: False, error}
+        """
+        # 互斥检查：该剧本是否已有 apply 类型的 running/pending 任务
+        active_tasks = (get_writing_tasks(script_id, None, "running") or []) + \
+                       (get_writing_tasks(script_id, None, "pending") or [])
+        for t in active_tasks:
+            if t.get("task_type") == "apply":
+                return {"success": False, "error": "已有应用任务正在进行中"}
+
+        # 创建 apply 类型的 writing_task
+        task = add_writing_task(script_id, chapter_index, "apply",
+                                prompt=f"应用任务{source_task_id}的创作结果")
+        apply_task_id = task["id"]
+
+        # 异步执行应用工作流
+        asyncio.create_task(
+            self._execute_apply_workflow(apply_task_id, script_id, chapter_index, source_task_id)
+        )
+
+        return {
+            "success": True,
+            "apply_task_id": apply_task_id,
+            "chapter_index": chapter_index,
+        }
+
+    async def _execute_apply_workflow(self, apply_task_id: int, script_id: int,
+                                       chapter_index: int, source_task_id: int):
+        """执行应用创作结果的异步工作流。
+
+        流程：
+        1. 获取源任务的创作内容
+        2. 过滤内容、提取标题
+        3. 创建/覆写章节
+        4. 执行事实记录
+        5. 执行伏笔爽点提取
+        6. 提取结尾钩子
+        7. 构建 RAG 索引
+        8. 更新任务状态
+        """
+        start_time = time.time()
+        try:
+            update_writing_task(apply_task_id, status="running", progress=5,
+                                progress_message="开始应用创作结果...",
+                                current_step="开始")
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "started",
+                    "message": "正在应用创作结果...",
+                }
+            )
+
+            # 获取源任务内容
+            source_task = get_writing_task(None, source_task_id)
+            if not source_task:
+                raise ValueError(f"源创作任务不存在，task_id={source_task_id}")
+
+            raw_content = source_task.get("polished") or source_task.get("draft") or ""
+            if not raw_content.strip():
+                raise ValueError("创作结果为空")
+
+            # 过滤内容、提取标题
+            filtered_content = self._filter_chapter_content(raw_content)
+            actual_title = self._extract_chapter_title(raw_content, script_id, chapter_index)
+
+            # 保存章节
+            from services.script_service import ScriptService
+            script_service = ScriptService()
+            script_service.add_chapter(script_id, actual_title, filtered_content,
+                                        chapter_index=chapter_index)
+            script_service.update_chapter_title(script_id, chapter_index, actual_title)
+
+            self._logger.info(
+                f"[WebnovelService] 应用任务 {apply_task_id}: 第{chapter_index}章已保存，标题: {actual_title}"
+            )
+
+            update_writing_task(apply_task_id, progress=30,
+                                progress_message="章节内容已保存",
+                                current_step="内容保存")
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "content_saved",
+                    "message": "章节已保存，正在执行后处理...",
+                }
+            )
+
+            # 获取 project_id 用于后处理
+            project = get_webnovel_project_by_script(script_id)
+            project_id = project["id"] if project else 0
+
+            # 构建 writing_context 供事实记录使用
+            writing_context = self._build_writing_context_for_apply(script_id)
+
+            # 后处理步骤（事实记录 → 伏笔爽点提取 → 结尾钩子 → RAG 索引）
+            await self._run_apply_post_process(
+                apply_task_id, script_id, chapter_index, project_id,
+                filtered_content, writing_context, start_time,
+            )
+
+            # 完成
+            update_writing_task(apply_task_id, status="completed", progress=100,
+                                progress_message="应用完成",
+                                current_step="完成")
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "completed",
+                    "message": "应用完成",
+                }
+            )
+            self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id} 完成")
+
+        except Exception as e:
+            self._logger.error(f"[WebnovelService] 应用任务 {apply_task_id} 失败: {e}")
+            elapsed = time.time() - start_time
+            if elapsed >= _APPLY_TASK_TIMEOUT:
+                error_msg = f"应用任务超时（{int(elapsed)}秒）"
+            else:
+                error_msg = str(e)
+            update_writing_task(apply_task_id, status="failed",
+                                error_message=error_msg,
+                                progress_message=f"应用失败: {error_msg[:100]}",
+                                current_step="失败")
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "failed",
+                    "message": "应用失败",
+                    "error": error_msg,
+                }
+            )
+
+    async def _run_apply_post_process(self, apply_task_id: int, script_id: int,
+                                       chapter_index: int, project_id: int,
+                                       filtered_content: str,
+                                       writing_context: Dict[str, Any],
+                                       start_time: float):
+        """执行应用任务的后处理步骤（并行优化版）。
+
+        Phase 1: 事实记录 + 伏笔爽点提取（含回收检查）+ 结尾钩子 并行
+        Phase 2: RAG 索引构建
+
+        云端模式下 Phase 1 的 3 次 LLM 调用并发执行，延迟取最慢一个；
+        本地模式下 _LOCAL_INFERENCE_LOCK 自动串行，行为不变。
+        供 _execute_apply_workflow 和 retry_post_process 复用。
+        """
+        from webnovel.pipeline.executors.fact_recorder_executor import FactRecorderExecutor
+        from webnovel.pipeline.executors.foreshadow_cool_point_extractor_executor import (
+            ForeshadowCoolPointExtractorExecutor,
+        )
+
+        # ── Phase 1: 事实记录 + 伏笔爽点提取 + 结尾钩子 并行 ──
+        update_writing_task(apply_task_id, progress=40,
+                            progress_message="正在执行后处理（事实记录/伏笔提取/钩子提取）...",
+                            current_step="后处理")
+        await ws_broadcast_manager.broadcast_apply_task_update(
+            script_id, {
+                "task_id": apply_task_id,
+                "chapter_index": chapter_index,
+                "phase": "processing",
+                "message": "正在执行后处理...",
+            }
+        )
+
+        # 创建并行任务
+        fact_executor = FactRecorderExecutor(script_id, chapter_index, apply_task_id)
+        fact_task = asyncio.create_task(fact_executor.execute({
+            "polished_content": filtered_content,
+            "writing_context": writing_context,
+        }))
+
+        foreshadow_executor = ForeshadowCoolPointExtractorExecutor(script_id, chapter_index, apply_task_id)
+        foreshadow_task = asyncio.create_task(foreshadow_executor.execute({
+            "polished_content": filtered_content,
+        }))
+
+        hook_task = None
+        if project_id:
+            hook_task = asyncio.create_task(
+                self._extract_and_save_hook(project_id, chapter_index, filtered_content)
+            )
+
+        # 等待事实记录完成
+        fact_result = await fact_task
+        if fact_result.success:
+            self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id}: 事实记录完成 - {fact_result.step_summary}")
+        else:
+            self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 事实记录失败 - {fact_result.error_message}")
+
+        # 等待伏笔爽点提取完成（内部已包含伏笔回收检查）
+        foreshadow_result = await foreshadow_task
+        if foreshadow_result.success:
+            self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id}: 伏笔爽点提取完成 - {foreshadow_result.step_summary}")
+        else:
+            self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 伏笔爽点提取失败 - {foreshadow_result.error_message}")
+
+        # 等待结尾钩子提取完成
+        if hook_task:
+            await hook_task
+            _meta = get_chapter_meta(project_id, chapter_index)
+            if _meta:
+                update_chapter_meta(_meta["id"], hook_type="已完成")
+
+        if time.time() - start_time >= _APPLY_TASK_TIMEOUT:
+            raise TimeoutError("应用任务超时")
+
+        # ── Phase 2: RAG 索引构建 ──
+        update_writing_task(apply_task_id, progress=85,
+                            progress_message="正在构建索引...",
+                            current_step="RAG索引构建")
+        await ws_broadcast_manager.broadcast_apply_task_update(
+            script_id, {
+                "task_id": apply_task_id,
+                "chapter_index": chapter_index,
+                "phase": "processing",
+                "message": "正在构建索引...",
+            }
+        )
+        if project_id:
+            await self._store_rag_chunk(project_id, chapter_index, filtered_content)
+
+    async def retry_post_process(self, script_id: int, chapter_index: int) -> Dict[str, Any]:
+        """对已有内容的章节重新执行后处理（事实记录 + 伏笔爽点提取 + 结尾钩子 + RAG 索引）。
+
+        用于应用任务后处理失败后的重试。
+        """
+        # 获取章节内容
+        chapter = get_script_chapter(script_id, chapter_index)
+        if not chapter or (chapter.get("word_count") or 0) == 0:
+            return {"success": False, "error": "章节内容为空，无法重试后处理"}
+
+        # 互斥检查
+        active_tasks = (get_writing_tasks(script_id, None, "running") or []) + \
+                       (get_writing_tasks(script_id, None, "pending") or [])
+        for t in active_tasks:
+            if t.get("task_type") == "apply":
+                return {"success": False, "error": "已有应用任务正在进行中"}
+
+        # 创建 apply 任务记录
+        task = add_writing_task(script_id, chapter_index, "apply",
+                                prompt=f"重试后处理：第{chapter_index}章")
+        apply_task_id = task["id"]
+
+        asyncio.create_task(
+            self._execute_retry_post_process(apply_task_id, script_id, chapter_index)
+        )
+
+        return {"success": True, "task_id": apply_task_id}
+
+    async def _execute_retry_post_process(self, apply_task_id: int, script_id: int,
+                                           chapter_index: int):
+        """重试后处理的异步执行流程。"""
+        start_time = time.time()
+        try:
+            update_writing_task(apply_task_id, status="running", progress=10,
+                                progress_message="开始重试后处理...",
+                                current_step="开始")
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "started",
+                    "message": "正在重试后处理...",
+                }
+            )
+
+            # 获取章节内容
+            chapter = get_script_chapter(script_id, chapter_index)
+            if not chapter:
+                raise ValueError(f"章节不存在，chapter_index={chapter_index}")
+
+            # 获取章节原文内容
+            from services.script_service import ScriptService
+            script_service = ScriptService()
+            content_data = script_service.get_chapter_content(script_id, chapter_index)
+            if not content_data or not content_data.get("content", "").strip():
+                raise ValueError("章节内容为空")
+            filtered_content = content_data["content"]
+
+            # 获取 project_id
+            project = get_webnovel_project_by_script(script_id)
+            project_id = project["id"] if project else 0
+
+            # 构建 writing_context
+            writing_context = self._build_writing_context_for_apply(script_id)
+
+            # 广播 content_saved（章节已存在，直接跳到后处理）
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "content_saved",
+                    "message": "章节内容已确认，正在执行后处理...",
+                }
+            )
+
+            # 执行后处理
+            await self._run_apply_post_process(
+                apply_task_id, script_id, chapter_index, project_id,
+                filtered_content, writing_context, start_time,
+            )
+
+            # 完成
+            update_writing_task(apply_task_id, status="completed", progress=100,
+                                progress_message="后处理完成",
+                                current_step="完成")
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "completed",
+                    "message": "后处理完成",
+                }
+            )
+            self._logger.info(f"[WebnovelService] 重试后处理任务 {apply_task_id} 完成")
+
+        except Exception as e:
+            self._logger.error(f"[WebnovelService] 重试后处理任务 {apply_task_id} 失败: {e}")
+            error_msg = str(e)
+            update_writing_task(apply_task_id, status="failed",
+                                error_message=error_msg,
+                                progress_message=f"后处理失败: {error_msg[:100]}",
+                                current_step="失败")
+            await ws_broadcast_manager.broadcast_apply_task_update(
+                script_id, {
+                    "task_id": apply_task_id,
+                    "chapter_index": chapter_index,
+                    "phase": "failed",
+                    "message": "后处理失败",
+                    "error": error_msg,
+                }
+            )
+
+    def _build_writing_context_for_apply(self, script_id: int) -> Dict[str, Any]:
+        """为 apply 任务构建最小化的 writing_context（供事实记录器使用）。"""
+        project = get_webnovel_project_by_script(script_id)
+        if not project:
+            return {"world_settings": [], "characters": []}
+
+        project_id = project["id"]
+
+        # 世界观
+        world_settings = []
+        worldview = get_worldview_by_project(project_id)
+        if worldview:
+            world_settings.append({
+                "name": worldview.get("name", ""),
+                "world_summary": worldview.get("world_summary", ""),
+            })
+
+        # 角色
+        characters = []
+        cards = get_character_cards_by_project(project_id)
+        for card in cards:
+            characters.append({
+                "character_name": card.get("character_name", ""),
+                "role": card.get("role", ""),
+            })
+
+        return {
+            "world_settings": world_settings,
+            "characters": characters,
+        }
+
     async def _update_state_after_chapter(self, script_id: int, chapter_index: int, content: str):
         """创作完成后更新 webnovel_state 的当前章节和字数。
 
@@ -1464,12 +1876,15 @@ class WebnovelService:
             except Exception:
                 _items_by_char = {}
             for char in characters:
-                _names = [
-                    it.get("item_name", "") for it in _items_by_char.get(char.get("id"), [])
-                    if it.get("item_name")
-                ]
-                if _names:
-                    char["items_text"] = "、".join(_names)
+                _item_strs = []
+                for it in _items_by_char.get(char.get("id"), []):
+                    _name = it.get("item_name", "")
+                    if not _name:
+                        continue
+                    _qty = it.get("quantity", 1) or 1
+                    _item_strs.append(f"{_name}x{_qty}" if _qty > 1 else _name)
+                if _item_strs:
+                    char["items_text"] = "、".join(_item_strs)
                 text = _build_character_chunk_text(char)
                 if text:
                     _collect_one("character", text, metadata=json.dumps({"source": "character_card", "char_id": char.get("id")}))
@@ -1511,6 +1926,42 @@ class WebnovelService:
             for v in villains:
                 _collect_one("villain", _build_villain_chunk_text(v),
                              metadata=json.dumps({"source": "villain", "villain_id": v.get("id")}))
+
+            # 8. CSV 知识表（按题材加载，入 RAG 供写文/审查时语义检索）
+            try:
+                from webnovel.repositories.csv_knowledge_repository import (
+                    query_csv_knowledge, build_csv_knowledge_chunk_text
+                )
+                project = get_webnovel_project(project_id)
+                _csv_genre = (project.get("genre", "") or "") if project else ""
+
+                if _csv_genre:
+                    # (表名, chunk_type, genre列名)
+                    _csv_tables = [
+                        ("webnovel_csv_plot", "csv_plot", "applicable_genre"),
+                        ("webnovel_csv_pacing", "csv_pacing", "applicable_genre"),
+                        ("webnovel_csv_verdict_rules", "csv_verdict", "genre"),
+                        ("webnovel_csv_scene", "csv_scene", "applicable_genre"),
+                        ("webnovel_csv_writing", "csv_writing", "applicable_genre"),
+                        ("webnovel_csv_naming", "csv_naming", "applicable_genre"),
+                        ("webnovel_csv_character", "csv_character_knowledge", "applicable_genre"),
+                        ("webnovel_csv_golden_finger", "csv_golden_finger_knowledge", "applicable_genre"),
+                        ("webnovel_csv_genre_tone", "csv_genre_tone", "applicable_genre"),
+                    ]
+                    for table_name, chunk_type, genre_col in _csv_tables:
+                        rows = query_csv_knowledge(table_name, genre=_csv_genre, genre_column=genre_col)
+                        for row in rows:
+                            text = build_csv_knowledge_chunk_text(table_name, row)
+                            if text:
+                                _meta = json.dumps({
+                                    "source": table_name,
+                                    "code": row.get("code", ""),
+                                    "genre": _csv_genre,
+                                    "keywords": row.get("keywords", ""),
+                                })
+                                _collect_one(chunk_type, text, metadata=_meta)
+            except Exception as e:
+                self._logger.warning(f"[WebnovelService] CSV知识索引失败: {e}")
 
             # 批量编码并写入向量库
             if pending_items:

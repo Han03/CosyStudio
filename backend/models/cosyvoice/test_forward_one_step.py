@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 
 from llm.llm import Qwen2Encoder
 
-model_path = 'c:/MyProjects/ai/CosyWritter/pretrained_models/cosyvoice/iic_CosyVoice2-0.5B/CosyVoice-BlankEN'
+model_path = 'c:/MyProjects/ai/CosyStudio/pretrained_models/cosyvoice/iic_CosyVoice2-0.5B/CosyVoice-BlankEN'
 
 print(f"Loading Qwen2Encoder from: {model_path}")
 encoder = Qwen2Encoder(model_path)

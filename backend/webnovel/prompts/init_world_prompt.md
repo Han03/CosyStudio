@@ -8,10 +8,28 @@ user_prompt: |
   题材：{genre}
   一句话故事：{one_liner}
   核心冲突：{core_conflict}
+  目标字数：{target_words}
+  目标章节：{target_chapters}
+  目标读者：{target_reader}
+  目标平台：{platform}
+
+  【主角设定】
   主角姓名：{protagonist_name}
   主角欲望：{protagonist_desire}
+  主角缺陷：{protagonist_flaw}
+  主角原型：{protagonist_archetype}
+  主角结构：{protagonist_structure}
+
+  【关系配置】
+  感情线配置：{heroine_config}
+  反派分层：{antagonist_level}
+  反派镜像：{antagonist_mirror}
+
+  【金手指设定】
   金手指类型：{gf_type}
   金手指名称：{gf_name}
+  金手指风格：{gf_style}
+  可见度：{gf_visibility}
 
   【用户已填世界观信息】
   世界观复杂度：{world_complexity}

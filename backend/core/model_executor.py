@@ -217,12 +217,15 @@ class ModelExecutor:
         generate_params: dict = None,
         max_tokens: int = None,
         call_point_override: dict = None,
+        executor_name: str = "",
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """执行文本预测能力。
 
         Args:
             call_point_override: 调用点模型覆盖配置 {platform_code, model_code}，
                 若提供则优先使用，失败后回退到默认能力优先级。
+            executor_name: 调用点名称，用于自动查找调用点模型覆盖配置。
+                当 call_point_override 未显式传入时，自动通过此名称解析覆盖配置。
         """
         capabilities = capability_manager.get_capabilities_by_type("text_predict")
         
@@ -232,7 +235,16 @@ class ModelExecutor:
             if capability:
                 capabilities = [capability]
 
-        # 调用点覆盖：构造临时 capability 插入到列表最前面
+        # 调用点覆盖：通过 executor_name 自动解析，或显式传入 call_point_override
+        if not call_point_override and executor_name:
+            from core.config_manager import get_call_point_model
+            call_point_override = get_call_point_model(executor_name)
+            if call_point_override:
+                _logger.info(
+                    f"调用点覆盖生效(execute_text_predict): {executor_name} -> "
+                    f"{call_point_override['platform_code']}/{call_point_override['model_code']}"
+                )
+
         if call_point_override:
             override_cap = {
                 "id": f"call_point_override_{call_point_override['platform_code']}_{call_point_override['model_code']}",
@@ -714,6 +726,9 @@ class ModelExecutor:
             "messages": messages,
             "stream": stream,
         }
+        # 🔴 流式请求必须显式要求返回 usage，否则 OpenAI 兼容 API 默认不在 SSE 中返回 token 统计
+        if stream:
+            payload["stream_options"] = {"include_usage": True}
         # 🔴 调用方指定的 max_tokens 必须传递给云端 API，否则输出会被模型默认值截断
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens

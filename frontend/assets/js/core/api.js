@@ -6,6 +6,23 @@
 
 // ─── Toast 通知 ───────────────────────────────────────────────
 
+/**
+ * 获取或创建全局 toast 容器，多个 toast 自动纵向堆叠、不会重叠。
+ */
+function _getToastContainer() {
+    var container = document.getElementById('toastContainer');
+    if (container) return container;
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.style.cssText = [
+        'position:fixed', 'top:20px', 'right:20px', 'z-index:99999',
+        'display:flex', 'flex-direction:column', 'gap:10px',
+        'pointer-events:none', 'max-width:420px'
+    ].join(';');
+    document.body.appendChild(container);
+    return container;
+}
+
 function showToast(message, type) {
     if (typeof message !== 'string') {
         try { message = String(message); } catch (_) { message = '未知错误'; }
@@ -15,9 +32,10 @@ function showToast(message, type) {
     var bgColors = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
     var icons    = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
 
+    var container = _getToastContainer();
+
     var toast = document.createElement('div');
     toast.style.cssText = [
-        'position:fixed', 'top:20px', 'right:20px', 'z-index:99999',
         'padding:12px 20px', 'border-radius:10px', 'color:#fff',
         'font-size:14px', 'min-width:220px', 'max-width:420px',
         'box-shadow:0 4px 16px rgba(0,0,0,0.18)',
@@ -25,11 +43,11 @@ function showToast(message, type) {
         'opacity:0', 'transform:translateX(20px)',
         'transition:opacity 0.3s,transform 0.3s',
         'background:' + (bgColors[type] || bgColors.info),
-        'word-break:break-word'
+        'word-break:break-word', 'pointer-events:auto'
     ].join(';');
     toast.innerHTML = '<i class="fas ' + (icons[type] || icons.info) + '"></i><span>' + message + '</span>';
 
-    document.body.appendChild(toast);
+    container.appendChild(toast);
     // 触发动画
     requestAnimationFrame(function () {
         toast.style.opacity = '1';
@@ -39,7 +57,7 @@ function showToast(message, type) {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(20px)';
         setTimeout(function () { toast.remove(); }, 300);
-    }, 3000);
+    }, 5000);
 }
 
 // 便捷别名

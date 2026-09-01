@@ -24,6 +24,7 @@ async function regenerateScript() {
             showToast('生成全部台词任务已启动', 'success');
             state.scriptData.status = 'running';
             updateStatusBadge('running');
+            showGenerationProgress();
             state.currentLines = [];
             renderLines();
             await loadScriptInfo();
@@ -37,6 +38,7 @@ async function regenerateScript() {
 async function stopGeneration() {
     if (!state.scriptId) return;
     if (!confirm('确定停止生成吗？已生成的台词会保留。')) return;
+    hideGenerationProgress();
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
         state.ws.send(JSON.stringify({ type: 'stop_generation' }));
         showToast('生成已停止', 'info');
@@ -97,12 +99,26 @@ function updateStatusBadge(status) {
 }
 
 function updateProgress(percent, message) {
-    const bar = document.getElementById('progressBar');
-    const text = document.getElementById('progressText');
-    const msg = document.getElementById('progressMessage');
-    if (bar) bar.style.width = `${percent}%`;
-    if (text) text.textContent = `${percent}%`;
-    if (msg && message) msg.textContent = message;
+    const fill = document.getElementById('playerBarProgressFill');
+    if (fill) fill.style.width = `${percent}%`;
+}
+
+function showGenerationProgress() {
+    const container = document.getElementById('playerBarProgress');
+    const fill = document.getElementById('playerBarProgressFill');
+    const stopBtn = document.getElementById('stopGenBtn');
+    if (container) container.style.display = 'block';
+    if (fill) fill.style.width = '0%';
+    if (stopBtn) stopBtn.style.display = 'flex';
+}
+
+function hideGenerationProgress() {
+    const container = document.getElementById('playerBarProgress');
+    const fill = document.getElementById('playerBarProgressFill');
+    const stopBtn = document.getElementById('stopGenBtn');
+    if (container) container.style.display = 'none';
+    if (fill) fill.style.width = '0%';
+    if (stopBtn) stopBtn.style.display = 'none';
 }
 
 function updateGenerateButtons(isGenerating) {
@@ -110,13 +126,6 @@ function updateGenerateButtons(isGenerating) {
     if (btn) {
         btn.disabled = isGenerating;
         btn.innerHTML = isGenerating ? '<i class="fas fa-spinner fa-spin"></i> 生成中...' : '<i class="fas fa-magic"></i> 生成台词';
-    }
-}
-
-function updateClearButton() {
-    const btn = document.getElementById('clearLinesBtn');
-    if (btn) {
-        btn.style.display = state.currentLines.length > 0 ? 'block' : 'none';
     }
 }
 

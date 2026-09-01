@@ -441,11 +441,19 @@ function renderCharacterCards(data) {
             html += `<div class="cc-character-header">`;
             html += `<span class="cc-character-name">${c.name || '未命名'}</span>`;
             html += `<span class="cc-type-badge cc-type-${type}">${typeLabel}</span>`;
-            if (c.age) html += `<span class="cc-character-age">${c.age}岁</span>`;
+            if (c.age || c.age_stage) {
+                const ageParts = [];
+                if (c.age && c.age > 0) ageParts.push(`${c.age}岁`);
+                if (c.age_stage) ageParts.push(c.age_stage);
+                html += `<span class="cc-character-age">${ageParts.join(' · ')}</span>`;
+            }
             html += `</div>`;
 
             if (c.identity) {
                 html += `<div class="cc-character-identity">${c.identity}</div>`;
+            }
+            if (c.protagonist_relation) {
+                html += `<div class="cc-character-relation"><i class="fas fa-link"></i> 与主角关系：${c.protagonist_relation}</div>`;
             }
 
             // 信息格：核心标签、初印象、核心性格、行为底线
@@ -535,21 +543,23 @@ function renderCharacterCards(data) {
             // 随身物品（只读展示，由事实记录阶段维护；持有中正常显示，已失去置灰）
             const items = ch.items || [];
             if (items.length > 0) {
-                const ITEM_STATUS_LABELS = { lost: '已失去', destroyed: '已损毁', gifted: '已赠出' };
-                const held = items.filter(i => i.status === 'held');
-                const gone = items.filter(i => i.status !== 'held')
+                const held = items.filter(i => (parseInt(i.quantity) || 0) > 0);
+                const gone = items.filter(i => (parseInt(i.quantity) || 0) <= 0)
                     .sort((a, b) => (a.lost_chapter || 0) - (b.lost_chapter || 0));
+                // 计算持有总件数（含数量）
+                const heldTotalQty = held.reduce((sum, i) => sum + (parseInt(i.quantity) || 1), 0);
                 const itemChips = [...held, ...gone].map(i => {
+                    const qty = parseInt(i.quantity) || 0;
+                    const isHeld = qty > 0;
+                    const qtyTag = isHeld && qty > 1 ? ` <span class="cc-item-qty">x${qty}</span>` : '';
                     const tip = [
-                        i.item_desc || i.change_note,
-                        i.source ? `来源:${i.source}` : '',
+                        i.change_note || i.source,
                         i.acquired_chapter ? `获得于第${i.acquired_chapter}章` : '',
-                        (i.status !== 'held' && i.lost_chapter) ? `失去于第${i.lost_chapter}章` : '',
+                        (!isHeld && i.lost_chapter) ? `失去于第${i.lost_chapter}章` : '',
                     ].filter(Boolean).join(' | ');
-                    const statusTag = i.status !== 'held' ? ` · ${ITEM_STATUS_LABELS[i.status] || i.status}` : '';
-                    return `<span class="cc-item-chip${i.status !== 'held' ? ' cc-item-lost' : ''}" title="${tip}">${i.item_name}${statusTag}</span>`;
+                    return `<span class="cc-item-chip${!isHeld ? ' cc-item-lost' : ''}" title="${tip}">${i.item_name}${qtyTag}</span>`;
                 }).join('');
-                html += `<div class="cc-subsection"><div class="cc-subsection-title"><i class="fas fa-box-open"></i> 随身物品 (${held.length})</div><div class="cc-items-wrap">${itemChips}</div></div>`;
+                html += `<div class="cc-subsection"><div class="cc-subsection-title"><i class="fas fa-box-open"></i> 随身物品 (${heldTotalQty})</div><div class="cc-items-wrap">${itemChips}</div></div>`;
             }
 
             html += `</div>`; // cc-character-card end
@@ -1489,6 +1499,9 @@ async function renderOutlineDetailPanel(volId) {
                     <button class="btn btn-xs btn-outline-success" onclick="splitVolumeToChapters(${volId})">
                         <i class="fas fa-magic"></i> 智能拆章
                     </button>
+                    <button class="btn btn-xs btn-outline-danger" onclick="clearChapterPlans(${volId})">
+                        <i class="fas fa-eraser"></i> 清空
+                    </button>
                 </div>
             </div>
             <div class="chapter-plan-list">
@@ -1520,7 +1533,14 @@ async function loadChapterPlans(volumeOutlineId) {
     }
 }
 
+/** 标记当前剧本是否有智能拆章任务正在进行 */
+let _splitChapterInProgress = false;
+
 function splitVolumeToChapters(outlineId) {
+    if (_splitChapterInProgress) {
+        showToast('当前剧本已有智能拆章任务正在进行，请等待完成后再试', 'warning');
+        return;
+    }
     const outline = (state.volumeOutlines || []).find(o => o.id === outlineId);
     if (!outline) {
         showToast('卷纲不存在', 'error');
@@ -1605,8 +1625,8 @@ async function confirmAiSplitChapter() {
         end_chapter: endChapter
     });
 
+    _splitChapterInProgress = true;
     closeAiSplitChapterModal();
-    showToast('智能拆章已启动，正在后台生成...', 'info');
 
     try {
         const data = await apiRequest(`/api/books/scripts/volume-outlines/split-chapter?${params.toString()}`, {
@@ -1614,10 +1634,14 @@ async function confirmAiSplitChapter() {
             errorPrefix: '智能拆章失败'
         });
         if (!data.success) {
+            _splitChapterInProgress = false;
             showToast(data.detail || data.message || '智能拆章启动失败', 'error');
+        } else {
+            showToast('智能拆章已启动，正在后台生成...', 'info');
         }
         // 成功时不立即刷新，等待 WebSocket 通知后再刷新
     } catch (e) {
+        _splitChapterInProgress = false;
         console.error('智能拆章失败:', e);
         showToast('智能拆章失败', 'error');
     }
@@ -1722,6 +1746,31 @@ async function deleteChapterPlan(planId, outlineId) {
     } catch (e) {
         console.error('删除章节规划失败:', e);
         showToast('删除失败', 'error');
+    }
+}
+
+async function clearChapterPlans(outlineId) {
+    const plans = (state.volumeChapterPlans && state.volumeChapterPlans[outlineId]) || [];
+    if (plans.length === 0) {
+        showToast('该卷暂无章节规划可清空', 'info');
+        return;
+    }
+    if (!confirm(`确定清空该卷的全部 ${plans.length} 条章节规划吗？此操作不可撤销。`)) return;
+    try {
+        const data = await apiRequest(`/api/books/scripts/chapter-plans?script_id=${state.scriptId}&outline_id=${outlineId}`, {
+            method: 'DELETE',
+            errorPrefix: '清空失败'
+        });
+        if (data.success) {
+            if (state.volumeChapterPlans) delete state.volumeChapterPlans[outlineId];
+            await renderOutlineDetailPanel(outlineId);
+            showToast('已清空全部章节规划', 'success');
+        } else {
+            showToast(data.message || '清空失败', 'error');
+        }
+    } catch (e) {
+        console.error('清空章节规划失败:', e);
+        showToast('清空失败', 'error');
     }
 }
 

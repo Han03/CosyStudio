@@ -1,4 +1,4 @@
-"""CosyWritter Kivy 桌面端自定义组件模块。
+"""CosyStudio Kivy 桌面端自定义组件模块。
 
 每个组件一个文件,便于维护和扩展。
 """

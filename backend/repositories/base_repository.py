@@ -75,7 +75,7 @@ from core.paths import CACHE_DIR as _DB_DIR, MEDIA_DIR as _MEDIA_DIR
 _DB_PATH = os.path.join(_DB_DIR, "app.db")
 
 _conn: Optional[sqlite3.Connection] = None
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 
 def _get_conn() -> sqlite3.Connection:

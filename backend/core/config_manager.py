@@ -273,7 +273,7 @@ DEFAULT_CONFIG = {
     },
     "call_point_models": {},
     "system": {
-        "app_name": "CosyWritter",
+        "app_name": "CosyStudio",
         "max_workers": 4,
         "log_level": "INFO",
         "port": 8000
@@ -536,7 +536,7 @@ def update_qwen_reranker_config_params(max_length=None):
 
 def get_app_name() -> str:
     config = get_config()
-    return config.get("system", {}).get("app_name", "CosyWritter")
+    return config.get("system", {}).get("app_name", "CosyStudio")
 
 def get_server_port():
     config = get_config()

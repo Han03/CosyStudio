@@ -1,8 +1,4 @@
-import os
 import sqlite3
-
-from utils.logger import logger
-from core.paths import MEDIA_DIR as _MEDIA_DIR
 
 
 def _init_schema(conn: sqlite3.Connection):
@@ -72,6 +68,7 @@ def _init_schema(conn: sqlite3.Connection):
             description TEXT DEFAULT '',
             task_id TEXT DEFAULT '',
             error TEXT DEFAULT '',
+            progress INTEGER DEFAULT 0,
             progress_message TEXT DEFAULT '',
             generating_chapter_index INTEGER DEFAULT 0,
             created_at REAL,
@@ -111,8 +108,6 @@ def _init_schema(conn: sqlite3.Connection):
             tone TEXT DEFAULT '',
             FOREIGN KEY (script_id) REFERENCES scripts(id) ON DELETE CASCADE
         );
-        -- 音频调整参数已迁移到 script_line_audio_history 表（每份音频独立保存）。
-        -- 加载台词时通过 LEFT JOIN 关联最新音频历史的参数，不再存储在 script_lines 中。
 
         CREATE INDEX IF NOT EXISTS idx_script_lines_script ON script_lines(script_id);
         CREATE INDEX IF NOT EXISTS idx_script_lines_chapter ON script_lines(script_id, chapter_index);
@@ -122,6 +117,9 @@ def _init_schema(conn: sqlite3.Connection):
             script_id INTEGER NOT NULL,
             role TEXT NOT NULL DEFAULT '',
             line_count INTEGER DEFAULT 0,
+            gender TEXT DEFAULT '',
+            age TEXT DEFAULT '',
+            description TEXT DEFAULT '',
             created_at REAL,
             FOREIGN KEY (script_id) REFERENCES scripts(id) ON DELETE CASCADE
         );
@@ -443,7 +441,9 @@ def _init_schema(conn: sqlite3.Connection):
             name TEXT DEFAULT '',
             alias TEXT DEFAULT '',
             age INTEGER DEFAULT 0,
+            age_stage TEXT DEFAULT '',
             identity TEXT DEFAULT '',
+            protagonist_relation TEXT DEFAULT '',
             starting_state TEXT DEFAULT '',
             core_tags TEXT DEFAULT '',
             first_impression TEXT DEFAULT '',
@@ -511,20 +511,15 @@ def _init_schema(conn: sqlite3.Connection):
 
         CREATE INDEX IF NOT EXISTS idx_webnovel_char_power ON webnovel_character_power(character_id);
 
-        -- 角色物品表：动态维护角色当前持有的物品（事实记录阶段增减），
-        -- 防止写文时出现"凭空掉出未持有物品"的不一致。
-        -- status: held（持有）/ lost（丢失）/ destroyed（损毁）/ gifted（赠出）；
-        -- 每人每件物品一条记录，重新获得时复用原记录翻转状态。
         CREATE TABLE IF NOT EXISTS webnovel_character_item (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             character_id INTEGER NOT NULL,
             item_name TEXT NOT NULL,
-            item_desc TEXT DEFAULT '',
             source TEXT DEFAULT '',
             acquired_chapter INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'held',
             lost_chapter INTEGER DEFAULT 0,
             change_note TEXT DEFAULT '',
+            quantity INTEGER DEFAULT 1,
             created_at REAL,
             updated_at REAL,
             FOREIGN KEY (character_id) REFERENCES webnovel_character_card(id) ON DELETE CASCADE
@@ -1296,319 +1291,13 @@ def _init_schema(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_webnovel_anti_pattern_project ON webnovel_anti_pattern(project_id);
         """
     )
-    # 迁移：llm_call_logs 已迁移到独立数据库文件 (app_llm_logs.db)，
-    # 清理旧数据库中的残留表（如果存在）
+
+    # 迁移：为已存在的 scripts 表添加 progress 字段（如果不存在）
     try:
-        conn.execute("DROP TABLE IF EXISTS llm_call_logs")
+        cursor = conn.execute("PRAGMA table_info(scripts)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "progress" not in columns:
+            conn.execute("ALTER TABLE scripts ADD COLUMN progress INTEGER DEFAULT 0")
+            conn.commit()  # WAL 模式下必须显式提交，否则变更可能不可见
     except Exception:
-        pass
-
-    try:
-        cursor = conn.execute("PRAGMA table_info(ebook_chapters)")
-        columns = [col[1] for col in cursor.fetchall()]
-        if "content" not in columns:
-            conn.execute("ALTER TABLE ebook_chapters ADD COLUMN content TEXT DEFAULT ''")
-            logger.info("[Database] Added content column to ebook_chapters")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to add content column: {e}")
-
-    try:
-        cursor = conn.execute("PRAGMA table_info(webnovel_project)")
-        columns = [col[1] for col in cursor.fetchall()]
-        new_cols = [
-            ("one_liner", "TEXT DEFAULT ''"),
-            ("core_conflict", "TEXT DEFAULT ''"),
-            ("target_reader", "TEXT DEFAULT ''"),
-            ("platform", "TEXT DEFAULT ''"),
-            ("core_selling_points", "TEXT DEFAULT ''"),
-            ("opening_hook", "TEXT DEFAULT ''"),
-            ("protagonist_desire", "TEXT DEFAULT ''"),
-            ("protagonist_archetype", "TEXT DEFAULT ''"),
-            ("protagonist_structure", "TEXT DEFAULT '单主角'"),
-            ("heroine_config", "TEXT DEFAULT ''"),
-            ("heroine_role", "TEXT DEFAULT ''"),
-            ("antagonist_tiers", "TEXT DEFAULT ''"),
-            ("antagonist_level", "TEXT DEFAULT ''"),
-        ]
-        for col_name, col_def in new_cols:
-            if col_name not in columns:
-                conn.execute(f"ALTER TABLE webnovel_project ADD COLUMN {col_name} {col_def}")
-                logger.info(f"[Database] Added {col_name} column to webnovel_project")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to add columns to webnovel_project: {e}")
-
-    # 迁移：移除 webnovel_character_group_member 表上 character_id 的外键约束
-    # （LLM 生成的 character_id 无法保证引用有效，外键会导致 FOREIGN KEY constraint failed）
-    try:
-        cursor = conn.execute("PRAGMA foreign_key_list(webnovel_character_group_member)")
-        fk_list = cursor.fetchall()
-        # fk_list 每行: (id, seq, table, from, to, on_update, on_delete, match)
-        has_character_fk = any(
-            row[3] == "character_id" and row[2] == "webnovel_character_card"
-            for row in fk_list
-        )
-        if has_character_fk:
-            conn.execute("PRAGMA foreign_keys=OFF")
-            conn.execute("""
-                CREATE TABLE webnovel_character_group_member_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    group_id INTEGER NOT NULL,
-                    character_id INTEGER,
-                    role TEXT DEFAULT '',
-                    main_line_contribution TEXT DEFAULT '',
-                    key_flaw TEXT DEFAULT '',
-                    key_ability TEXT DEFAULT '',
-                    FOREIGN KEY (group_id) REFERENCES webnovel_character_group(id) ON DELETE CASCADE
-                )
-            """)
-            conn.execute("""
-                INSERT INTO webnovel_character_group_member_new
-                SELECT id, group_id, character_id, role, main_line_contribution, key_flaw, key_ability
-                FROM webnovel_character_group_member
-            """)
-            conn.execute("DROP TABLE webnovel_character_group_member")
-            conn.execute("ALTER TABLE webnovel_character_group_member_new RENAME TO webnovel_character_group_member")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_webnovel_group_member ON webnovel_character_group_member(group_id)")
-            conn.execute("PRAGMA foreign_keys=ON")
-            logger.info("[Database] Removed character_id FK from webnovel_character_group_member")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to migrate webnovel_character_group_member: {e}")
-        try:
-            conn.execute("PRAGMA foreign_keys=ON")
-        except Exception:
-            pass
-
-    # 迁移：webnovel_volume_outline 新增 core_conflict_anchor 列
-    try:
-        cursor = conn.execute("PRAGMA table_info(webnovel_volume_outline)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "core_conflict_anchor" not in columns:
-            conn.execute("ALTER TABLE webnovel_volume_outline ADD COLUMN core_conflict_anchor TEXT DEFAULT ''")
-            logger.info("[Database] Added core_conflict_anchor column to webnovel_volume_outline")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to add core_conflict_anchor column: {e}")
-
-    # 迁移：创建 webnovel_foreshadow 表
-    try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS webnovel_foreshadow (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_id INTEGER NOT NULL,
-                volume_outline_id INTEGER NOT NULL,
-                content TEXT DEFAULT '',
-                buried_chapter INTEGER DEFAULT 0,
-                payoff_chapter INTEGER DEFAULT 0,
-                level TEXT DEFAULT '',
-                created_at REAL,
-                updated_at REAL,
-                FOREIGN KEY (project_id) REFERENCES webnovel_project(id) ON DELETE CASCADE,
-                FOREIGN KEY (volume_outline_id) REFERENCES webnovel_volume_outline(id) ON DELETE CASCADE
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_webnovel_foreshadow_project ON webnovel_foreshadow(project_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_webnovel_foreshadow_volume ON webnovel_foreshadow(volume_outline_id)")
-        logger.info("[Database] Ensured webnovel_foreshadow table exists")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to create webnovel_foreshadow table: {e}")
-
-    # ── 一次性迁移：chapter_index 从 0-based 改为 1-based ──
-    try:
-        cursor = conn.execute("SELECT COUNT(*) FROM ebook_chapters WHERE chapter_index = 0")
-        if cursor.fetchone()[0] > 0:
-            logger.info("[Database] 开始迁移 chapter_index 从 0-based 到 1-based ...")
-            # 1. 更新所有相关表的 chapter_index
-            migration_tables = [
-                ("ebook_chapters", "chapter_index"),
-                ("script_chapters", "chapter_index"),
-                ("script_lines", "chapter_index"),
-                ("chapter_audio_history", "chapter_index"),
-                ("ebook_chapter_sentences", "chapter_index"),
-                ("script_writing_tasks", "chapter_index"),
-            ]
-            for table, col in migration_tables:
-                try:
-                    conn.execute(f"UPDATE {table} SET {col} = {col} + 1")
-                    logger.info(f"[Database] 已迁移 {table}.{col}")
-                except Exception as te:
-                    logger.warning(f"[Database] 迁移 {table}.{col} 失败: {te}")
-
-            # 2. 重命名 script_chapters 中的章节文件（从大到小避免覆盖）
-            try:
-                rows = conn.execute(
-                    "SELECT id, file_path FROM script_chapters ORDER BY chapter_index DESC"
-                ).fetchall()
-                import shutil
-                for row in rows:
-                    old_path = row[1]
-                    if not old_path:
-                        continue
-                    # 从 media 根目录解析绝对路径
-                    abs_old = os.path.join(_MEDIA_DIR, old_path.replace("/", os.sep))
-                    if not os.path.exists(abs_old):
-                        continue
-                    # 计算新文件名：从 file_path 中提取文件名并替换
-                    dirname = os.path.dirname(abs_old)
-                    basename = os.path.basename(abs_old)
-                    # 旧文件名格式: {idx}.txt，新文件名: {idx+1}.txt
-                    name_part, ext = os.path.splitext(basename)
-                    try:
-                        old_idx = int(name_part)
-                        new_idx = old_idx + 1
-                        new_basename = f"{new_idx}{ext}"
-                        abs_new = os.path.join(dirname, new_basename)
-                        shutil.move(abs_old, abs_new)
-                        # 更新 file_path
-                        new_rel_path = old_path.rsplit("/", 1)[0] + f"/{new_basename}"
-                        conn.execute(
-                            "UPDATE script_chapters SET file_path = ? WHERE id = ?",
-                            (new_rel_path, row[0])
-                        )
-                    except (ValueError, OSError) as e:
-                        logger.warning(f"[Database] 重命名文件失败 {old_path}: {e}")
-                logger.info("[Database] 章节文件重命名完成")
-            except Exception as fe:
-                logger.warning(f"[Database] 章节文件重命名失败: {fe}")
-
-            # 3. 更新 scripts 表中的 generating_chapter_index
-            try:
-                conn.execute("UPDATE scripts SET generating_chapter_index = generating_chapter_index + 1 WHERE generating_chapter_index >= 0")
-            except Exception:
-                pass
-
-            logger.info("[Database] chapter_index 迁移完成")
-    except Exception as e:
-        logger.warning(f"[Database] chapter_index 迁移检查失败: {e}")
-
-    # 迁移：webnovel_chapter_plot 从 JSON 存储改为一对多行级存储
-    try:
-        cursor = conn.execute("PRAGMA table_info(webnovel_chapter_plot)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "plot_list" in columns and "scene" not in columns:
-            conn.execute("PRAGMA foreign_keys=OFF")
-            conn.execute("""
-                CREATE TABLE webnovel_chapter_plot_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    project_id INTEGER NOT NULL,
-                    chapter_index INTEGER NOT NULL,
-                    plot_order INTEGER NOT NULL DEFAULT 0,
-                    scene TEXT DEFAULT '',
-                    description TEXT DEFAULT '',
-                    characters TEXT DEFAULT '',
-                    emotion TEXT DEFAULT '',
-                    conflict TEXT DEFAULT '',
-                    created_at REAL,
-                    FOREIGN KEY (project_id) REFERENCES webnovel_project(id) ON DELETE CASCADE
-                )
-            """)
-            # 迁移旧数据：解析 plot_list JSON 并展开为多行
-            old_rows = conn.execute(
-                "SELECT project_id, chapter_index, plot_list, created_at FROM webnovel_chapter_plot"
-            ).fetchall()
-            import json as _json
-            for old in old_rows:
-                p_id, ch_idx, plot_json, created = old[0], old[1], old[2], old[3]
-                try:
-                    plots = _json.loads(plot_json) if plot_json else []
-                except (_json.JSONDecodeError, TypeError):
-                    plots = []
-                for order, plot in enumerate(plots):
-                    if not isinstance(plot, dict):
-                        continue
-                    chars = plot.get("characters", [])
-                    chars_str = ",".join(chars) if isinstance(chars, list) else str(chars)
-                    conn.execute(
-                        """INSERT INTO webnovel_chapter_plot_new
-                            (project_id, chapter_index, plot_order, scene, description, characters, emotion, conflict, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (p_id, ch_idx, order,
-                         plot.get("scene", ""), plot.get("description", ""),
-                         chars_str, plot.get("emotion", ""), plot.get("conflict", ""),
-                         created)
-                    )
-            conn.execute("DROP TABLE webnovel_chapter_plot")
-            conn.execute("ALTER TABLE webnovel_chapter_plot_new RENAME TO webnovel_chapter_plot")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_webnovel_chapter_plot_project ON webnovel_chapter_plot(project_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_webnovel_chapter_plot_chapter ON webnovel_chapter_plot(project_id, chapter_index)")
-            conn.execute("PRAGMA foreign_keys=ON")
-            logger.info("[Database] Migrated webnovel_chapter_plot from JSON to row-level storage")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to migrate webnovel_chapter_plot: {e}")
-        try:
-            conn.execute("PRAGMA foreign_keys=ON")
-        except Exception:
-            pass
-
-    conn.commit()
-
-    # 迁移：webnovel_character_card 新增 alias 列（保存曾用名/别名，用于身份揭露时的角色卡合并）
-    try:
-        cursor = conn.execute("PRAGMA table_info(webnovel_character_card)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "alias" not in columns:
-            conn.execute("ALTER TABLE webnovel_character_card ADD COLUMN alias TEXT DEFAULT ''")
-            logger.info("[Database] Added alias column to webnovel_character_card")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to add alias column to webnovel_character_card: {e}")
-
-    # 迁移：清理重复角色名并创建唯一索引
-    try:
-        # 删除重复角色（保留 id 最小的记录）
-        conn.execute("""
-            DELETE FROM webnovel_character_card
-            WHERE id NOT IN (
-                SELECT MIN(id) FROM webnovel_character_card
-                WHERE name != '' GROUP BY project_id, name
-            )
-            AND name != ''
-        """)
-        deleted = conn.total_changes
-        if deleted > 0:
-            logger.info(f"[Database] Removed {deleted} duplicate character cards")
-        # 创建唯一索引（IF NOT EXISTS 保证幂等）
-        conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_webnovel_char_unique_name
-                ON webnovel_character_card(project_id, name)
-                WHERE name != ''
-        """)
-        logger.info("[Database] Created unique index on webnovel_character_card(project_id, name)")
-    except Exception as e:
-        logger.warning(f"[Database] Failed to create unique index on character_card: {e}")
-
-    # 迁移：script_character_configs 增加云端 TTS 支持字段
-    for col_name, col_def in [("tts_capability_id", "TEXT DEFAULT ''"), ("cloud_extra_params", "TEXT DEFAULT '{}'")]:
-        try:
-            conn.execute(f"ALTER TABLE script_character_configs ADD COLUMN {col_name} {col_def}")
-            logger.info(f"[Database] Added {col_name} column to script_character_configs")
-        except Exception as e:
-            pass  # 列已存在则忽略
-
-    # 迁移：script_line_audio_history 增加 tts_capability_id 字段
-    try:
-        conn.execute("ALTER TABLE script_line_audio_history ADD COLUMN tts_capability_id TEXT DEFAULT ''")
-        logger.info("[Database] Added tts_capability_id column to script_line_audio_history")
-    except Exception as e:
-        pass  # 列已存在则忽略
-
-    # 迁移：script_line_audio_history 增加音频调整参数字段（参数绑定到音频）
-    for col_name, col_def in [
-        ('audio_volume', 'REAL DEFAULT 1.0'),
-        ('audio_pitch', 'INTEGER DEFAULT 0'),
-        ('fade_in', 'REAL DEFAULT 0.0'),
-        ('fade_out', 'REAL DEFAULT 0.0'),
-        ('audio_adjust_enabled', 'INTEGER DEFAULT 0'),
-        ('range_start', 'REAL DEFAULT 0.0'),
-        ('range_end', 'REAL DEFAULT 0.0'),
-    ]:
-        try:
-            conn.execute(f"ALTER TABLE script_line_audio_history ADD COLUMN {col_name} {col_def}")
-            logger.info(f"[Database] Added {col_name} column to script_line_audio_history")
-        except Exception:
-            pass
-
-
-    # 迁移：script_line_audio_history 增加 agent_id 字段（兼容旧数据库）
-    try:
-        conn.execute("ALTER TABLE script_line_audio_history ADD COLUMN agent_id TEXT DEFAULT ''")
-        logger.info("[Database] Added agent_id column to script_line_audio_history")
-    except Exception:
-        pass
+        pass  # 表不存在时忽略

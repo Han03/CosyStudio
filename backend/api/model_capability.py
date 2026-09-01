@@ -482,24 +482,69 @@ async def reorder_capabilities(request: ReorderRequest):
 
 # ===================== 调用点模型配置 API =====================
 
-CALL_POINT_DETAILS = {
-    "init_executor": {"name": "世界观设定", "description": "世界观、力量体系、金手指等设定"},
-    "character_builder": {"name": "角色构建", "description": "角色设定"},
-    "plan_executor": {"name": "卷纲规划", "description": "卷纲规划、章节规划"},
-    "chapter_plot_generator": {"name": "剧情生成", "description": "章节剧情列表"},
-    "draft_generator": {"name": "草稿生成", "description": "章节草稿正文创作"},
-    "draft_polisher": {"name": "草稿润色", "description": "草稿质量优化润色"},
-    "draft_reviewer": {"name": "质量审查", "description": "草稿多维度质量审查"},
-    "fact_recorder": {"name": "事实记录", "description": "剧情事实提取与记录"},
-    "setting_recorder": {"name": "设定记录", "description": "世界观设定提取与记录"},
-    "context_builder": {"name": "上下文构建", "description": "写作上下文构建"},
-    "query_executor": {"name": "查询执行", "description": "信息查询"},
-    "story_system": {"name": "故事系统", "description": "故事系统生成"},
-    "chapter_plot_reviewer": {"name": "剧情审查", "description": "章节剧情审查"},
-    "foreshadow_cool_point_extractor": {"name": "伏笔爽点提取", "description": "伏笔和爽点提取"},
-    "chapter_splitter": {"name": "章节拆分", "description": "章节内容拆分"},
-    "timeline_fixer": {"name": "时间线修复", "description": "时间线一致性修复"},
-}
+# 调用点按业务分类组织，每个分类内按执行顺序排列
+CALL_POINT_CATEGORIES = [
+    {
+        "category": "深度初始化",
+        "icon": "fas fa-seedling",
+        "color": "#6c5ce7",
+        "call_points": {
+            "init_ai_all_in_one": {"name": "一键全量生成", "description": "深度初始化-一键模式: 一次性生成3套完整方案"},
+            "init_ai_project": {"name": "项目定位生成", "description": "深度初始化-步骤2: 项目定位 AI 辅助生成"},
+            "init_ai_protagonist": {"name": "主角设定生成", "description": "深度初始化-步骤3: 主角设定 AI 辅助生成"},
+            "init_ai_golden_finger": {"name": "金手指设定生成", "description": "深度初始化-步骤4: 金手指设定 AI 辅助生成"},
+            "init_ai_world": {"name": "世界观设定生成", "description": "深度初始化-步骤5: 世界观设定 AI 辅助生成"},
+            "init_ai_constraints": {"name": "约束包生成", "description": "深度初始化-步骤6: 创意约束包 AI 辅助生成"},
+            "story_system": {"name": "故事系统", "description": "Story System 合同生成"},
+            "init_executor": {"name": "世界观设定", "description": "世界观、力量体系、金手指等设定"},
+            "character_builder": {"name": "角色构建", "description": "角色设定"},
+            "plan_executor": {"name": "卷纲规划", "description": "卷纲规划、章节规划"},
+        },
+    },
+    {
+        "category": "智能创作",
+        "icon": "fas fa-pen-fancy",
+        "color": "#00b894",
+        "call_points": {
+            "chapter_splitter": {"name": "章节拆分", "description": "章节内容拆分"},
+            "timeline_fixer": {"name": "时间线修复", "description": "时间线一致性修复"},
+            "context_builder": {"name": "上下文构建", "description": "写作上下文构建"},
+            "chapter_plot_generator": {"name": "剧情生成", "description": "章节剧情列表"},
+            "chapter_plot_reviewer_score": {"name": "剧情审查评分", "description": "剧情多维度质量评分"},
+            "chapter_plot_reviewer_revise": {"name": "剧情审查修正", "description": "根据评分反馈修正剧情"},
+            "draft_generator": {"name": "草稿生成", "description": "章节草稿正文创作"},
+            "draft_reviewer_score": {"name": "草稿审查评分", "description": "草稿多维度质量评分"},
+            "draft_reviewer_revise": {"name": "草稿审查修正", "description": "根据评分反馈修正草稿"},
+            "draft_polisher": {"name": "草稿润色", "description": "草稿质量优化润色"},
+            "fact_recorder": {"name": "事实记录", "description": "剧情事实提取与记录"},
+            "setting_recorder": {"name": "设定记录", "description": "世界观设定提取与记录"},
+            "foreshadow_cool_point_extractor": {"name": "伏笔爽点提取", "description": "伏笔和爽点提取"},
+        },
+    },
+    {
+        "category": "台词配音",
+        "icon": "fas fa-microphone-alt",
+        "color": "#e17055",
+        "call_points": {
+            "script_line_generator": {"name": "台词生成", "description": "章节台词/对白生成"},
+            "character_profile_extractor": {"name": "角色属性提取", "description": "推断角色性别/年龄/描述"},
+            "agent_matcher": {"name": "智能体匹配", "description": "角色-配音智能体全局匹配"},
+        },
+    },
+    {
+        "category": "其他",
+        "icon": "fas fa-cogs",
+        "color": "#636e72",
+        "call_points": {
+            "query_executor": {"name": "查询执行", "description": "信息查询"},
+        },
+    },
+]
+
+# 扁平索引：{name: detail} 用于向后兼容的快速查找
+CALL_POINT_DETAILS = {}
+for _cat in CALL_POINT_CATEGORIES:
+    CALL_POINT_DETAILS.update(_cat["call_points"])
 
 
 class CallPointModelsRequest(BaseModel):
@@ -508,17 +553,29 @@ class CallPointModelsRequest(BaseModel):
 
 @router.get("/api/capabilities/call-points")
 async def get_call_points():
-    """获取所有调用点列表及其当前模型覆盖配置，同时返回可选的 text_predict 能力列表"""
+    """获取所有调用点（按分类分组）及其当前模型覆盖配置，同时返回可选的 text_predict 能力列表"""
     current_overrides = get_call_point_models()
-    call_points = []
-    for name, detail in CALL_POINT_DETAILS.items():
-        override = current_overrides.get(name, {})
-        call_points.append({
-            "name": name,
-            "display_name": detail["name"],
-            "description": detail["description"],
-            "capability_id": override.get("capability_id", ""),
+
+    # 按分类组织返回
+    categories = []
+    for cat_def in CALL_POINT_CATEGORIES:
+        cat_call_points = []
+        for name, detail in cat_def["call_points"].items():
+            override = current_overrides.get(name, {})
+            cat_call_points.append({
+                "name": name,
+                "display_name": detail["name"],
+                "description": detail["description"],
+                "category": cat_def["category"],
+                "capability_id": override.get("capability_id", ""),
+            })
+        categories.append({
+            "category": cat_def["category"],
+            "icon": cat_def["icon"],
+            "color": cat_def["color"],
+            "call_points": cat_call_points,
         })
+
     # 返回可选的 text_predict 能力列表供前端下拉选择
     all_capabilities = get_model_capabilities()
     available_capabilities = [
@@ -528,7 +585,7 @@ async def get_call_points():
         for cap in all_capabilities.get("text_predict", [])
         if cap.get("enabled", False)
     ]
-    return {"call_points": call_points, "available_capabilities": available_capabilities}
+    return {"categories": categories, "available_capabilities": available_capabilities}
 
 
 @router.post("/api/capabilities/call-points")

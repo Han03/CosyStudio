@@ -27,6 +27,9 @@ class RAGService:
     SETTINGS_TYPES = frozenset({
         "character", "worldview", "power_system", "golden_finger",
         "volume_outline", "foreshadow", "villain",
+        "csv_plot", "csv_pacing", "csv_verdict", "csv_scene",
+        "csv_writing", "csv_naming", "csv_character_knowledge",
+        "csv_golden_finger_knowledge", "csv_genre_tone",
     })
 
     # 默认最低相似度阈值（低于此值的结果会被过滤）
@@ -48,6 +51,16 @@ class RAGService:
         "golden_finger": 0.20,      # 金手指设定
         "villain": 0.20,            # 反派信息
         "volume_outline": 0.22,     # 卷纲
+        # CSV 知识类型（写文/审查时语义检索）
+        "csv_plot": 0.22,           # 剧情模板
+        "csv_pacing": 0.22,         # 节奏技巧
+        "csv_verdict": 0.22,        # 裁决规则
+        "csv_scene": 0.22,          # 场景模式
+        "csv_writing": 0.22,        # 写作技巧
+        "csv_naming": 0.22,         # 命名规则
+        "csv_character_knowledge": 0.22,  # 角色知识
+        "csv_golden_finger_knowledge": 0.22,  # 金手指设计知识
+        "csv_genre_tone": 0.22,     # 题材基调
     }
 
     def __init__(self, vector_store: VectorStoreBase):

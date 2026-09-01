@@ -18,9 +18,9 @@ from webnovel.repositories import (
 
 
 # 物品变化事实的动作分类（与 fact_record_prompt 约定的动词集一致）
+# 获得类动词 → 累加数量；其他动词（失去/损毁/赠予等）→ 扣减数量
 _GAIN_ACTIONS = {"获得", "得到", "收下", "缴获", "抢得", "抢走", "夺得",
                  "买下", "买得", "拾得", "捡到", "接过"}
-_GIFT_ACTIONS = {"赠予", "赠送", "送给", "交给", "交出"}
 
 
 class FactRecorderExecutor(BaseExecutor):
@@ -59,17 +59,20 @@ class FactRecorderExecutor(BaseExecutor):
             characters_text = []
             for c in writing_context.get('characters', []):
                 if isinstance(c, dict):
-                    if c.get('role'):
-                        characters_text.append(c['role'])
-                    elif c.get('character_name'):
+                    if c.get('character_name'):
                         characters_text.append(c['character_name'])
+                    elif c.get('role'):
+                        characters_text.append(c['role'])
                     else:
                         characters_text.append("角色")
 
             # 从 .md 文件加载 prompt 模板
             prompt_data = self._load_prompt("fact_record")
+            # 事实记录需要覆盖全章内容，截断过短会遗漏核心事件（如升级突破、物品消耗）。
+            # 成品章节 3000-5000 字，取前 4000 字可覆盖大部分关键事件。
+            chapter_content = polished_content[:4000] if len(polished_content) > 4000 else polished_content
             prompt = prompt_data["user_prompt"].format(
-                chapter_content=polished_content[:2000],
+                chapter_content=chapter_content,
                 world_settings=json.dumps(world_settings_text, ensure_ascii=False),
                 characters=json.dumps(characters_text, ensure_ascii=False),
             )
@@ -87,7 +90,7 @@ class FactRecorderExecutor(BaseExecutor):
                 max_tokens=800,
                 script_id=script_id,
                 project_id=project_id,
-                executor_name="fact_recorder_executor",
+                executor_name=self.step_name,
                 prompt_name="fact_record",
             )
 
@@ -99,7 +102,7 @@ class FactRecorderExecutor(BaseExecutor):
                 content,
                 script_id=script_id,
                 project_id=project_id,
-                executor_name="fact_recorder_executor",
+                executor_name=self.step_name,
                 prompt_name="fact_record",
             )
 
@@ -209,7 +212,7 @@ class FactRecorderExecutor(BaseExecutor):
                 max_tokens=2000,
                 script_id=script_id,
                 project_id=project_id,
-                executor_name="fact_recorder_executor",
+                executor_name=self.step_name,
                 prompt_name="create_new_characters",
             )
 
@@ -221,7 +224,7 @@ class FactRecorderExecutor(BaseExecutor):
                 content,
                 script_id=script_id,
                 project_id=project_id,
-                executor_name="fact_recorder_executor",
+                executor_name=self.step_name,
                 prompt_name="create_new_characters",
             )
 
@@ -242,9 +245,15 @@ class FactRecorderExecutor(BaseExecutor):
                     continue
                 if any(name in existing or existing in name for existing in existing_names):
                     continue
-                # 过滤常见非角色名词
-                skip_terms = {"主角", "反派", "女主", "男主", "配角", "路人", "群众", "弟子", "长老"}
+                # 过滤常见非角色名词（含泛称、动物、尸体等非人物实体）
+                skip_terms = {"主角", "反派", "女主", "男主", "配角", "路人", "群众", "弟子", "长老",
+                              "妖兽", "猛兽", "妖兵", "妖丹", "灵兽", "凶兽", "幻兽",
+                              "尸体", "遗骸", "骸骨", "残骸", "尸傀", "尸虫"}
                 if name in skip_terms or len(name) > 10:
+                    continue
+                # 过滤含动物/尸体关键词的名称（如"铁背狼""散修遗骸"）
+                _non_char_keywords = ("狼", "虎", "蛇", "熊", "鹰", "兽", "尸", "骸", "傀")
+                if any(kw in name for kw in _non_char_keywords):
                     continue
 
                 # 按 LLM 返回的类型建卡；非法/缺失时兜底 minor，避免龙套污染配角层
@@ -254,7 +263,7 @@ class FactRecorderExecutor(BaseExecutor):
                 # 白名单字段直传：键名与 prompt 输出及角色卡表列名完全一致，
                 # 避免二次映射导致的字段错位/丢失（minor 无深化字段，缺失自动为空）
                 card_fields = (
-                    "identity", "core_personality", "core_tags", "first_impression",
+                    "age_stage", "identity", "protagonist_relation", "core_personality", "core_tags", "first_impression",
                     "short_term_goal", "true_desire", "personality_flaw", "starting_state",
                     "long_term_goal", "behavior_pattern", "ability_limit",
                 )
@@ -420,15 +429,16 @@ class FactRecorderExecutor(BaseExecutor):
         text = re.split(r"[（(，,。]", text, 1)[0]
         return text.strip()
 
-    def _parse_item_change(self, content: str) -> Tuple[str, str, str, str]:
-        """解析物品变化事实内容，返回 (角色名, 动作, 物品名, 说明)。
+    def _parse_item_change(self, content: str) -> Tuple[str, str, str, str, int]:
+        """解析物品变化事实内容，返回 (角色名, 动作, 物品名, 说明, 数量)。
 
         主格式（prompt 约定）："角色名 获得|失去 物品名: 变化说明"；
+        数量约定：说明中包含 "xN" 或 "×N" 表示数量（默认 1）。
         动词集与 _GAIN_ACTIONS/_GIFT_ACTIONS 及 prompt 约定保持一致。
         """
         content = (content or "").strip()
         if not content:
-            return "", "", "", ""
+            return "", "", "", "", 1
         m = re.search(
             r"([^，。；:：]{1,12}?)[，,、\s]*"
             r"(获得|得到|收下|缴获|抢得|抢走|夺得|买下|买得|拾得|捡到|接过|"
@@ -437,8 +447,16 @@ class FactRecorderExecutor(BaseExecutor):
             content
         )
         if not m:
-            return "", "", "", ""
-        return m.group(1).strip(), m.group(2), m.group(3).strip(), m.group(4).strip()
+            return "", "", "", "", 1
+        note_raw = m.group(4).strip()
+        # 从说明中解析数量：匹配 xN、×N、XN、N个、N把、N枚 等
+        qty = 1
+        qty_m = re.search(r"[x×X](\d+)|(\d+)[个把枚枚块瓶壶柄支条颗粒袋份副套双箱桶包罐]|数量[：:]\s*(\d+)", note_raw)
+        if qty_m:
+            qty = int(qty_m.group(1) or qty_m.group(2) or qty_m.group(3) or 1)
+            # 从说明中移除数量标记，保留其余说明文字
+            note_raw = (note_raw[:qty_m.start()] + note_raw[qty_m.end():]).strip().strip("，,、:：")
+        return m.group(1).strip(), m.group(2), m.group(3).strip(), note_raw, qty
 
     def _handle_item_change(
         self, char_name_map: Dict[str, dict], sorted_names: List[str],
@@ -452,7 +470,7 @@ class FactRecorderExecutor(BaseExecutor):
             from utils.logger import log_manager
             logger = log_manager.get_logger("fact_recorder")
 
-            char_raw, action, item_name, note = self._parse_item_change(fact_content)
+            char_raw, action, item_name, note, quantity = self._parse_item_change(fact_content)
             if not action or not item_name:
                 return []
 
@@ -462,24 +480,23 @@ class FactRecorderExecutor(BaseExecutor):
                 return []
             char_id = char_name_map[matched_name]["id"]
 
+            qty_note = f"x{quantity}" if quantity > 1 else ""
+            full_note = f"第{chapter_index}章{action}{qty_note}: {note[:100]}" if note else f"第{chapter_index}章{action}{qty_note}"
+
             if action in _GAIN_ACTIONS:
                 upsert_character_item(
                     char_id, item_name,
-                    item_desc=note[:200], source=note[:100],
+                    source=note[:200],
                     chapter=chapter_index,
-                    note=f"第{chapter_index}章{action}: {note[:100]}" if note else f"第{chapter_index}章{action}",
+                    note=full_note,
+                    quantity=quantity,
                 )
-                logger.info(f"[fact_recorder] 角色 '{matched_name}' 获得物品 '{item_name}'")
+                logger.info(f"[fact_recorder] 角色 '{matched_name}' 获得物品 '{item_name}' x{quantity}")
             else:
-                if action in ("损毁", "损坏"):
-                    status = "destroyed"
-                elif action in _GIFT_ACTIONS:
-                    status = "gifted"
-                else:
-                    status = "lost"
                 ok = mark_character_item_lost(
-                    char_id, item_name, status=status,
-                    chapter=chapter_index, note=f"第{chapter_index}章: {fact_content[:100]}"
+                    char_id, item_name,
+                    chapter=chapter_index, note=f"第{chapter_index}章: {fact_content[:100]}",
+                    quantity=quantity,
                 )
                 if not ok:
                     # 角色没有该物品却"失去"：不一致信号，记日志不阻断，不凭空建记录
@@ -488,7 +505,7 @@ class FactRecorderExecutor(BaseExecutor):
                         f"（第{chapter_index}章），疑似正文不一致"
                     )
                     return []
-                logger.info(f"[fact_recorder] 角色 '{matched_name}' 失去物品 '{item_name}'({status})")
+                logger.info(f"[fact_recorder] 角色 '{matched_name}' 失去物品 '{item_name}' x{quantity}")
             return [char_id]
         except Exception:
             return []

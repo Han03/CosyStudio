@@ -1,4 +1,4 @@
-"""CosyWritter Kivy 桌面端基础组件。
+"""CosyStudio Kivy 桌面端基础组件。
 
 提供全局主题 COLORS、字体注册、图标 Image 工厂 _icon_image,
 以及 TopBar 等基础容器组件。

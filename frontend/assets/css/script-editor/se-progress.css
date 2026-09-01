@@ -41,56 +41,33 @@
 .toast-msg.info { background: #3b82f6; }
 .toast-msg.warning { background: #f59e0b; }
 
-/* ========== 生成进度条 ========== */
-.progress-container {
-    background: var(--neu-bg);
-    padding: 0 20px 12px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-    flex-shrink: 0;
-}
-
-.progress-bar-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.progress-label {
-    font-size: 12px;
-    color: var(--neu-text-muted);
-    white-space: nowrap;
-    min-width: 60px;
-}
-
-.progress-bar {
-    flex: 1;
-    height: 8px;
-    background: var(--neu-bg);
-    border-radius: 4px;
-    box-shadow: var(--neu-shadow-inset);
+/* ========== 播放控制器边缘进度条 ========== */
+.player-bar-progress {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 3px 3px 0 0;
     overflow: hidden;
+    z-index: 10;
 }
 
-.progress-bar-fill {
+.player-bar-progress-fill {
     height: 100%;
-    width: 100%;
+    width: 0%;
     background: linear-gradient(90deg, var(--neu-accent), #a78bfa, var(--neu-accent));
     background-size: 200% 100%;
-    border-radius: 4px;
     animation: colorFlow 3s infinite ease-in-out;
+    border-radius: 3px 3px 0 0;
+    transition: width 0.4s ease;
 }
 
 @keyframes colorFlow {
     0% { background-position: 0% 0; }
     50% { background-position: 100% 0; }
     100% { background-position: 0% 0; }
-}
-
-.progress-message {
-    font-size: 12px;
-    color: var(--neu-text-muted);
-    margin-top: 6px;
-    text-align: center;
 }
 
 .stop-btn {

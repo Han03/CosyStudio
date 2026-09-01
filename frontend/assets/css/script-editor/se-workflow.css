@@ -463,3 +463,176 @@
 .option-detail-modal .modal-body .constraint-package-three-questions {
     margin-top: 12px;
 }
+
+/* ========== 一键初始化模式切换按钮 ========== */
+.init-mode-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--neu-accent, #6c5ce7);
+    background: rgba(108, 92, 231, 0.08);
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.init-mode-toggle-btn:hover {
+    background: rgba(108, 92, 231, 0.15);
+    border-color: var(--neu-accent, #6c5ce7);
+}
+
+.init-mode-toggle-btn i {
+    font-size: 11px;
+}
+
+/* ========== 一键初始化 Section 折叠卡片 ========== */
+.init-oneclick-section {
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.init-oneclick-section:hover {
+    border-color: rgba(108, 92, 231, 0.15);
+}
+
+.init-oneclick-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--neu-text, #333);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+}
+
+.init-oneclick-section-title:hover {
+    background: rgba(108, 92, 231, 0.04);
+}
+
+.init-oneclick-section-title i:first-child {
+    color: var(--neu-accent, #6c5ce7);
+    font-size: 14px;
+}
+
+.oc-section-arrow {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--neu-text-muted, #888);
+    transition: transform 0.2s ease;
+}
+
+.init-oneclick-section-body {
+    padding: 0 14px 14px 14px;
+}
+
+/* ========== 一键初始化方案卡片 ========== */
+.all-in-one-sets-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.all-in-one-set-card {
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+    background: rgba(0, 0, 0, 0.02);
+    border: 2px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.all-in-one-set-card:hover {
+    border-color: rgba(108, 92, 231, 0.3);
+    background: rgba(108, 92, 231, 0.03);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.1);
+}
+
+.all-in-one-set-card.selected {
+    border-color: var(--neu-accent, #6c5ce7);
+    background: rgba(108, 92, 231, 0.06);
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.15);
+}
+
+.oc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    background: rgba(108, 92, 231, 0.05);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.all-in-one-set-card.selected .oc-card-header {
+    background: rgba(108, 92, 231, 0.1);
+}
+
+.oc-card-check {
+    color: var(--neu-text-muted, #888);
+    font-size: 14px;
+}
+
+.all-in-one-set-card.selected .oc-card-check {
+    color: var(--neu-accent, #6c5ce7);
+}
+
+.oc-card-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--neu-text, #333);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc-card-score {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    color: var(--neu-accent, #6c5ce7);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.oc-card-score .score-num {
+    font-size: 14px;
+}
+
+.oc-card-body {
+    padding: 10px 12px;
+}
+
+.oc-card-field {
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--neu-text-muted, #888);
+    margin-bottom: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc-card-field strong {
+    color: var(--neu-text, #333);
+    font-weight: 500;
+    margin-right: 2px;
+}

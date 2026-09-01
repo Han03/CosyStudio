@@ -104,6 +104,9 @@ function handleWsMessage(msg) {
         case 'chapter_applied':
             handleChapterAppliedMessage(msg);
             break;
+        case 'apply_task_update':
+            handleApplyTaskUpdate(msg);
+            break;
         case 'init_progress':
             handleInitProgressMessage(msg);
             break;
@@ -112,6 +115,9 @@ function handleWsMessage(msg) {
             break;
         case 'reindex_progress':
             handleReindexProgressMessage(msg);
+            break;
+        case 'script_progress':
+            handleScriptProgressMessage(msg);
             break;
         case 'pong':
             break;
@@ -196,6 +202,71 @@ function handleChapterAppliedMessage(msg) {
     }
 }
 
+function handleApplyTaskUpdate(msg) {
+    const update = msg.update || {};
+    const phase = update.phase;
+    const message = update.message || '';
+    const chapterIndex = update.chapter_index;
+
+    console.log(`[WS] 应用任务更新: phase=${phase}, chapter=${chapterIndex}, msg=${message}`);
+
+    switch (phase) {
+        case 'started':
+            // 设置应用状态（不锁编辑器，用户可能正在查看其他章节）
+            state.applyingChapterIndex = chapterIndex;
+            state.applyTaskId = update.task_id;
+            // 显示横幅
+            if (typeof showApplyBanner === 'function') showApplyBanner('正在应用创作结果...');
+            // 刷新章节列表以显示处理中状态
+            if (typeof renderChapterList === 'function') renderChapterList();
+            break;
+
+        case 'content_saved':
+            // 章节已创建，刷新列表并切换到目标章节
+            if (typeof loadScriptInfo === 'function') {
+                loadScriptInfo().then(() => {
+                    if (typeof selectChapter === 'function') selectChapter(chapterIndex);
+                    // 切换后再锁定编辑器，此时编辑器显示的是目标章节
+                    if (typeof setEditorReadonly === 'function') setEditorReadonly(true);
+                    if (typeof renderChapterList === 'function') renderChapterList();
+                });
+            }
+            if (typeof updateApplyBanner === 'function') updateApplyBanner('章节已保存，正在执行后处理...');
+            break;
+
+        case 'processing':
+            // 更新横幅显示当前处理步骤
+            if (typeof updateApplyBanner === 'function') updateApplyBanner(message);
+            break;
+
+        case 'completed':
+            // 清除应用状态
+            if (typeof clearApplyState === 'function') clearApplyState();
+            // 刷新章节列表以获取最新状态
+            if (typeof loadScriptInfo === 'function') {
+                loadScriptInfo().then(() => {
+                    if (typeof renderChapterList === 'function') renderChapterList();
+                });
+            }
+            if (typeof showToast === 'function') showToast('应用完成', 'success');
+            break;
+
+        case 'failed':
+            // 清除应用状态
+            if (typeof clearApplyState === 'function') clearApplyState();
+            // 刷新章节列表
+            if (typeof loadScriptInfo === 'function') {
+                loadScriptInfo().then(() => {
+                    if (typeof renderChapterList === 'function') renderChapterList();
+                });
+            }
+            // 显示错误提示
+            const errorMsg = update.error || '应用失败';
+            if (typeof showToast === 'function') showToast('应用失败: ' + errorMsg, 'error');
+            break;
+    }
+}
+
 async function handleAudioGeneratedMessage(msg) {
     const lineId = msg.line_id;
     console.log('[WS] 收到音频生成通知:', lineId);
@@ -243,6 +314,7 @@ function startChapterGeneration(chapterIndex) {
         return;
     }
     state.generatingChapterIndex = chapterIndex;
+    showGenerationProgress();
     const btn = document.getElementById('generateBtn');
     if (btn) {
         btn.disabled = true;
@@ -252,6 +324,16 @@ function startChapterGeneration(chapterIndex) {
         type: 'generate_chapter',
         chapter_index: chapterIndex
     }));
+}
+
+function handleScriptProgressMessage(msg) {
+    // 守卫：如果生成已结束，忽略迟到的进度消息
+    if (state.generatingChapterIndex === -1 && state.scriptData && state.scriptData.status === 'ready') {
+        return;
+    }
+    const progress = msg.progress || 0;
+    const message = msg.message || '';
+    updateProgress(progress, message);
 }
 
 function handleStatusMessage(msg) {
@@ -266,8 +348,12 @@ function handleStatusMessage(msg) {
         }
         if (status === 'running' && chapterIndex !== undefined && chapterIndex !== null) {
             state.generatingChapterIndex = chapterIndex;
+            showGenerationProgress();
+        } else if (status === 'running') {
+            showGenerationProgress();
         } else if (status === 'ready') {
             state.generatingChapterIndex = -1;
+            hideGenerationProgress();
         }
         // 初始化中状态：展示任务遮罩
         if (status === 'initializing' && typeof showInitTaskMask === 'function') {
@@ -276,8 +362,6 @@ function handleStatusMessage(msg) {
     }
     if (typeof progress === 'number') {
         updateProgress(progress, message);
-    } else if (message) {
-        document.getElementById('progressMessage').textContent = message;
     }
 }
 
@@ -382,7 +466,7 @@ function appendLines(newLines) {
 function handleFinishMessage(msg) {
     state.generatingChapterIndex = -1;
     updateStatusBadge('ready');
-    updateProgress(100, msg.message || '生成完成');
+    hideGenerationProgress();
     if (state.scriptData) {
         state.scriptData.status = 'ready';
     }
@@ -410,6 +494,7 @@ function handleErrorMessage(msg) {
         return;
     }
     updateStatusBadge('failed');
+    hideGenerationProgress();
     if (state.scriptData) {
         state.scriptData.status = 'failed';
     }
@@ -429,6 +514,11 @@ function handleChapterPlansGeneratedMessage(msg) {
     const { outline_id: outlineId, success, message, plan_count: planCount } = msg;
     console.log(`[WS] 智能拆章完成: success=${success}, planCount=${planCount}, message=${message}`);
 
+    // 清除拆章进行中标记
+    if (typeof _splitChapterInProgress !== 'undefined') {
+        _splitChapterInProgress = false;
+    }
+
     if (typeof showToast === 'function') {
         showToast(message, success ? 'success' : 'error');
     }
@@ -442,6 +532,11 @@ function handleChapterPlansGeneratedMessage(msg) {
         if (typeof loadWebnovelOutline === 'function') {
             loadWebnovelOutline();
         }
+    }
+
+    // 同步刷新全局任务列表（若任务管理面板已打开则实时更新状态）
+    if (typeof refreshTasks === 'function') {
+        refreshTasks();
     }
 }
 

@@ -19,6 +19,9 @@ user_prompt: |
   【题材世界观】
   {genre_worldview}
   
+  【金手指设计知识】
+  {golden_finger_knowledge}
+  
   【设计要求】
   1. 体系公理：核心信条/定律、代价规则、公平性原则
   2. 体系类型：境界/等级/职业/血脉/契约/科技/双轨制

@@ -908,3 +908,105 @@
     font-style: italic;
 }
 
+/* ========== 角色属性标签 ========== */
+.char-profile-section {
+    margin-bottom: 4px;
+}
+.char-profile-fields {
+    display: flex;
+    gap: 10px;
+}
+.char-profile-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+.char-profile-row label {
+    font-size: 11px;
+    color: var(--neu-text-muted);
+    font-weight: 500;
+}
+.char-profile-row select,
+.char-profile-row textarea {
+    width: 100%;
+    padding: 5px 8px;
+    border: 1px solid var(--neu-border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--neu-text);
+    background: var(--neu-bg);
+    outline: none;
+    transition: border-color 0.15s;
+}
+.char-profile-row select:focus,
+.char-profile-row textarea:focus {
+    border-color: var(--neu-accent);
+}
+.char-profile-desc-row {
+    margin-top: 8px;
+}
+.char-agent-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    margin-left: 3px;
+    vertical-align: middle;
+}
+.char-agent-dot-empty {
+    background: #d1d5db;
+}
+
+/* ========== 智能匹配结果 ========== */
+.auto-match-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--neu-text);
+}
+.auto-match-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.auto-match-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--neu-light);
+    border-radius: 8px;
+    box-shadow: var(--neu-shadow-small);
+}
+.auto-match-role {
+    min-width: 60px;
+    font-size: 13px;
+}
+.auto-match-arrow {
+    color: var(--neu-text-muted);
+    font-size: 12px;
+}
+.auto-match-agent {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.auto-match-agent-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--neu-accent);
+}
+.auto-match-agent-meta {
+    font-size: 11px;
+    color: var(--neu-text-muted);
+}
+.auto-match-reason {
+    font-size: 11px;
+    color: var(--neu-text-muted);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

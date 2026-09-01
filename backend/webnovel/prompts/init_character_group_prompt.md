@@ -38,7 +38,7 @@ user_prompt: |
   - trust_cracks: 信任裂痕点（字符串）
   - anti_trope_influence: 反套路影响（字符串）
   - hard_constraint_cooperation: 硬约束下的合作方式（字符串）
-  - members: 团队成员列表（数组，唯一允许的数组字段），每个成员包含 name(角色姓名，必须优先从【已有角色名单】中选择；若剧情需要引入名单之外的新角色，也可以使用新姓名)、role(角色定位)、identity(角色身份简介)、main_line_contribution(主线贡献)、key_flaw(关键缺陷)、key_ability(关键能力)
+  - members: 团队成员列表（数组），每个成员包含 name(角色姓名，必须优先从【已有角色名单】中选择；若剧情需要引入名单之外的新角色，也可以使用新姓名)、role(角色定位)、identity(角色身份简介)、main_line_contribution(主线贡献)、key_flaw(关键缺陷)、key_ability(关键能力)
   - arcs: 团队成长弧线（数组），每个阶段包含stage(阶段名)、description(描述)
   
   【格式硬约束】

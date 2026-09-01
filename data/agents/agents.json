@@ -19,8 +19,8 @@
       {
         "tone": "坚定",
         "prompt_text": "你若想征服世界，先得征服你自己。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\11826c14-e0a1-478c-9f79-4fc93dcf4c0d\\tones\\坚定.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\11826c14-e0a1-478c-9f79-4fc93dcf4c0d\\tones\\坚定_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\11826c14-e0a1-478c-9f79-4fc93dcf4c0d\\tones\\坚定.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\11826c14-e0a1-478c-9f79-4fc93dcf4c0d\\tones\\坚定_original.mp3",
         "range_start": 3.389720356725511,
         "range_end": 6.321625,
         "speaker_id": "11826c14-e0a1-478c-9f79-4fc93dcf4c0d__坚定"
@@ -52,8 +52,8 @@
       {
         "tone": "平静",
         "prompt_text": "像银色的弯月亮，挂在海峡上",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\1c38302c-514d-4072-abb3-efb28ea7e2c1\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\1c38302c-514d-4072-abb3-efb28ea7e2c1\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\1c38302c-514d-4072-abb3-efb28ea7e2c1\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\1c38302c-514d-4072-abb3-efb28ea7e2c1\\tones\\平静_original.wav",
         "range_start": 3.336234394462767,
         "range_end": 6.008241495653244,
         "speaker_id": "1c38302c-514d-4072-abb3-efb28ea7e2c1__平静"
@@ -85,8 +85,8 @@
       {
         "tone": "平静",
         "prompt_text": "香火袅袅，是人们心灵的寄托。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\6847c54b-bc35-4ba0-ac36-769757ff4c74\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\6847c54b-bc35-4ba0-ac36-769757ff4c74\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\6847c54b-bc35-4ba0-ac36-769757ff4c74\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\6847c54b-bc35-4ba0-ac36-769757ff4c74\\tones\\平静_original.wav",
         "range_start": 0.45834224987030037,
         "range_end": 5.995621267727444,
         "speaker_id": "6847c54b-bc35-4ba0-ac36-769757ff4c74__平静"
@@ -118,8 +118,8 @@
       {
         "tone": "诡异",
         "prompt_text": "没错，她在说，别靠近那扇门。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\d8432496-05fd-4220-8045-8fc31f363491\\tones\\诡异.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\d8432496-05fd-4220-8045-8fc31f363491\\tones\\诡异_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\d8432496-05fd-4220-8045-8fc31f363491\\tones\\诡异.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\d8432496-05fd-4220-8045-8fc31f363491\\tones\\诡异_original.wav",
         "range_start": 13.460243128981999,
         "range_end": 16.678458,
         "speaker_id": "d8432496-05fd-4220-8045-8fc31f363491__诡异"
@@ -152,8 +152,8 @@
       {
         "tone": "开心",
         "prompt_text": "我特意多买了一个给你，甜而不腻，超好吃。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\dde1d5a8-41a1-4767-a54d-23bac867b49a\\tones\\开心.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\dde1d5a8-41a1-4767-a54d-23bac867b49a\\tones\\开心_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\dde1d5a8-41a1-4767-a54d-23bac867b49a\\tones\\开心.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\dde1d5a8-41a1-4767-a54d-23bac867b49a\\tones\\开心_original.mp3",
         "range_start": 4.204264338334402,
         "range_end": 7.763829442501069,
         "speaker_id": "dde1d5a8-41a1-4767-a54d-23bac867b49a__开心"
@@ -185,8 +185,8 @@
       {
         "tone": "平静",
         "prompt_text": "您关注的股票今日涨幅为2% 需要为您详细播报吗?",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4a5dcb1f-31ba-4a8f-9dd3-b6c743fcce7c\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4a5dcb1f-31ba-4a8f-9dd3-b6c743fcce7c\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4a5dcb1f-31ba-4a8f-9dd3-b6c743fcce7c\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4a5dcb1f-31ba-4a8f-9dd3-b6c743fcce7c\\tones\\平静_original.mp3",
         "range_start": 8.201948024931408,
         "range_end": 12.808,
         "speaker_id": "4a5dcb1f-31ba-4a8f-9dd3-b6c743fcce7c__平静"
@@ -220,8 +220,8 @@
       {
         "tone": "平静",
         "prompt_text": "我已经为您准备好相关资料，如有调整，随时告诉我。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\e9e656f7-d327-4f70-a523-de840bfc7ab0\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\e9e656f7-d327-4f70-a523-de840bfc7ab0\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\e9e656f7-d327-4f70-a523-de840bfc7ab0\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\e9e656f7-d327-4f70-a523-de840bfc7ab0\\tones\\平静_original.mp3",
         "range_start": 8.456941166666667,
         "range_end": 13.278188,
         "speaker_id": "e9e656f7-d327-4f70-a523-de840bfc7ab0__平静"
@@ -254,8 +254,8 @@
       {
         "tone": "平静",
         "prompt_text": "各位家长和同学们，大家好呀，我是你们的李老师。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\01a093c3-52ca-42bd-8625-6b3d3d18f81a\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\01a093c3-52ca-42bd-8625-6b3d3d18f81a\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\01a093c3-52ca-42bd-8625-6b3d3d18f81a\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\01a093c3-52ca-42bd-8625-6b3d3d18f81a\\tones\\平静_original.mp3",
         "range_start": 0.0,
         "range_end": 5.0608935327380955,
         "speaker_id": "01a093c3-52ca-42bd-8625-6b3d3d18f81a__平静"
@@ -287,8 +287,8 @@
       {
         "tone": "平静",
         "prompt_text": "这款瘦身库,我跟你们说,啊,谁穿谁就知道有多绝。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\daf7e095-89de-4bdd-8b91-a32a535d21ce\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\daf7e095-89de-4bdd-8b91-a32a535d21ce\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\daf7e095-89de-4bdd-8b91-a32a535d21ce\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\daf7e095-89de-4bdd-8b91-a32a535d21ce\\tones\\平静_original.mp3",
         "range_start": 0.7825028125,
         "range_end": 5.686187104166667,
         "speaker_id": "daf7e095-89de-4bdd-8b91-a32a535d21ce__平静"
@@ -320,8 +320,8 @@
       {
         "tone": "平静",
         "prompt_text": "我研究了半天都没能明白，你教教我好不好。你好厉害哦，一下子就弄好了。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\c24340cf-7253-41e4-a9ce-1398934c7949\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\c24340cf-7253-41e4-a9ce-1398934c7949\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\c24340cf-7253-41e4-a9ce-1398934c7949\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\c24340cf-7253-41e4-a9ce-1398934c7949\\tones\\平静_original.mp3",
         "range_start": 2.6967890625,
         "range_end": 9.1690828125,
         "speaker_id": "c24340cf-7253-41e4-a9ce-1398934c7949__平静"
@@ -353,8 +353,8 @@
       {
         "tone": "平静",
         "prompt_text": "我已经为您调整好室内温度,还准备了您喜欢的饮品。您可以放松休息一下。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\b65e1bc3-56f8-4ed1-af7e-935860b4e327\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\b65e1bc3-56f8-4ed1-af7e-935860b4e327\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\b65e1bc3-56f8-4ed1-af7e-935860b4e327\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\b65e1bc3-56f8-4ed1-af7e-935860b4e327\\tones\\平静_original.mp3",
         "range_start": 1.6837126116071428,
         "range_end": 7.584156808035713,
         "speaker_id": "b65e1bc3-56f8-4ed1-af7e-935860b4e327__平静"
@@ -386,8 +386,8 @@
       {
         "tone": "平静",
         "prompt_text": "一念放下，万般从容。心若止水，处处是禅意。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\35522115-e270-4034-8d09-e3dd31dda292\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\35522115-e270-4034-8d09-e3dd31dda292\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\35522115-e270-4034-8d09-e3dd31dda292\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\35522115-e270-4034-8d09-e3dd31dda292\\tones\\平静_original.mp3",
         "range_start": 11.507960482142856,
         "range_end": 18.211050866071428,
         "speaker_id": "35522115-e270-4034-8d09-e3dd31dda292__平静"
@@ -420,8 +420,8 @@
       {
         "tone": "平静",
         "prompt_text": "天空为什么是蓝色的呀?云朵是不是被太阳、晒化的棉花糖",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\46b4c69f-1532-4614-894d-fde26bbc5efb\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\46b4c69f-1532-4614-894d-fde26bbc5efb\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\46b4c69f-1532-4614-894d-fde26bbc5efb\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\46b4c69f-1532-4614-894d-fde26bbc5efb\\tones\\平静_original.mp3",
         "range_start": 0.0,
         "range_end": 5.497824988095238,
         "speaker_id": "46b4c69f-1532-4614-894d-fde26bbc5efb__平静"
@@ -453,8 +453,8 @@
       {
         "tone": "平静",
         "prompt_text": "结果醒来,发现我只是把枕头当成了面团。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\f1d518e7-d3a9-48fd-aad9-773c1bdf209d\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\f1d518e7-d3a9-48fd-aad9-773c1bdf209d\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\f1d518e7-d3a9-48fd-aad9-773c1bdf209d\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\f1d518e7-d3a9-48fd-aad9-773c1bdf209d\\tones\\平静_original.mp3",
         "range_start": 4.677466517857143,
         "range_end": 8.671707589285715,
         "speaker_id": "f1d518e7-d3a9-48fd-aad9-773c1bdf209d__平静"
@@ -486,8 +486,8 @@
       {
         "tone": "平静",
         "prompt_text": "今天下班快回来吧,我做了你最爱吃的红烧肉。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4d22d035-c5af-446f-aa17-fd15a5a1cc81\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4d22d035-c5af-446f-aa17-fd15a5a1cc81\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4d22d035-c5af-446f-aa17-fd15a5a1cc81\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4d22d035-c5af-446f-aa17-fd15a5a1cc81\\tones\\平静_original.mp3",
         "range_start": 1.100093005952381,
         "range_end": 4.796405505952381,
         "speaker_id": "4d22d035-c5af-446f-aa17-fd15a5a1cc81__平静"
@@ -519,8 +519,8 @@
       {
         "tone": "平静",
         "prompt_text": "在一个活蹦乱跳,咿呀学语的孩子身上,留下了美好的记忆。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\1a484f50-cbfe-4b99-a92b-f759b60c2f82\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\1a484f50-cbfe-4b99-a92b-f759b60c2f82\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\1a484f50-cbfe-4b99-a92b-f759b60c2f82\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\1a484f50-cbfe-4b99-a92b-f759b60c2f82\\tones\\平静_original.mp3",
         "range_start": 12.32,
         "range_end": 17.92,
         "speaker_id": "1a484f50-cbfe-4b99-a92b-f759b60c2f82__平静"
@@ -552,8 +552,8 @@
       {
         "tone": "平静",
         "prompt_text": "一会儿下班有时间不？等下来我家玩，我刚买了你最爱吃的榴莲千层。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\cef1d003-9f30-4d4b-acd7-2110f7967349\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\cef1d003-9f30-4d4b-acd7-2110f7967349\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\cef1d003-9f30-4d4b-acd7-2110f7967349\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\cef1d003-9f30-4d4b-acd7-2110f7967349\\tones\\平静_original.mp3",
         "range_start": 0.0,
         "range_end": 5.720813,
         "speaker_id": "cef1d003-9f30-4d4b-acd7-2110f7967349__平静"
@@ -585,8 +585,8 @@
       {
         "tone": "平静",
         "prompt_text": "纸页上娟秀的字迹,还带着当年的温度。她想起,昨天在老宅隔楼里,发现她时的场景。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\9696e978-b429-4681-b19c-d8218640e602\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\9696e978-b429-4681-b19c-d8218640e602\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\9696e978-b429-4681-b19c-d8218640e602\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\9696e978-b429-4681-b19c-d8218640e602\\tones\\平静_original.mp3",
         "range_start": 5.180281622023809,
         "range_end": 12.306911830357144,
         "speaker_id": "9696e978-b429-4681-b19c-d8218640e602__平静"
@@ -618,8 +618,8 @@
       {
         "tone": "平静",
         "prompt_text": "人家真的好想要那个粉色的小兔子包包嘛",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\9f8f89de-36bc-41df-95a9-9f7af814378a\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\9f8f89de-36bc-41df-95a9-9f7af814378a\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\9f8f89de-36bc-41df-95a9-9f7af814378a\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\9f8f89de-36bc-41df-95a9-9f7af814378a\\tones\\平静_original.mp3",
         "range_start": 0.0,
         "range_end": 3.562586389880952,
         "speaker_id": "9f8f89de-36bc-41df-95a9-9f7af814378a__平静"
@@ -651,8 +651,8 @@
       {
         "tone": "平静",
         "prompt_text": "我们都能为您提供最贴心的服务,只需简单的语音指令,即可轻松完成操作。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\acd3f250-9760-4445-95fa-f7a4b789d4d0\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\acd3f250-9760-4445-95fa-f7a4b789d4d0\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\acd3f250-9760-4445-95fa-f7a4b789d4d0\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\acd3f250-9760-4445-95fa-f7a4b789d4d0\\tones\\平静_original.mp3",
         "range_start": 0.0,
         "range_end": 6.2475476190476185,
         "speaker_id": "acd3f250-9760-4445-95fa-f7a4b789d4d0__平静"
@@ -685,8 +685,8 @@
       {
         "tone": "平静",
         "prompt_text": "人家甩脸色,别往心里去。记得上次,你帮我改方案时说的吗?",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\3848dc84-befd-4735-900e-0e698547762e\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\3848dc84-befd-4735-900e-0e698547762e\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\3848dc84-befd-4735-900e-0e698547762e\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\3848dc84-befd-4735-900e-0e698547762e\\tones\\平静_original.mp3",
         "range_start": 1.5923723958333333,
         "range_end": 7.40940625,
         "speaker_id": "3848dc84-befd-4735-900e-0e698547762e__平静"
@@ -718,8 +718,8 @@
       {
         "tone": "平静",
         "prompt_text": "可没等他高兴多久,矿洞深处突然传来一声震耳欲聋的咆哮。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4b94cded-1d36-4ead-813d-82d36c0f72fb\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4b94cded-1d36-4ead-813d-82d36c0f72fb\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4b94cded-1d36-4ead-813d-82d36c0f72fb\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4b94cded-1d36-4ead-813d-82d36c0f72fb\\tones\\平静_original.mp3",
         "range_start": 12.14227087202381,
         "range_end": 17.690725773809525,
         "speaker_id": "4b94cded-1d36-4ead-813d-82d36c0f72fb__平静"
@@ -752,8 +752,8 @@
       {
         "tone": "平静",
         "prompt_text": "您这个账户没有处理好,肯定要给你打电话的呀。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\b30b5c2b-10ac-445f-98db-781d8444ebd5\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\b30b5c2b-10ac-445f-98db-781d8444ebd5\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\b30b5c2b-10ac-445f-98db-781d8444ebd5\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\b30b5c2b-10ac-445f-98db-781d8444ebd5\\tones\\平静_original.mp3",
         "range_start": 3.9575315,
         "range_end": 7.067020535714286,
         "speaker_id": "b30b5c2b-10ac-445f-98db-781d8444ebd5__平静"
@@ -785,8 +785,8 @@
       {
         "tone": "平静",
         "prompt_text": "这个是目前的平台规则,先生确实抱歉。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\e280c1ca-f7d4-4f0e-a397-fd0160ce9e2e\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\e280c1ca-f7d4-4f0e-a397-fd0160ce9e2e\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\e280c1ca-f7d4-4f0e-a397-fd0160ce9e2e\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\e280c1ca-f7d4-4f0e-a397-fd0160ce9e2e\\tones\\平静_original.mp3",
         "range_start": 0.0,
         "range_end": 3.709375,
         "speaker_id": "e280c1ca-f7d4-4f0e-a397-fd0160ce9e2e__平静"
@@ -818,8 +818,8 @@
       {
         "tone": "平静",
         "prompt_text": "特别适合您这样的人群,想给您简单介绍一下。您看方便吗?",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\02713ea1-5d4a-4b52-b602-cf4db0fc66b3\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\02713ea1-5d4a-4b52-b602-cf4db0fc66b3\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\02713ea1-5d4a-4b52-b602-cf4db0fc66b3\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\02713ea1-5d4a-4b52-b602-cf4db0fc66b3\\tones\\平静_original.mp3",
         "range_start": 9.146472098214286,
         "range_end": 15.289625,
         "speaker_id": "02713ea1-5d4a-4b52-b602-cf4db0fc66b3__平静"
@@ -851,8 +851,8 @@
       {
         "tone": "平静",
         "prompt_text": "演员用细腻的情感,演艺角色的挣扎与抉择。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\d1b80f80-abd5-436e-9811-110d0f304938\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\d1b80f80-abd5-436e-9811-110d0f304938\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\d1b80f80-abd5-436e-9811-110d0f304938\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\d1b80f80-abd5-436e-9811-110d0f304938\\tones\\平静_original.mp3",
         "range_start": 8.761943241071428,
         "range_end": 13.001593196428571,
         "speaker_id": "d1b80f80-abd5-436e-9811-110d0f304938__平静"
@@ -884,8 +884,8 @@
       {
         "tone": "平静",
         "prompt_text": "这不是枯燥的说教,而是哲人用声音编织的思维迷宫。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\0aa0149b-b9f8-4726-bdc7-436dd33f0263\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\0aa0149b-b9f8-4726-bdc7-436dd33f0263\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\0aa0149b-b9f8-4726-bdc7-436dd33f0263\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\0aa0149b-b9f8-4726-bdc7-436dd33f0263\\tones\\平静_original.mp3",
         "range_start": 10.419915605654761,
         "range_end": 15.595063,
         "speaker_id": "0aa0149b-b9f8-4726-bdc7-436dd33f0263__平静"
@@ -917,8 +917,8 @@
       {
         "tone": "开心",
         "prompt_text": "你上次说,想看极光。我已经把年假和机票都订好了。顺便还带了相机。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4d3e552d-5d4e-49b4-8b7e-bac23e36256a\\tones\\开心.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\4d3e552d-5d4e-49b4-8b7e-bac23e36256a\\tones\\开心_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4d3e552d-5d4e-49b4-8b7e-bac23e36256a\\tones\\开心.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\4d3e552d-5d4e-49b4-8b7e-bac23e36256a\\tones\\开心_original.mp3",
         "range_start": 0.0,
         "range_end": 5.746938,
         "speaker_id": "4d3e552d-5d4e-49b4-8b7e-bac23e36256a__开心"
@@ -950,8 +950,8 @@
       {
         "tone": "平静",
         "prompt_text": "但想到你最爱吃我做的红烧肉,突然觉得,洗三个小时碗都值得。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\ca13c694-2935-4eea-8206-4e002e1e1d94\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\ca13c694-2935-4eea-8206-4e002e1e1d94\\tones\\平静_original.mp3",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\ca13c694-2935-4eea-8206-4e002e1e1d94\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\ca13c694-2935-4eea-8206-4e002e1e1d94\\tones\\平静_original.mp3",
         "range_start": 2.9548601160714285,
         "range_end": 8.071813,
         "speaker_id": "ca13c694-2935-4eea-8206-4e002e1e1d94__平静"
@@ -983,8 +983,8 @@
       {
         "tone": "平静",
         "prompt_text": "花开、花落,它暗喻了人生的起伏。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\ce973859-eb68-4da0-9ebd-c886c26fbde9\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\ce973859-eb68-4da0-9ebd-c886c26fbde9\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\ce973859-eb68-4da0-9ebd-c886c26fbde9\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\ce973859-eb68-4da0-9ebd-c886c26fbde9\\tones\\平静_original.wav",
         "range_start": 16.48554886607143,
         "range_end": 22.794833,
         "speaker_id": "ce973859-eb68-4da0-9ebd-c886c26fbde9__平静"
@@ -1016,8 +1016,8 @@
       {
         "tone": "愤怒",
         "prompt_text": "尼玛逼，你把这个马达子摆到路中间。这个屌巷子是你家开的。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\3bee23de-f76a-49b8-92ec-e0a7d52d77df\\tones\\愤怒.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\3bee23de-f76a-49b8-92ec-e0a7d52d77df\\tones\\愤怒_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\3bee23de-f76a-49b8-92ec-e0a7d52d77df\\tones\\愤怒.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\3bee23de-f76a-49b8-92ec-e0a7d52d77df\\tones\\愤怒_original.wav",
         "range_start": 14.09021082142857,
         "range_end": 18.350042,
         "speaker_id": "3bee23de-f76a-49b8-92ec-e0a7d52d77df__愤怒"
@@ -1049,8 +1049,8 @@
       {
         "tone": "撒娇",
         "prompt_text": "还让不让让好好紧肥啦?不行,你要请我一顿好的赔偿我。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\cf69a7b1-4710-4eef-8ba1-cc9622865db1\\tones\\撒娇.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\cf69a7b1-4710-4eef-8ba1-cc9622865db1\\tones\\撒娇_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\cf69a7b1-4710-4eef-8ba1-cc9622865db1\\tones\\撒娇.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\cf69a7b1-4710-4eef-8ba1-cc9622865db1\\tones\\撒娇_original.wav",
         "range_start": 1.1420238095238096,
         "range_end": 7.0460714285714285,
         "speaker_id": "cf69a7b1-4710-4eef-8ba1-cc9622865db1__撒娇"
@@ -1082,8 +1082,8 @@
       {
         "tone": "无奈",
         "prompt_text": "睡娃作业要签字嘛。屋里老少子还嫌我不陪他逛骡马市。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\105777f5-5c4f-42a2-91cd-0b79fd79c920\\tones\\无奈.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\105777f5-5c4f-42a2-91cd-0b79fd79c920\\tones\\无奈_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\105777f5-5c4f-42a2-91cd-0b79fd79c920\\tones\\无奈.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\105777f5-5c4f-42a2-91cd-0b79fd79c920\\tones\\无奈_original.wav",
         "range_start": 11.222453098214284,
         "range_end": 16.909167,
         "speaker_id": "105777f5-5c4f-42a2-91cd-0b79fd79c920__无奈"
@@ -1115,8 +1115,8 @@
       {
         "tone": "期待",
         "prompt_text": "哇,真的呢?面包香喷喷的,好想吃一口呀。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\f248a560-2862-4fc1-8937-c40c5d28b0a7\\tones\\期待.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\f248a560-2862-4fc1-8937-c40c5d28b0a7\\tones\\期待_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\f248a560-2862-4fc1-8937-c40c5d28b0a7\\tones\\期待.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\f248a560-2862-4fc1-8937-c40c5d28b0a7\\tones\\期待_original.wav",
         "range_start": 0.0,
         "range_end": 5.27478211904762,
         "speaker_id": "f248a560-2862-4fc1-8937-c40c5d28b0a7__期待"
@@ -1148,8 +1148,8 @@
       {
         "tone": "平静",
         "prompt_text": "白马跳得高,胖娃耍关刀。关刀耍得远,胖娃吃汤圆。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\5da856a3-855e-499a-afc6-ff850ddb601e\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\5da856a3-855e-499a-afc6-ff850ddb601e\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\5da856a3-855e-499a-afc6-ff850ddb601e\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\5da856a3-855e-499a-afc6-ff850ddb601e\\tones\\平静_original.wav",
         "range_start": 7.504538690476191,
         "range_end": 14.45,
         "speaker_id": "5da856a3-855e-499a-afc6-ff850ddb601e__平静"
@@ -1181,8 +1181,8 @@
       {
         "tone": "平静",
         "prompt_text": "慢慢、舒展开肩膀呀,就像躺在软软的云朵上一样。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\e282cb3f-f563-4642-b134-1d11af723850\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\e282cb3f-f563-4642-b134-1d11af723850\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\e282cb3f-f563-4642-b134-1d11af723850\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\e282cb3f-f563-4642-b134-1d11af723850\\tones\\平静_original.wav",
         "range_start": 12.075703124999999,
         "range_end": 19.321125,
         "speaker_id": "e282cb3f-f563-4642-b134-1d11af723850__平静"
@@ -1214,8 +1214,8 @@
       {
         "tone": "平静",
         "prompt_text": "我们家那边后面有一个后山,就护城河那边儿。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\ac1a9226-cdec-4e91-a77b-bb9c48a06cf3\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\ac1a9226-cdec-4e91-a77b-bb9c48a06cf3\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\ac1a9226-cdec-4e91-a77b-bb9c48a06cf3\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\ac1a9226-cdec-4e91-a77b-bb9c48a06cf3\\tones\\平静_original.wav",
         "range_start": 0.0,
         "range_end": 3.2726563125000006,
         "speaker_id": "ac1a9226-cdec-4e91-a77b-bb9c48a06cf3__平静"
@@ -1247,8 +1247,8 @@
       {
         "tone": "平静",
         "prompt_text": "且说那糯米粉团子,虽然捏的是古怪,可是,很有童趣啊。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\03354f29-c667-451b-8c88-d52402554fb0\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\03354f29-c667-451b-8c88-d52402554fb0\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\03354f29-c667-451b-8c88-d52402554fb0\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\03354f29-c667-451b-8c88-d52402554fb0\\tones\\平静_original.wav",
         "range_start": 1.6577470238095238,
         "range_end": 8.34589880952381,
         "speaker_id": "03354f29-c667-451b-8c88-d52402554fb0__平静"
@@ -1280,8 +1280,8 @@
       {
         "tone": "平静",
         "prompt_text": "定是早起的斑鸠,被咱们惊着了。你要不过来看看路边的野菊,香气可以暖人呢。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\21868164-6c4e-42fe-89f5-393dd4214c92\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\backend\\agents\\data\\21868164-6c4e-42fe-89f5-393dd4214c92\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\21868164-6c4e-42fe-89f5-393dd4214c92\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\backend\\agents\\data\\21868164-6c4e-42fe-89f5-393dd4214c92\\tones\\平静_original.wav",
         "range_start": 9.150496214285713,
         "range_end": 15.618124428571427,
         "speaker_id": "21868164-6c4e-42fe-89f5-393dd4214c92__平静"
@@ -1313,8 +1313,8 @@
       {
         "tone": "平静",
         "prompt_text": "安静的可以听到自己的呼吸声、和心跳声。",
-        "voice_path": "c:\\MyProjects\\ai\\CosyWritter\\data\\agents\\636ae32f-16d6-4c51-bb4f-db9f3cbb7ad6\\tones\\平静.wav",
-        "original_path": "c:\\MyProjects\\ai\\CosyWritter\\data\\agents\\636ae32f-16d6-4c51-bb4f-db9f3cbb7ad6\\tones\\平静_original.wav",
+        "voice_path": "c:\\MyProjects\\ai\\CosyStudio\\data\\agents\\636ae32f-16d6-4c51-bb4f-db9f3cbb7ad6\\tones\\平静.wav",
+        "original_path": "c:\\MyProjects\\ai\\CosyStudio\\data\\agents\\636ae32f-16d6-4c51-bb4f-db9f3cbb7ad6\\tones\\平静_original.wav",
         "range_start": 3.1,
         "range_end": 7.43,
         "speaker_id": "636ae32f-16d6-4c51-bb4f-db9f3cbb7ad6__平静"

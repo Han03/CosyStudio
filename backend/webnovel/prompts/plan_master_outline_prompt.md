@@ -34,6 +34,9 @@ user_prompt: |
   创意约束：{genre_creative_constraints}
   故事规则：{genre_story_rules}
   
+  【约束包与叠加包】
+  {csv_constraint_packs}
+  
   【总纲设计要求】
   1. 整体结构：设计4-8卷的故事架构
   2. 每卷设计：

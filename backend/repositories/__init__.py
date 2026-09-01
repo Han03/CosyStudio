@@ -17,11 +17,13 @@ from .script_chapter_repository import (
 from .script_line_repository import (
     add_script_lines, insert_line_at_position, reorder_script_lines, get_script_lines,
     get_script_lines_paged, update_script_line, delete_script_line, delete_script_lines_by_chapter,
-    delete_script_lines, get_script_line_by_id, get_script_line_count, get_script_chapters_with_lines
+    delete_script_lines, get_script_line_by_id, get_script_line_count, get_script_chapters_with_lines,
+    get_lines_by_role
 )
 from .script_character_repository import (
     get_character_configs, get_character_config, upsert_character_config, add_script_characters,
-    get_script_characters, increment_character_line_count, delete_script_characters
+    get_script_characters, increment_character_line_count, delete_script_characters,
+    update_character_profile, batch_update_character_profiles
 )
 from .audio_history_repository import (
     save_audio_history, get_audio_history_by_line_id, get_matching_audio_history,

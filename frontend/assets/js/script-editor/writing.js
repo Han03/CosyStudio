@@ -416,12 +416,8 @@ function updateWorkflowProgress(stepName, taskStatus) {
         '草稿审查':         { num: 4,  label: '审查' },
         // 节点5: 润色
         '草稿润色':         { num: 5,  label: '润色' },
-        // 节点6: 事实
-        '事实记录':         { num: 6,  label: '事实' },
-        // 节点7: 伏笔
-        '伏笔和爽点提取':   { num: 7,  label: '伏笔' },
-        // 节点8: 归档
-        '任务归档':         { num: 8,  label: '归档' }
+        // 节点6: 归档
+        '任务归档':         { num: 6,  label: '归档' }
     };
 
     const cfg = stepConfig[stepName];
@@ -513,18 +509,28 @@ async function applyContinueResult() {
     }
 
     try {
-        const data = await apiRequest(`/api/books/scripts/chapters/continue/apply?script_id=${state.scriptId}`, {
+        const data = await apiRequest(`/api/books/scripts/chapters/continue/apply-task?script_id=${state.scriptId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ task_id: taskId, chapter_index: chapterIndex }),
             errorPrefix: '应用失败'
         });
-        if (!data.success) {
+        if (!data.success && !data.apply_task_id) {
             showToast(data.detail || data.error || '应用失败', 'error');
             return;
         }
-        // 后续 UI 更新由 WebSocket chapter_applied 消息驱动，
-        // 此处仅显示“应用中”提示，避免前端重复执行章节创建/内容写入
+        // 设置应用状态
+        state.applyingChapterIndex = chapterIndex;
+        state.applyTaskId = data.apply_task_id;
+        // 关闭创作模态框
+        closeContinueModal();
+        // 显示横幅（不锁编辑器，用户可能正在查看其他章节；
+        // 编辑器锁定由 content_saved WS 消息在切换到目标章节后执行）
+        showApplyBanner('正在应用创作结果...');
+        // 刷新章节列表以显示处理中效果
+        if (typeof renderChapterList === 'function') {
+            renderChapterList();
+        }
         showToast('正在应用创作结果...', 'info');
     } catch (e) {
         console.error('应用创作结果失败:', e);
@@ -540,6 +546,25 @@ function resetContinueModal() {
     if (recreateBtn) recreateBtn.style.display = 'none';
     document.getElementById('continueTaskStatus').innerHTML = '';
     state.continueTaskId = null;
+}
+
+/**
+ * 点击"重新创作"按钮：临时切换到未创作状态，允许修改创作要求和选项。
+ * 创作结果保留在 state 中，关闭模态框后重新打开仍可查看。
+ */
+function recreateContinue() {
+    // 显示输入区域（创作要求 + 选项）
+    document.getElementById('continueInstructions').style.display = 'block';
+    // 隐藏结果预览区
+    document.getElementById('continueProgressContainer').style.display = 'none';
+    // 切换按钮状态
+    document.getElementById('continueStartBtn').style.display = 'block';
+    document.getElementById('continueApplyBtn').style.display = 'none';
+    const recreateBtn = document.getElementById('continueRecreateBtn');
+    if (recreateBtn) recreateBtn.style.display = 'none';
+    // 清空预览和状态提示，但保留 state 中的结果数据
+    document.getElementById('continueResultPreview').innerHTML = '';
+    document.getElementById('continueTaskStatus').innerHTML = '';
 }
 
 async function insertContinueResult(content) {
@@ -641,4 +666,138 @@ function renderRagResults(chunks) {
         </div>
         `;
     }).join('');
+}
+
+// ── 应用任务 UI 辅助函数 ──────────────────────────────────────
+
+/**
+ * 设置编辑器为只读/可编辑状态。
+ */
+function setEditorReadonly(readonly) {
+    const textarea = document.getElementById('originalTextBody');
+    if (textarea) {
+        textarea.readOnly = readonly;
+        textarea.classList.toggle('readonly', readonly);
+    }
+    const saveBtn = document.getElementById('saveOriginalBtn');
+    if (saveBtn) {
+        saveBtn.style.display = readonly ? 'none' : '';
+    }
+}
+
+/**
+ * 显示应用进度横幅。
+ */
+function showApplyBanner(message) {
+    let banner = document.getElementById('applyBanner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'applyBanner';
+        banner.className = 'apply-banner';
+        const editorContainer = document.querySelector('.editor-container') || document.querySelector('.original-text-container');
+        if (editorContainer) {
+            editorContainer.insertBefore(banner, editorContainer.firstChild);
+        }
+    }
+    banner.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${message}`;
+    banner.style.display = 'block';
+}
+
+/**
+ * 隐藏应用进度横幅。
+ */
+function hideApplyBanner() {
+    const banner = document.getElementById('applyBanner');
+    if (banner) {
+        banner.style.display = 'none';
+    }
+}
+
+/**
+ * 更新应用进度横幅文本。
+ */
+function updateApplyBanner(message) {
+    const banner = document.getElementById('applyBanner');
+    if (banner) {
+        banner.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${message}`;
+    }
+}
+
+/**
+ * 清除应用状态，恢复编辑器为可编辑。
+ */
+function clearApplyState() {
+    state.applyingChapterIndex = null;
+    state.applyTaskId = null;
+    setEditorReadonly(false);
+    hideApplyBanner();
+    if (typeof renderChapterList === 'function') {
+        renderChapterList();
+    }
+}
+
+/**
+ * 页面加载时根据章节列表的 apply_status 恢复应用状态。
+ */
+function restoreApplyStateFromChapters() {
+    if (!state.chapters || state.chapters.length === 0) return;
+
+    // 查找处于 processing 状态的章节
+    const processingChapter = state.chapters.find(c => c.apply_status === 'processing');
+    if (processingChapter) {
+        state.applyingChapterIndex = processingChapter.chapter_index;
+        // 仅当用户正在查看处理中的章节时才锁定编辑器
+        if (state.currentChapterIndex === processingChapter.chapter_index) {
+            setEditorReadonly(true);
+        }
+        // 显示处理中横幅
+        showApplyBanner('正在应用创作结果，请勿关闭页面...');
+        // renderChapterList 已自动渲染处理中效果
+        return;
+    }
+
+    // 查找处于 apply_failed 状态的章节
+    const failedChapter = state.chapters.find(c => c.apply_status === 'apply_failed');
+    if (failedChapter) {
+        // 章节已有内容但后处理失败 → 提示重试
+        showToast(`第${failedChapter.chapter_index}章后处理失败，可点击「重试后处理」`, 'warning');
+    }
+}
+
+/**
+ * 重试后处理（事实记录 + 伏笔爽点提取 + 结尾钩子 + RAG 索引）。
+ */
+async function retryPostProcess(chapterIndex) {
+    if (chapterIndex === null || chapterIndex === undefined) {
+        showToast('未确定目标章节', 'warning');
+        return;
+    }
+    try {
+        const data = await apiRequest(
+            `/api/books/scripts/chapters/continue/retry-post-process?script_id=${state.scriptId}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chapter_index: chapterIndex }),
+                errorPrefix: '重试失败'
+            }
+        );
+        if (!data.success && !data.task_id) {
+            showToast(data.detail || data.error || '重试失败', 'error');
+            return;
+        }
+        // 设置应用状态
+        state.applyingChapterIndex = chapterIndex;
+        state.applyTaskId = data.task_id;
+        // 设置编辑器只读并显示横幅
+        setEditorReadonly(true);
+        showApplyBanner('正在重试后处理...');
+        if (typeof renderChapterList === 'function') {
+            renderChapterList();
+        }
+        showToast('正在重试后处理...', 'info');
+    } catch (e) {
+        console.error('重试后处理失败:', e);
+        showToast('重试失败: ' + e.message, 'error');
+    }
 }

@@ -24,8 +24,6 @@ class PipelineOrchestrator:
         "draft_generator",
         "draft_reviewer",
         "draft_polisher",
-        "fact_recorder",
-        "foreshadow_cool_point_extractor",
         "task_archiver",
     ]
 
@@ -39,9 +37,7 @@ class PipelineOrchestrator:
             "draft_generator",
             "draft_reviewer",
             "draft_polisher",
-            "fact_recorder",
             "setting_recorder",
-            "foreshadow_cool_point_extractor",
         ],
         "write_fast": [
             "context_builder",
@@ -50,7 +46,6 @@ class PipelineOrchestrator:
             "draft_generator",
             "draft_reviewer",
             "draft_polisher",
-            "fact_recorder",
         ],
         "write_minimal": [
             "context_builder",
@@ -58,7 +53,6 @@ class PipelineOrchestrator:
             "chapter_plot_reviewer",
             "draft_generator",
             "draft_polisher",
-            "fact_recorder",
         ],
         "query": ["query_executor"],
         "story_system": ["story_system"],

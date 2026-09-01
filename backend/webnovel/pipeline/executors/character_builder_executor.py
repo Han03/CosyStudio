@@ -84,8 +84,6 @@ class CharacterBuilderExecutor(BaseExecutor):
         executor = get_model_executor()
         prompt_data = self._load_prompt(prompt_name)
 
-        _logger.info(f"[character_builder] 调用LLM生成 {prompt_name}，prompt加载: {'成功' if prompt_data['user_prompt'] else '失败'}")
-
         if not prompt_data["user_prompt"]:
             _logger.error(f"[character_builder] {prompt_name} 的user_prompt为空")
             return {}
@@ -118,7 +116,6 @@ class CharacterBuilderExecutor(BaseExecutor):
                     return _SafeAttr()
 
             user_prompt = prompt_data["user_prompt"].format_map(_SafeFormatMap(**context_data))
-            _logger.info(f"[character_builder] 准备调用LLM，prompt长度: {len(user_prompt)}")
 
             project_id = 0
             try:
@@ -135,7 +132,7 @@ class CharacterBuilderExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=user_prompt,
                 system_prompt=prompt_data["system_prompt"],
-                max_tokens=4000,
+                max_tokens=6000,
                 script_id=self.script_id,
                 project_id=project_id,
                 executor_name="character_builder",
@@ -143,10 +140,7 @@ class CharacterBuilderExecutor(BaseExecutor):
             )
             _latency_ms = int((_time.time() - _call_start) * 1000)
 
-            _logger.info(f"[character_builder] LLM调用完成，结果类型: {type(result)}")
             content = result.get("content", "") if result else ""
-            _logger.info(f"[character_builder] LLM返回内容长度: {len(content)}")
-            _logger.info(f"[character_builder] LLM返回内容前300字符: {repr(content[:300])}")
 
             content = content.strip()
 
@@ -169,28 +163,46 @@ class CharacterBuilderExecutor(BaseExecutor):
                 return json_result
             else:
                 _logger.error(f"[character_builder] JSON解析失败，所有策略均失败")
-                _logger.error(f"[character_builder] 解析失败的内容: {repr(content[:500])}")
                 return {"raw_content": content}
         except Exception as e:
             _logger.error(f"[character_builder] LLM调用异常: {e}")
             return {"error": str(e)}
 
     @staticmethod
-    def _sanitize_age(age_val) -> int:
-        """安全转换 age 字段为 int。"""
+    def _age_to_stage(age_num: int) -> str:
+        """数字年龄 → 年龄段。"""
+        if age_num <= 0:
+            return ""
+        if age_num < 18:
+            return "少年"
+        if age_num < 40:
+            return "青年"
+        if age_num < 60:
+            return "中年"
+        return "老年"
+
+    @staticmethod
+    def _sanitize_age(age_val) -> Tuple[int, str]:
+        """安全转换 age 字段，返回 (精确年龄 int, 年龄段 str)。
+
+        支持输入：数字年龄、年龄段字符串、两者组合。
+        """
+        _AGE_STAGES = {"少年", "青年", "中年", "老年"}
         if isinstance(age_val, bool):
-            return 0
-        if isinstance(age_val, int):
-            return age_val
+            return 0, ""
         if isinstance(age_val, str):
+            age_val = age_val.strip()
+            if age_val in _AGE_STAGES:
+                return 0, age_val
             try:
-                return int(age_val)
+                age_num = int(age_val)
+                return (age_num, CharacterBuilderExecutor._age_to_stage(age_num)) if age_num > 0 else (0, "")
             except ValueError:
-                return 0
-        try:
-            return int(age_val)
-        except Exception:
-            return 0
+                return 0, age_val if age_val else ""
+        if isinstance(age_val, (int, float)):
+            age_num = int(age_val)
+            return (age_num, CharacterBuilderExecutor._age_to_stage(age_num)) if age_num > 0 else (0, "")
+        return 0, ""
 
     def _save_character_card(self, project_id: int, role: str, char_data: dict) -> Tuple[dict, Optional[int]]:
         """保存角色卡到数据库，处理字段映射、age 转换、关联表写入。
@@ -214,12 +226,13 @@ class CharacterBuilderExecutor(BaseExecutor):
         if not data.get("long_term_goal") and data.get("desire"):
             data["long_term_goal"] = data["desire"]
 
-        # 安全转换 age 为 int，其余字段为字符串
-        if "age" in data:
-            data["age"] = self._sanitize_age(data["age"])
+        # age → 精确年龄(int) + 年龄段(str)，其余字段为字符串
+        if "age" in data or "age_stage" in data:
+            age_num, age_stage = self._sanitize_age(data.pop("age", 0))
+            data["age"] = age_num
+            # age_stage 优先取 LLM 显式输出，其次从数字年龄推导
+            data["age_stage"] = _sanitize_value(data.pop("age_stage", ""), "") or age_stage
         for key in list(data.keys()):
-            if key == "age":
-                continue
             data[key] = _sanitize_value(data[key], "")
 
         char = add_character_card(project_id, role, **data)
@@ -539,6 +552,7 @@ class CharacterBuilderExecutor(BaseExecutor):
                 if name:
                     name_to_card[name] = card
             name_to_id = {n: c["id"] for n, c in name_to_card.items()}
+            new_members_info = []  # 收集未匹配的新成员信息，用于批量 LLM 补充
 
             for member in _safe_items(members):
                 member_name = member.get("name", "")
@@ -559,23 +573,22 @@ class CharacterBuilderExecutor(BaseExecutor):
                     _logger.info(
                         f"[character_builder] 角色团成员 '{member_name}' 升级为主角团核心 (co_protagonist)"
                     )
-                # 匹配失败：为该成员创建新角色卡（按 POV/职能判定类型）
+                # 匹配失败：为该成员创建新角色卡（按 POV/职能判定类型），后续批量 LLM 补充详细字段
                 if char_id is None and member_name:
                     _logger.info(
-                        f"[character_builder] 团队成员 '{member_name}' 未匹配到已有角色卡，创建新角色卡"
+                        f"[character_builder] 团队成员 '{member_name}' 未匹配到已有角色卡，创建基础角色卡"
                     )
                     new_card_data = {
                         "name": _sanitize_value(member_name),
                         "identity": _sanitize_value(member.get("identity", "")),
-                        "core_personality": _sanitize_value(member.get("role", "")),
                         "personality_flaw": _sanitize_value(member.get("key_flaw", "")),
                         "ability_limit": _sanitize_value(member.get("key_ability", "")),
                     }
                     new_card = add_character_card(project_id, member_type, **new_card_data)
                     char_id = new_card.get("id")
-                    # 更新映射表，避免后续同名成员重复创建
                     if char_id:
                         name_to_id[member_name] = char_id
+                        new_members_info.append({**member, "_char_id": char_id})
                 add_character_group_member(
                     character_group_id,
                     char_id,
@@ -584,6 +597,10 @@ class CharacterBuilderExecutor(BaseExecutor):
                     _sanitize_value(member.get("key_flaw", "")),
                     _sanitize_value(member.get("key_ability", ""))
                 )
+
+            # 批量 LLM 补充新角色详细字段（仅 1 次调用）
+            if new_members_info:
+                await self._enrich_new_character_cards(project_id, new_members_info, llm_context)
 
             for arc in _safe_items(arcs):
                 add_character_group_arc(
@@ -595,6 +612,102 @@ class CharacterBuilderExecutor(BaseExecutor):
             character_group_data = cg_data
 
         return character_group_data or {}, character_group_id
+
+    async def _enrich_new_character_cards(
+        self, project_id: int, new_members: List[Dict[str, Any]], llm_context: Dict[str, Any]
+    ) -> None:
+        """批量 LLM 补充新角色卡详细字段（仅 1 次调用）。
+
+        将未匹配成员的基础信息组装为 prompt，调用 init_character_batch 生成完整角色卡数据，
+        然后通过 update_character_card 补充到已有基础卡中。
+        """
+        # 构建待生成角色列表文本
+        member_lines = []
+        for i, m in enumerate(new_members, 1):
+            name = m.get("name", "")
+            role = m.get("role", "")
+            identity = m.get("identity", "")
+            key_flaw = m.get("key_flaw", "")
+            key_ability = m.get("key_ability", "")
+            member_lines.append(
+                f"{i}. 姓名：{name}，角色定位：{role}，身份：{identity}，"
+                f"关键缺陷：{key_flaw}，关键能力：{key_ability}"
+            )
+        llm_context["new_members_section"] = "\n".join(member_lines)
+
+        _logger.info(
+            f"[character_builder] 批量 LLM 补充 {len(new_members)} 个新角色卡详细字段"
+        )
+        result = await self._call_llm("init_character_batch", llm_context)
+
+        # 解析 LLM 返回：可能是数组（直接）或包含 characters 键的对象
+        chars = []
+        if isinstance(result, list):
+            chars = result
+        elif isinstance(result, dict) and "characters" in result:
+            chars = result["characters"]
+        elif isinstance(result, dict) and "new_characters" in result:
+            chars = result["new_characters"]
+
+        if not chars:
+            _logger.warning("[character_builder] 批量角色卡生成返回为空")
+            return
+
+        # 按名称匹配更新角色卡
+        enriched_by_name = {}
+        for c in chars:
+            if isinstance(c, dict) and c.get("name"):
+                enriched_by_name[c["name"]] = c
+
+        _ENRICH_FIELDS = [
+            "age_stage", "protagonist_relation", "core_personality", "core_tags", "first_impression",
+            "behavior_bottom_line", "emotion_triggers", "easy_to_anger",
+            "easy_to_soften", "short_term_goal", "medium_term_goal",
+            "long_term_goal", "true_desire", "starting_state",
+            "psychological_shadow", "cost_tolerance", "behavior_pattern",
+            "failure_reaction", "breakthrough_strength",
+        ]
+
+        updated = 0
+        for m in new_members:
+            name = m.get("name", "")
+            char_id = m.get("_char_id")
+            if not name or not char_id:
+                continue
+            enriched = enriched_by_name.get(name)
+            if not enriched or not isinstance(enriched, dict):
+                # 尝试子串匹配
+                for ename, edata in enriched_by_name.items():
+                    if name in ename or ename in name:
+                        enriched = edata
+                        break
+            if not enriched:
+                _logger.warning(f"[character_builder] 新角色 '{name}' 未匹配到 LLM 补充数据")
+                continue
+
+            updates = {}
+            for field in _ENRICH_FIELDS:
+                val = enriched.get(field)
+                if val:
+                    updates[field] = _sanitize_value(val)
+            # age 特殊处理
+            age_val = enriched.get("age")
+            if age_val:
+                try:
+                    updates["age"] = int(age_val)
+                except (ValueError, TypeError):
+                    pass
+
+            if updates:
+                update_character_card(char_id, **updates)
+                updated += 1
+                _logger.info(
+                    f"[character_builder] 新角色 '{name}' 角色卡已补充 {len(updates)} 个详细字段"
+                )
+
+        _logger.info(
+            f"[character_builder] 批量角色卡补充完成：{updated}/{len(new_members)} 个角色已更新"
+        )
 
     async def execute(self, context: Dict[str, Any]) -> ExecutorResult:
         """标准执行器接口（供 pipeline 直接调用时使用）。"""

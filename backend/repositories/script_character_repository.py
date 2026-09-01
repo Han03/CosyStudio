@@ -58,7 +58,15 @@ def upsert_character_config(
     return True
 
 
-def add_script_characters(script_id: int, roles: List[str]) -> List[Dict[str, Any]]:
+def add_script_characters(script_id: int, roles: List[str],
+                         profiles: Optional[Dict[str, Dict[str, str]]] = None) -> List[Dict[str, Any]]:
+    """新增角色记录。
+
+    Args:
+        script_id: 剧本 ID
+        roles: 角色名列表
+        profiles: 可选的角色属性映射 {role: {gender, age, description}}
+    """
     if not roles:
         return []
     import time
@@ -75,10 +83,16 @@ def add_script_characters(script_id: int, roles: List[str]) -> List[Dict[str, An
                 (script_id, role),
             ).fetchone()
             if not existing:
+                profile = (profiles or {}).get(role, {})
                 conn.execute(
-                    """INSERT INTO script_characters (script_id, role, line_count, created_at)
-                       VALUES (?, ?, 0, ?)""",
-                    (script_id, role, now),
+                    """INSERT INTO script_characters
+                       (script_id, role, line_count, gender, age, description, created_at)
+                       VALUES (?, ?, 0, ?, ?, ?, ?)""",
+                    (script_id, role,
+                     profile.get("gender", ""),
+                     profile.get("age", ""),
+                     profile.get("description", ""),
+                     now),
                 )
                 inserted.append({"script_id": script_id, "role": role})
         conn.commit()
@@ -116,3 +130,51 @@ def delete_script_characters(script_id: int) -> None:
     with _lock:
         conn.execute("DELETE FROM script_characters WHERE script_id=?", (script_id,))
         conn.commit()
+
+
+def update_character_profile(script_id: int, role: str,
+                             gender: str = '', age: str = '',
+                             description: str = '') -> bool:
+    """更新角色的性别/年龄/描述属性。"""
+    conn = _get_conn()
+    with _lock:
+        conn.execute(
+            """UPDATE script_characters
+               SET gender=?, age=?, description=?
+               WHERE script_id=? AND role=?""",
+            (gender, age, description, script_id, role),
+        )
+        conn.commit()
+    return True
+
+
+def batch_update_character_profiles(script_id: int,
+                                    profiles: List[Dict[str, Any]]) -> int:
+    """批量更新角色属性。
+
+    Args:
+        script_id: 剧本 ID
+        profiles: [{role, gender, age, description}, ...]
+
+    Returns:
+        成功更新的记录数
+    """
+    if not profiles:
+        return 0
+    conn = _get_conn()
+    updated = 0
+    with _lock:
+        for p in profiles:
+            role = p.get("role", "").strip()
+            if not role:
+                continue
+            conn.execute(
+                """UPDATE script_characters
+                   SET gender=?, age=?, description=?
+                   WHERE script_id=? AND role=?""",
+                (p.get("gender", ""), p.get("age", ""),
+                 p.get("description", ""), script_id, role),
+            )
+            updated += 1
+        conn.commit()
+    return updated

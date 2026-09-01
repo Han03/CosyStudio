@@ -176,13 +176,15 @@ class ContextBuilderExecutor(BaseExecutor):
                         "character_name": char.get("name", ""),
                         "alias": char.get("alias", ""),
                         "identity": char.get("identity", ""),
+                        "protagonist_relation": char.get("protagonist_relation", ""),
                         "personality": char.get("core_personality", ""),
                         "flaw": char.get("personality_flaw", ""),
                         "goals": char.get("true_desire", "") or char.get("long_term_goal", ""),
                         "abilities": char.get("ability_limit", ""),
                         "items": [
                             {"name": it.get("item_name", ""),
-                             "desc": it.get("item_desc", "") or it.get("change_note", "")}
+                             "quantity": it.get("quantity", 1) or 1,
+                             "desc": it.get("source", "") or it.get("change_note", "")}
                             for it in _items_by_char.get(char.get("id"), [])
                             if it.get("item_name")
                         ],
@@ -397,6 +399,12 @@ class ContextBuilderExecutor(BaseExecutor):
                         # 执行多轮查询，粗筛（章节邻近性衰减）+ 指纹去重，
                         # 按轮次保留候选供后续重排（跨轮次的向量余弦相似度不可比，
                         # 因为查询向量不同，不能直接混合排序）
+                        # 前文回顾已覆盖的章节集合（上一章 + 更早 2 章），
+                        # 用于 RAG 候选过滤，避免 chapter_summary 与前文回顾重复。
+                        _prev_covered_chs = set(
+                            range(max(0, chapter_index - 3), chapter_index)
+                        )
+
                         seen_contents = set()
                         all_rag_results = []
                         per_round_candidates = []  # [(query_text, kept_results)]
@@ -410,13 +418,23 @@ class ContextBuilderExecutor(BaseExecutor):
                                 )
                                 kept = []
                                 for r in results:
+                                    ch_num = r.get("chapter_number", 0)
+                                    chunk_type = r.get("chunk_type", "")
+
                                     # 上一章已整章注入前文回顾，其内容类片段（正文/摘要/
                                     # 段落）再进入 RAG 会重复挤占槽位，只保留远距离信息（
                                     # 伏笔/设定/更早章节）供下游注入，发挥 RAG 独特价值。
-                                    ch_num = r.get("chapter_number", 0)
                                     if (ch_num == chapter_index - 1
-                                            and r.get("chunk_type") in (
+                                            and chunk_type in (
                                                 "chapter", "chapter_summary", "chapter_paragraph")):
+                                        continue
+
+                                    # 前文回顾已覆盖章节的结构化摘要（chapter_summary）
+                                    # 在 RAG 中属于冗余，剔除后槽位专供伏笔/设定/段落
+                                    # 细节等 RAG 独特价值内容。
+                                    # 注意：chapter_paragraph 不过滤，因为前文回顾对更
+                                    # 早章节只有精简摘要，段落级细节仍依赖 RAG 补充。
+                                    if chunk_type == "chapter_summary" and ch_num in _prev_covered_chs:
                                         continue
 
                                     # 章节邻近性衰减：距离当前章节越远，要求越高。

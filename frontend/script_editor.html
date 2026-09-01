@@ -93,34 +93,11 @@
                 <span class="workflow-step-label">润色</span>
             </div>
             <div class="workflow-step-line"></div>
-            <div class="workflow-step" data-step="6" title="事实记录">
-                <div class="workflow-step-dot"></div>
-                <span class="workflow-step-label">事实</span>
-            </div>
-            <div class="workflow-step-line"></div>
-            <div class="workflow-step" data-step="7" title="伏笔提取">
-                <div class="workflow-step-dot"></div>
-                <span class="workflow-step-label">伏笔</span>
-            </div>
-            <div class="workflow-step-line"></div>
-            <div class="workflow-step" data-step="8" title="任务归档">
+            <div class="workflow-step" data-step="6" title="任务归档">
                 <div class="workflow-step-dot"></div>
                 <span class="workflow-step-label">归档</span>
             </div>
         </div>
-    </div>
-
-    <!-- 生成进度条 -->
-    <div class="progress-container" id="progressContainer" style="display: none;">
-        <div class="progress-bar-wrapper">
-            <div class="progress-bar">
-                <div class="progress-bar-fill" id="progressBarFill"></div>
-            </div>
-            <button class="stop-btn" id="stopGenBtn" onclick="stopGeneration()">
-                <i class="fas fa-stop-circle"></i> 停止
-            </button>
-        </div>
-        <div class="progress-message" id="progressMessage">正在准备生成...</div>
     </div>
 
     <!-- 主体区域 -->
@@ -191,6 +168,9 @@
                     <span><i class="fas fa-users"></i> 配音角色 </span>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <span class="badge bg-secondary" id="characterCountBadge">0</span>
+                        <button class="character-add-btn" onclick="autoMatchAgents()" title="一键匹配配音智能体">
+                            <i class="fas fa-wand-magic-sparkles"></i>
+                        </button>
                         <button class="character-add-btn" onclick="addNewCharacter()" title="新增配音角色">
                             <i class="fas fa-plus"></i>
                         </button>
@@ -308,9 +288,16 @@
 
     <!-- 底部播放控制 -->
     <div class="player-bar">
+        <!-- 边缘进度条：贴合 player-bar 顶部 -->
+        <div class="player-bar-progress" id="playerBarProgress" style="display:none;">
+            <div class="player-bar-progress-fill" id="playerBarProgressFill"></div>
+        </div>
         <div class="player-bar-left">
-            <button class="export-btn regenerate-btn" id="regenerateBtn" onclick="regenerateAllLines()" title="生成全部台词">
+            <button class="export-btn regenerate-btn" id="regenerateBtn" onclick="regenerateScript()" title="生成全部台词">
                 <i class="fas fa-sync-alt"></i> 生成全部台词
+            </button>
+            <button class="stop-btn" id="stopGenBtn" onclick="stopGeneration()" style="display:none;">
+                <i class="fas fa-stop-circle"></i> 停止
             </button>
         </div>
         <div class="player-bar-center">
@@ -343,6 +330,7 @@
     <script src="assets/js/script-editor/review.js"></script>
     <script src="assets/js/script-editor/tasks.js"></script>
     <script src="assets/js/script-editor/init.js"></script>
+    <script src="assets/js/script-editor/init-oneclick.js"></script>
     <script src="assets/js/script-editor/plan.js"></script>
     <script src="assets/js/script-editor/query.js"></script>
     <script src="assets/js/script-editor/dashboard.js"></script>
@@ -689,11 +677,10 @@
                                 <li>生成章节草稿</li>
                                 <li>质量审查（爽点、一致性、节奏、OOC等维度）</li>
                                 <li>润色优化，提升文笔质量</li>
-                                <li>记录本章事实，更新项目状态</li>
-                                <li>保存创作结果并归档任务</li>
+                                <li>归档任务，等待用户点击“应用结果”</li>
                             </ol>
                             <p style="margin-top: 8px; color: var(--neu-text-muted); font-size: 12px;">
-                                未指定章节时将自动根据项目状态确定创作章节。每步结果都会保存，意外中断后可直接再次点击创作按钮继续。
+                                创作完成后需点击“应用结果”将内容写入章节，并执行事实记录、伏笔提取、RAG索引等后处理。未指定章节时将自动确定创作章节，意外中断后可直接再次点击创作按钮继续。
                             </p>
                         </div>
                     </div>
@@ -709,7 +696,7 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeContinueModal()">关闭</button>
                 <button class="btn btn-danger" id="continueCancelBtn" onclick="cancelContinue()" style="display:none;">取消任务</button>
-                <button class="btn btn-warning" id="continueRecreateBtn" onclick="startContinue()" style="display:none;"><i class="fas fa-redo"></i> 重新创作</button>
+                <button class="btn btn-warning" id="continueRecreateBtn" onclick="recreateContinue()" style="display:none;"><i class="fas fa-redo"></i> 重新创作</button>
                 <button class="btn btn-primary" id="continueApplyBtn" onclick="applyContinueResult()" style="display:none;">应用结果</button>
                 <button class="btn btn-primary" id="continueStartBtn" onclick="startContinue()">开始创作</button>
             </div>
@@ -826,7 +813,10 @@
         <div class="modal-dialog" style="max-width: 850px; max-height: 90vh;">
             <div class="modal-header">
                 <h3><i class="fas fa-rocket"></i> 深度初始化 <span id="initStepTitle"></span></h3>
-                <button class="modal-close" id="initModalCloseBtn" onclick="closeInitModal()">×</button>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button class="btn init-mode-toggle-btn" onclick="switchToInitOneClick()" title="切换到一键模式"><i class="fas fa-bolt"></i> 一键模式</button>
+                    <button class="modal-close" id="initModalCloseBtn" onclick="closeInitModal()">×</button>
+                </div>
             </div>
             <div class="modal-body" style="overflow-y: auto;">
                 <div class="init-progress-steps">
@@ -1337,6 +1327,279 @@
         </div>
     </div>
 
+    <!-- 深度初始化（一键模式）模态框 -->
+    <div id="initModalOneClick" class="modal-overlay continue-modal" style="display:none;">
+        <div class="modal-dialog" style="max-width: 900px; max-height: 90vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-bolt"></i> 深度初始化 <span style="font-size:13px;opacity:0.7">(一键模式)</span></h3>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button class="btn init-mode-toggle-btn" onclick="switchToInitStepByStep()" title="切换到分步模式"><i class="fas fa-list-ol"></i> 分步模式</button>
+                    <button class="modal-close" id="initOCCloseBtn" onclick="closeInitModalOneClick()">×</button>
+                </div>
+            </div>
+            <div class="modal-body" style="overflow-y: auto;">
+                <!-- AI 生成区域 -->
+                <div id="ocAiZone" class="ai-gen-zone" style="margin-bottom:16px;">
+                    <div id="ocAiPlaceholder" class="ai-gen-placeholder">
+                        <div class="ai-gen-placeholder-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                        <div class="ai-gen-placeholder-text">
+                            <div class="ai-gen-placeholder-title">一键智能生成全部设定</div>
+                            <div class="ai-gen-placeholder-desc">AI 将一次性生成 3 套完整方案（含故事核、角色、金手指、世界观、约束包）</div>
+                        </div>
+                        <button class="btn btn-ai-generate" onclick="generateAllInOne()"><i class="fas fa-wand-magic-sparkles"></i> 一键智能生成</button>
+                    </div>
+                    <div id="ocAiLoading" class="ai-gen-loading" style="display:none;">
+                        <div class="ai-gen-spinner"></div>
+                        <span>正在生成 3 套完整方案，请稍候...</span>
+                    </div>
+                    <div id="ocAiResult" class="ai-gen-result" style="display:none;"></div>
+                </div>
+
+                <!-- 方案选择卡片区域 -->
+                <div id="ocSetsContainer" class="all-in-one-sets-container" style="display:none;"></div>
+
+                <!-- Section 1: 故事核与商业定位 -->
+                <div class="init-oneclick-section" id="ocSection1">
+                    <div class="init-oneclick-section-title" onclick="toggleOCSection('ocSection1Body')">
+                        <i class="fas fa-info-circle"></i> 故事核与商业定位 <i class="fas fa-chevron-down oc-section-arrow" id="ocSection1Arrow"></i>
+                    </div>
+                    <div class="init-oneclick-section-body" id="ocSection1Body">
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>书名</label>
+                                <input type="text" id="initTitle_oc" class="init-input" placeholder="输入书名" readonly title="书名请在剧本编辑器顶部修改">
+                            </div>
+                            <div class="init-form-group">
+                                <label>题材 <span class="init-required">*</span></label>
+                                <select id="initGenre_oc" class="init-select">
+                                    <option value="">请选择题材...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>目标字数</label>
+                                <input type="number" id="initTargetWords_oc" class="init-input" placeholder="如：1000000" min="0">
+                            </div>
+                            <div class="init-form-group">
+                                <label>目标章节</label>
+                                <input type="number" id="initTargetChapters_oc" class="init-input" placeholder="如：200" min="0">
+                            </div>
+                        </div>
+                        <div class="init-form-group">
+                            <label>一句话故事 <span class="init-required">*</span></label>
+                            <textarea id="initOneLiner_oc" class="init-textarea" rows="2" placeholder="一句话讲清故事核心..."></textarea>
+                        </div>
+                        <div class="init-form-group">
+                            <label>核心冲突 <span class="init-required">*</span></label>
+                            <textarea id="initCoreConflict_oc" class="init-textarea" rows="2" placeholder="主角要解决的核心矛盾..."></textarea>
+                        </div>
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>目标读者</label>
+                                <input type="text" id="initTargetReader_oc" class="init-input" placeholder="如：18-30岁男性">
+                            </div>
+                            <div class="init-form-group">
+                                <label>目标平台</label>
+                                <input type="text" id="initPlatform_oc" class="init-input" placeholder="如：起点中文网">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: 角色骨架与关系冲突 -->
+                <div class="init-oneclick-section" id="ocSection2">
+                    <div class="init-oneclick-section-title" onclick="toggleOCSection('ocSection2Body')">
+                        <i class="fas fa-user"></i> 角色骨架与关系冲突 <i class="fas fa-chevron-down oc-section-arrow" id="ocSection2Arrow"></i>
+                    </div>
+                    <div class="init-oneclick-section-body" id="ocSection2Body">
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>主角姓名 <span class="init-required">*</span></label>
+                                <input type="text" id="initProtagonistName_oc" class="init-input" placeholder="输入主角姓名">
+                            </div>
+                            <div class="init-form-group">
+                                <label>主角原型</label>
+                                <input type="text" id="initProtagonistArchetype_oc" class="init-input" placeholder="如：废柴逆袭、重生归来">
+                            </div>
+                        </div>
+                        <div class="init-form-group">
+                            <label>主角欲望 <span class="init-required">*</span></label>
+                            <textarea id="initProtagonistDesire_oc" class="init-textarea" rows="2" placeholder="主角最想要的是什么..."></textarea>
+                        </div>
+                        <div class="init-form-group">
+                            <label>主角缺陷 <span class="init-required">*</span></label>
+                            <textarea id="initProtagonistFlaw_oc" class="init-textarea" rows="2" placeholder="会导致主角付出代价的缺陷..."></textarea>
+                        </div>
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>主角结构</label>
+                                <select id="initProtagonistStructure_oc" class="init-select">
+                                    <option value="单主角">单主角</option>
+                                    <option value="多主角">多主角</option>
+                                </select>
+                            </div>
+                            <div class="init-form-group">
+                                <label>感情线配置</label>
+                                <select id="initHeroineConfig_oc" class="init-select">
+                                    <option value="无女主">无女主</option>
+                                    <option value="单女主">单女主</option>
+                                    <option value="多女主">多女主</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>反派分层</label>
+                                <select id="initAntagonistLevel_oc" class="init-select">
+                                    <option value="BOSS级">BOSS级</option>
+                                    <option value="多级反派">多级反派</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="init-form-group">
+                            <label>反派镜像</label>
+                            <textarea id="initVillainMirror_oc" class="init-textarea" rows="2" placeholder="反派与主角的镜像关系..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: 金手指与兑现机制 -->
+                <div class="init-oneclick-section" id="ocSection3">
+                    <div class="init-oneclick-section-title" onclick="toggleOCSection('ocSection3Body')">
+                        <i class="fas fa-star"></i> 金手指与兑现机制 <i class="fas fa-chevron-down oc-section-arrow" id="ocSection3Arrow"></i>
+                    </div>
+                    <div class="init-oneclick-section-body" id="ocSection3Body">
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>金手指类型</label>
+                                <select id="initGoldenFingerType_oc" class="init-select">
+                                    <option value="无金手指">无金手指</option>
+                                    <option value="系统">系统</option>
+                                    <option value="传承">传承</option>
+                                    <option value="法宝">法宝</option>
+                                    <option value="血脉">血脉</option>
+                                    <option value="功法">功法</option>
+                                    <option value="重生">重生</option>
+                                    <option value="商业头脑">商业头脑</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                            <div class="init-form-group">
+                                <label>金手指名称</label>
+                                <input type="text" id="initGoldenFingerName_oc" class="init-input" placeholder="如：神级修炼系统">
+                            </div>
+                        </div>
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>风格</label>
+                                <select id="initGoldenFingerStyle_oc" class="init-select">
+                                    <option value="辅助型">辅助型</option>
+                                    <option value="战斗型">战斗型</option>
+                                    <option value="经营型">经营型</option>
+                                    <option value="信息型">信息型</option>
+                                </select>
+                            </div>
+                            <div class="init-form-group">
+                                <label>可见度</label>
+                                <select id="initGoldenFingerVisibility_oc" class="init-select">
+                                    <option value="隐藏">隐藏</option>
+                                    <option value="半公开">半公开</option>
+                                    <option value="公开">公开</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="init-form-group">
+                            <label>不可逆代价 <span class="init-required">*</span></label>
+                            <textarea id="initGoldenFingerCost_oc" class="init-textarea" rows="2" placeholder="使用金手指必须付出的不可逆代价..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: 世界观与力量规则 -->
+                <div class="init-oneclick-section" id="ocSection4">
+                    <div class="init-oneclick-section-title" onclick="toggleOCSection('ocSection4Body')">
+                        <i class="fas fa-globe"></i> 世界观与力量规则 <i class="fas fa-chevron-down oc-section-arrow" id="ocSection4Arrow"></i>
+                    </div>
+                    <div class="init-oneclick-section-body" id="ocSection4Body">
+                        <div class="init-form-row">
+                            <div class="init-form-group">
+                                <label>世界规模 <span class="init-required">*</span></label>
+                                <select id="initWorldScale_oc" class="init-select">
+                                    <option value="单城">单城</option>
+                                    <option value="多城">多城</option>
+                                    <option value="大陆">大陆</option>
+                                    <option value="多界">多界</option>
+                                </select>
+                            </div>
+                            <div class="init-form-group">
+                                <label>力量体系类型 <span class="init-required">*</span></label>
+                                <select id="initPowerSystemType_oc" class="init-select">
+                                    <option value="修仙">修仙</option>
+                                    <option value="武道">武道</option>
+                                    <option value="魔法">魔法</option>
+                                    <option value="科技">科技</option>
+                                    <option value="异能">异能</option>
+                                    <option value="职场">职场</option>
+                                    <option value="无">无</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="init-form-group">
+                            <label>势力格局</label>
+                            <textarea id="initFactions_oc" class="init-textarea" rows="2" placeholder="主要势力及其关系..."></textarea>
+                        </div>
+                        <div class="init-form-group">
+                            <label>社会阶层与资源分配</label>
+                            <textarea id="initSocialClass_oc" class="init-textarea" rows="2" placeholder="社会结构和资源分布..."></textarea>
+                        </div>
+                        <div class="init-form-group">
+                            <label>货币体系</label>
+                            <input type="text" id="initCurrencySystem_oc" class="init-input" placeholder="如：灵石、金币、信用点">
+                        </div>
+                        <div class="init-form-group">
+                            <label>境界链（如适用）</label>
+                            <input type="text" id="initCultivationChain_oc" class="init-input" placeholder="如：练气-筑基-金丹-元婴">
+                        </div>
+                        <div class="init-form-group">
+                            <label>宗门/组织层级（如适用）</label>
+                            <input type="text" id="initSectHierarchy_oc" class="init-input" placeholder="如：外门-内门-核心-长老">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: 创意约束包 -->
+                <div class="init-oneclick-section" id="ocSection5">
+                    <div class="init-oneclick-section-title" onclick="toggleOCSection('ocSection5Body')">
+                        <i class="fas fa-lock"></i> 创意约束包 <i class="fas fa-chevron-down oc-section-arrow" id="ocSection5Arrow"></i>
+                    </div>
+                    <div class="init-oneclick-section-body" id="ocSection5Body">
+                        <div class="init-form-group">
+                            <label>反套路规则</label>
+                            <textarea id="initAntiTrope_oc" class="init-textarea" rows="2" placeholder="避免使用的套路和陈词滥调..."></textarea>
+                        </div>
+                        <div class="init-form-group">
+                            <label>硬性约束</label>
+                            <textarea id="initConstraints_oc" class="init-textarea" rows="2" placeholder="必须遵守的硬性规则..."></textarea>
+                        </div>
+                        <div class="init-form-group">
+                            <label>核心卖点</label>
+                            <textarea id="initCoreSellingPoints_oc" class="init-textarea" rows="2" placeholder="一句话讲清本书的独特卖点..."></textarea>
+                        </div>
+                        <div class="init-form-group">
+                            <label>开篇钩子</label>
+                            <textarea id="initOpeningHook_oc" class="init-textarea" rows="2" placeholder="吸引读者继续阅读的开篇设计..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="initOCFooterCloseBtn" onclick="closeInitModalOneClick()">关闭</button>
+                <button class="btn btn-primary" id="initOCConfirmBtn" onclick="confirmInitOneClick()">确认并初始化</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 状态查询模态框 -->
     <div id="queryModal" class="modal-overlay" style="display:none;">
         <div class="modal-dialog" style="max-width: 700px; max-height: 85vh;">
@@ -1489,6 +1752,19 @@
         </div>
     </div>
 
+    <!-- 智能匹配结果模态框 -->
+<div id="autoMatchModal" class="modal-overlay" style="display:none;">
+    <div class="modal-dialog" style="max-width: 560px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-wand-magic-sparkles"></i> 智能匹配结果</h3>
+            <button onclick="closeAutoMatchModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--neu-text-muted);"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding: 20px; max-height: 60vh; overflow-y: auto;" id="autoMatchContent">
+            <div class="loading-state"><div class="loading-spinner"></div><p class="mt-2">正在分析角色并匹配智能体...</p></div>
+        </div>
+    </div>
+</div>
+
     <!-- 深度初始化全局任务遮罩 -->
     <div id="initTaskMask" class="modal-overlay" style="display:none; background:rgba(0,0,0,0.85); z-index:9999;">
         <div class="modal-dialog" style="max-width:520px; max-height:80vh;">
@@ -1499,6 +1775,10 @@
                 <div id="initTaskCurrent" style="text-align:center; font-size:16px; margin-bottom:16px; color:var(--neu-accent, #2563eb); font-weight:600;">
                     准备中...
                 </div>
+                <div id="initTaskProgressBar" style="background:rgba(255,255,255,0.1); border-radius:6px; height:8px; margin:0 16px 4px; overflow:hidden; display:none;">
+                    <div id="initTaskProgressFill" style="background:var(--neu-accent, #2563eb); height:100%; width:0%; border-radius:6px; transition:width 0.4s ease;"></div>
+                </div>
+                <div id="initTaskProgressText" style="text-align:center; font-size:12px; color:var(--neu-text-muted, #888); margin-bottom:12px; display:none;">0%</div>
                 <div style="background:var(--neu-bg, #f5f5f5); border-radius:8px; padding:12px; max-height:300px; overflow-y:auto;" id="initTaskLog">
                     <div style="color:var(--neu-text-muted, #888); text-align:center; font-size:13px;">等待任务启动...</div>
                 </div>

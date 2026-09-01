@@ -102,7 +102,7 @@ class DraftPolisherExecutor(BaseExecutor):
                 max_tokens=8000,
                 script_id=script_id,
                 project_id=project_id,
-                executor_name="draft_polisher_executor",
+                executor_name=self.step_name,
                 prompt_name="draft_polish",
             )
 
@@ -113,7 +113,7 @@ class DraftPolisherExecutor(BaseExecutor):
                 raw_content,
                 script_id=script_id,
                 project_id=project_id,
-                executor_name="draft_polisher_executor",
+                executor_name=self.step_name,
                 prompt_name="draft_polish",
             )
 
@@ -139,6 +139,14 @@ class DraftPolisherExecutor(BaseExecutor):
             if len(polished_content) < len(draft_content):
                 polished_content = draft_content
 
+            # 超长截断保底：prompt 约定上限 5000 字，超出 5500 字说明模型追加了新剧情，
+            # 截断最后一段（避免截断到句子中间）。
+            MAX_POLISH_LEN = 5500
+            if len(polished_content) > MAX_POLISH_LEN:
+                cut_pos = polished_content.rfind("\n", 0, MAX_POLISH_LEN)
+                if cut_pos > MAX_POLISH_LEN * 0.8:
+                    polished_content = polished_content[:cut_pos].rstrip()
+
             summary = f"草稿润色完成：润色后{len(polished_content)}字"
             
             return ExecutorResult(
@@ -156,3 +164,4 @@ class DraftPolisherExecutor(BaseExecutor):
                 error_message=f"草稿润色执行失败: {str(e)}",
                 step_summary="草稿润色执行失败"
             )
+

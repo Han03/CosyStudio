@@ -30,7 +30,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         {"key": "conflict", "name": "冲突张力", "description": "剧情结构中的冲突设计是否充分，是否有足够的转折和悬念"},
     ]
 
-    MAX_REVISIONS = 2
+    MAX_REVISIONS = 1
 
     async def execute(self, context: Dict[str, Any]) -> ExecutorResult:
         """执行剧情审查。"""
@@ -60,7 +60,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             revision_count = 0
             last_review = []
 
-            while revision_count <= self.MAX_REVISIONS:
+            while revision_count < self.MAX_REVISIONS:
                 review_result = await self._review_plot(current_plot, chapter_plan, chapter_index)
                 last_review = review_result
 
@@ -78,13 +78,16 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
                 if not has_actionable:
                     break
 
-                # 已达修正上限 → 使用当前结果
-                if revision_count >= self.MAX_REVISIONS:
-                    break
-
                 # 触发修正
                 revised_plot = await self._revise_plot(current_plot, review_result)
                 if revised_plot:
+                    # 提前终止：修正后与修正前几乎相同（LLM 未做实质修改），继续循环无意义
+                    old_text = json.dumps(current_plot, ensure_ascii=False, sort_keys=True)
+                    new_text = json.dumps(revised_plot, ensure_ascii=False, sort_keys=True)
+                    if len(old_text) > 0 and abs(len(new_text) - len(old_text)) / len(old_text) < 0.05:
+                        # 长度变化小于 5%，视为无实质修改，提前退出
+                        current_plot = revised_plot
+                        break
                     current_plot = revised_plot
                 revision_count += 1
 
@@ -136,8 +139,8 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             if vo.get("chapter_start") <= chapter_index <= vo.get("chapter_end", chapter_index):
                 current_volume = vo
                 break
-        volume_conflict = current_volume.get("core_conflict", "")[:200] if current_volume else ""
-        volume_goal = current_volume.get("protagonist_goal", "")[:200] if current_volume else ""
+        volume_conflict = (current_volume.get("core_conflict", "") or "（未设定）")[:200] if current_volume else ""
+        volume_goal = (current_volume.get("protagonist_goal", "") or "（未设定）")[:200] if current_volume else ""
 
         # 主角
         protagonist_info = ""
@@ -169,7 +172,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             volume_goal=volume_goal,
             protagonist_info=protagonist_info,
             dimensions_text=dimensions_text,
-            plot_text=plot_text[:2000],
+            plot_text=plot_text,
         )
         system_prompt = prompt_data["system_prompt"]
 
@@ -180,7 +183,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             max_tokens=2000,
             script_id=self.script_id,
             project_id=project_id,
-            executor_name=self.step_name,
+            executor_name="chapter_plot_reviewer_score",
             prompt_name=f"plot_review_{chapter_index}",
         )
 
@@ -279,8 +282,8 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
 
         prompt_data = self._load_prompt("chapter_plot_revise")
         prompt = prompt_data["user_prompt"].format(
-            original_plot_text=original_plot_text[:1500],
-            issues_text=issues_text[:1000],
+            original_plot_text=original_plot_text,
+            issues_text=issues_text,
         )
         system_prompt = prompt_data["system_prompt"]
 
@@ -294,7 +297,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             max_tokens=2500,
             script_id=self.script_id,
             project_id=project_id,
-            executor_name=self.step_name,
+            executor_name="chapter_plot_reviewer_revise",
             prompt_name=f"plot_revise_{self.chapter_index}",
         )
 
@@ -306,7 +309,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             raw_content,
             script_id=self.script_id,
             project_id=project_id,
-            executor_name=self.step_name,
+            executor_name="chapter_plot_reviewer_revise",
             prompt_name=f"plot_revise_{self.chapter_index}",
         )
 

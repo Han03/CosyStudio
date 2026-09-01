@@ -235,11 +235,13 @@ class DraftGeneratorExecutor(BaseExecutor):
                 parts.append(f"目标:{goals}")
             # 持有物品清单（事实记录阶段维护，无记录时明示"无"，杜绝凭空掏出物品）
             items = char.get("items", []) or []
-            item_names = [
-                it.get("name", "") for it in items
-                if isinstance(it, dict) and it.get("name")
-            ]
-            parts.append(f"持有物品:{'、'.join(item_names)}" if item_names else "持有物品:无")
+            item_strs = []
+            for it in items:
+                if not isinstance(it, dict) or not it.get("name"):
+                    continue
+                qty = it.get("quantity", 1) or 1
+                item_strs.append(f"{it['name']}x{qty}" if qty > 1 else it["name"])
+            parts.append(f"持有物品:{'、'.join(item_strs)}" if item_strs else "持有物品:无")
             lines.append(" | ".join(parts))
 
         lines.append(

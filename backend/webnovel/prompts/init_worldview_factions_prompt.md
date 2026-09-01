@@ -12,6 +12,7 @@ user_prompt: |
   社会阶层：{worldview.social_hierarchy}
   核心区域：{worldview.core_regions}
   资源分配：{worldview.resource_distribution}
+  力量体系：{power_system.system_type}
 
   【用户已有势力数据】
   {existing_factions_text}
@@ -21,6 +22,9 @@ user_prompt: |
 
   【题材世界观参考】
   {genre_worldview}
+
+  【命名规则知识】
+  {naming_knowledge}
 
   【势力格局设计要求】
   1. 如果用户已有势力数据，请在此基础上补充完善（添加层级、关系、组织结构），而非重复生成；如果没有，请全新设计 3-6 个核心势力

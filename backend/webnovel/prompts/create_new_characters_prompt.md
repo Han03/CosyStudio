@@ -22,7 +22,9 @@ user_prompt: |
   所有新角色都必须输出基础字段：
   - name：角色名（具体人名；无名者用"身份+特征"的短称呼，如"持刀猎户"）
   - character_type：villain/supporting/minor 三选一
+  - age_stage：年龄段（从正文推断角色大致年龄段，输出"少年"/"青年"/"中年"/"老年"之一；完全无法推断则输出空字符串）
   - identity：身份（职业、阵营、来历，一句话）
+  - protagonist_relation：是主角的什么人（如朋友、师父、女儿等）
   - core_personality：性格（2-4 个关键词，顿号分隔）
   - core_tags：核心标签（2-3 个关键词，顿号分隔，如"流寇、贪财、持刀"）
   - first_impression：给读者/主角的第一印象（一句话）
@@ -36,10 +38,11 @@ user_prompt: |
   - behavior_pattern：行为模式（惯常的行事风格，一句话）
   - ability_limit：能力上限（已知最强的能力/手段，一句话；未知则输出空字符串）
 
-  禁止事项：禁止输出字段清单以外的键；禁止编造正文完全没有依据的具体数值（如精确年龄、境界名称）。
+  禁止事项：禁止输出字段清单以外的键；禁止编造正文完全没有依据的精确数值（如精确年龄数字、境界名称）；年龄段可根据外貌/称呼/行为合理推断。
+  禁止创建非人类角色：妖兽、猛兽、尸体、遗骸、傀偶、虫蛊等非人物实体不要创建为角色卡，只创建有姓名或有明确人格的人类/类人角色。
 
   【输出格式】
   请严格按照JSON格式输出，只输出JSON：
-  {{"new_characters": [{{"name": "角色名", "character_type": "villain", "identity": "身份", "core_personality": "性格", "core_tags": "标签1、标签2", "first_impression": "第一印象", "short_term_goal": "短期目标", "true_desire": "核心欲望", "personality_flaw": "性格缺陷", "starting_state": "初始状态", "long_term_goal": "长期目标", "behavior_pattern": "行为模式", "ability_limit": "能力上限"}}]}}
+  {{"new_characters": [{{"name": "角色名", "character_type": "villain", "age_stage": "青年", "identity": "身份", "protagonist_relation": "与主角的关系", "core_personality": "性格", "core_tags": "标签1、标签2", "first_impression": "第一印象", "short_term_goal": "短期目标", "true_desire": "核心欲望", "personality_flaw": "性格缺陷", "starting_state": "初始状态", "long_term_goal": "长期目标", "behavior_pattern": "行为模式", "ability_limit": "能力上限"}}]}}
   如果没有新角色，输出 {{"new_characters": []}}
 ---

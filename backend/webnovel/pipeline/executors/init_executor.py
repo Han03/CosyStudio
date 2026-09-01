@@ -94,6 +94,7 @@ from webnovel.repositories import (
     get_idea_bank_by_project,
     get_character_cards_by_project,
 )
+from repositories import update_script
 
 from .story_system_executor import StorySystemExecutor
 from .character_builder_executor import CharacterBuilderExecutor
@@ -112,7 +113,13 @@ class InitExecutor(BaseExecutor):
         self._interrupt_check = interrupt_check
 
     async def _notify_progress(self, step: str, message: str, progress: int):
-        """通知进度"""
+        """通知进度并持久化到 scripts 表，以便页面刷新后恢复进度条"""
+        # 持久化进度到数据库，页面刷新后可恢复
+        try:
+            update_script(self.script_id, progress=progress, progress_message=message)
+        except Exception as e:
+            _logger.warning(f"[init_executor] 持久化进度失败: {e}")
+        # WebSocket 实时通知
         if self._progress_callback:
             try:
                 await self._progress_callback(step, message, progress)
@@ -224,13 +231,38 @@ class InitExecutor(BaseExecutor):
         if not genre_template:
             return ""
         
-        part_data = genre_template.get(part_name, {})
+        part_data = genre_template.get(part_name)
+        if part_data is None:
+            return ""
         if isinstance(part_data, dict):
+            if not part_data:
+                return ""  # 空 dict 不渲染为 "{}"
             return json.dumps(part_data, ensure_ascii=False)
         elif isinstance(part_data, list):
+            if not part_data:
+                return ""  # 空 list 不渲染为 "[]"
             return json.dumps(part_data, ensure_ascii=False)
         else:
-            return str(part_data)
+            return str(part_data) if part_data else ""
+
+    def _load_csv_knowledge_text(self, table_name: str, genre: str, header: str = "") -> str:
+        """从 CSV 知识表按题材加载知识并格式化为直接注入文本。
+        
+        若精确题材无匹配，回退查询 applicable_genre='全局' 的行作为兜底。
+        """
+        try:
+            from webnovel.repositories.csv_knowledge_repository import (
+                query_csv_knowledge, format_csv_knowledge_for_prompt
+            )
+            genre_column = "genre" if table_name == "webnovel_csv_verdict_rules" else "applicable_genre"
+            rows = query_csv_knowledge(table_name, genre=genre, genre_column=genre_column)
+            # 若精确题材无匹配，回退查询"全局"数据
+            if not rows and genre_column != "genre":
+                rows = query_csv_knowledge(table_name, genre="全局", genre_column=genre_column)
+            return format_csv_knowledge_for_prompt(table_name, rows, header=header)
+        except Exception as e:
+            _logger.warning(f"[init_executor] 加载CSV知识失败({table_name}): {e}")
+            return ""
 
     def _load_anti_trope_rules(self, genre: str) -> str:
         """加载反套路规则。"""
@@ -265,8 +297,6 @@ class InitExecutor(BaseExecutor):
         executor = get_model_executor()
         prompt_data = self._load_prompt(prompt_name)
         
-        _logger.info(f"[init_executor] 调用LLM生成 {prompt_name}，prompt加载: {'成功' if prompt_data['user_prompt'] else '失败'}")
-        
         if not prompt_data["user_prompt"]:
             _logger.error(f"[init_executor] {prompt_name} 的user_prompt为空")
             return {}
@@ -299,7 +329,6 @@ class InitExecutor(BaseExecutor):
                     return _SafeAttr()
 
             user_prompt = prompt_data["user_prompt"].format_map(_SafeFormatMap(**context_data))
-            _logger.info(f"[init_executor] 准备调用LLM，prompt长度: {len(user_prompt)}")
 
             project_id = 0
             try:
@@ -324,14 +353,8 @@ class InitExecutor(BaseExecutor):
             )
             _latency_ms = int((_time.time() - _call_start) * 1000)
 
-            _logger.info(f"[init_executor] LLM调用完成，结果类型: {type(result)}")
             content = result.get("content", "") if result else ""
-            _logger.info(f"[init_executor] LLM返回内容长度: {len(content)}")
-            _logger.info(f"[init_executor] LLM返回内容前300字符: {repr(content[:300])}")
-
             content = content.strip()
-
-            _logger.info(f"[init_executor] 提取后的内容前300字符: {repr(content[:300])}")
 
             json_result = parse_llm_json(
                 content,
@@ -352,7 +375,6 @@ class InitExecutor(BaseExecutor):
                 return json_result
             else:
                 _logger.error(f"[init_executor] JSON解析失败，所有策略均失败")
-                _logger.error(f"[init_executor] 解析失败的内容: {repr(content[:500])}")
                 return {"raw_content": content}
         except Exception as e:
             _logger.error(f"[init_executor] LLM调用异常: {e}")
@@ -415,6 +437,10 @@ class InitExecutor(BaseExecutor):
 
             project = add_webnovel_project(**basic_fields)
             project_id = project["id"]
+
+            # 为空值用户输入字段生成 _desc 后缀版本，避免 prompt 中冒号后为空白
+            for _field in ("story_summary", "antagonist_tiers"):
+                project[f"{_field}_desc"] = project.get(_field, "") or "（未填写）"
 
             self._check_interrupted()
             await self._notify_progress("project", "项目基础信息已创建", 10)
@@ -508,6 +534,7 @@ class InitExecutor(BaseExecutor):
             # style 仅在 LLM 未生成 visual_expression 时兜底；growth_rhythm→cost_limitation
             if "name" in gf_data:
                 gf_data["main_role"] = gf_data.pop("name")
+                gf_data["name"] = gf_data["main_role"]  # 保留副本，供 prompt {golden_finger.name} 引用
             if "style" in gf_data:
                 style_val = gf_data.pop("style")
                 if not gf_data.get("visual_expression"):
@@ -556,13 +583,39 @@ class InitExecutor(BaseExecutor):
             heroine_data_list, heroine_id_list = await char_builder.build_heroine(project_data, llm_context)
 
             self._check_interrupted()
-            await self._notify_progress("villain", "正在生成反派设定...", 45)
+            await self._notify_progress("heroine", "女主设定已完成", 40)
+
             villain_data, villain_id = await char_builder.build_villain(project_data, llm_context)
+
+            self._check_interrupted()
+            await self._notify_progress("villain", "反派设定已完成", 45)
+
+            # ============== 加载 CSV 知识（按题材 × 步骤精准注入）=============
+            # 先设置默认空值，确保 prompt 模板占位符不会 KeyError
+            llm_context["golden_finger_knowledge"] = ""
+            llm_context["genre_tone_knowledge"] = ""
+            llm_context["naming_knowledge"] = ""
+
+            _genre = project_data.get("genre", "")
+            if _genre:
+                # 金手指设计知识 → init_power_system 步骤使用
+                _gf_knowledge = self._load_csv_knowledge_text("webnovel_csv_golden_finger", _genre)
+                if _gf_knowledge:
+                    llm_context["golden_finger_knowledge"] = _gf_knowledge
+
+                # 题材基调知识 → init_worldview 步骤使用
+                _tone_knowledge = self._load_csv_knowledge_text("webnovel_csv_genre_tone", _genre)
+                if _tone_knowledge:
+                    llm_context["genre_tone_knowledge"] = _tone_knowledge
+
+                # 命名规则知识 → init_worldview_factions 步骤使用
+                _naming_knowledge = self._load_csv_knowledge_text("webnovel_csv_naming", _genre)
+                if _naming_knowledge:
+                    llm_context["naming_knowledge"] = _naming_knowledge
 
             power_system_data = project_data.get("power_system")
             if not power_system_data:
                 self._check_interrupted()
-                await self._notify_progress("power_system", "正在生成力量体系...", 55)
                 power_system_data = await self._call_llm("init_power_system", llm_context)
             
             if power_system_data and "error" not in power_system_data:
@@ -600,6 +653,9 @@ class InitExecutor(BaseExecutor):
                 
                 llm_context["power_system"] = DictObj(ps_data)
 
+            self._check_interrupted()
+            await self._notify_progress("power_system", "力量体系已完成", 55)
+
             worldview_data = project_data.get("worldview")
             user_has_worldview = bool(worldview_data and isinstance(worldview_data, dict) and any(
                 str(v).strip() for v in worldview_data.values() if isinstance(v, str)
@@ -607,7 +663,6 @@ class InitExecutor(BaseExecutor):
 
             if user_has_worldview:
                 # ── 用户已填写第 5 步：以用户数据为主，LLM 仅补充缺失字段 ──
-                await self._notify_progress("worldview", "正在处理用户世界观设定...", 65)
                 mapped_wv, user_factions, user_history = self._normalize_step5_worldview(worldview_data)
 
                 # 检查关键字段是否缺失，若缺失则调用 LLM 补充
@@ -634,7 +689,6 @@ class InitExecutor(BaseExecutor):
             else:
                 # ── 用户未填写：完全由 LLM 生成 ──
                 self._check_interrupted()
-                await self._notify_progress("worldview", "正在生成世界观...", 65)
                 worldview_data = await self._call_llm("init_worldview", llm_context)
 
                 if worldview_data and "error" not in worldview_data:
@@ -670,8 +724,8 @@ class InitExecutor(BaseExecutor):
                         f"- {e.get('era', '')}: {e.get('event', '')}" if e.get('era') else f"- {e.get('event', '')}"
                         for e in _safe_items(history_events) if e.get("event")
                     ])
-                llm_context["existing_factions_text"] = existing_factions_text
-                llm_context["existing_history_text"] = existing_history_text
+                llm_context["existing_factions_text"] = existing_factions_text or "（用户未提供势力数据，请全新设计）"
+                llm_context["existing_history_text"] = existing_history_text or "（用户未提供历史数据，请全新设计）"
 
                 # 势力/历史：用户数据优先，缺失部分由 LLM 补充
                 if not factions and not history_events:
@@ -737,6 +791,9 @@ class InitExecutor(BaseExecutor):
                 
                 llm_context["worldview"] = DictObj(wv_data)
 
+            self._check_interrupted()
+            await self._notify_progress("worldview", "世界观设定已完成", 65)
+
             llm_context["anti_trope_rules"] = self._load_anti_trope_rules(project_data.get("genre", ""))
 
             constraints_data = project_data.get("constraints")
@@ -761,10 +818,20 @@ class InitExecutor(BaseExecutor):
                         villain_mirror=best_package.get("antagonist_mirror", ""),
                     )
 
+            # 约束包+叠加包：按题材从 CSV 加载，注入总纲生成 prompt
+            if _genre:
+                try:
+                    from webnovel.repositories import get_csv_packs_by_genre, format_pack_for_prompt
+                    _packs = get_csv_packs_by_genre(_genre)
+                    _packs_text = format_pack_for_prompt(_packs)
+                    if _packs_text:
+                        llm_context["csv_constraint_packs"] = _packs_text
+                except Exception as e:
+                    _logger.warning(f"[init_executor] 加载约束包失败: {e}")
+
             master_outline_data = project_data.get("master_outline")
             if not master_outline_data:
                 self._check_interrupted()
-                await self._notify_progress("master_outline", "正在生成总纲与卷纲...", 75)
                 master_outline_data = await self._call_llm("plan_master_outline", llm_context)
             
             if master_outline_data and "error" not in master_outline_data:
@@ -841,6 +908,9 @@ class InitExecutor(BaseExecutor):
                         crisis_text = _safe_str(crisis) if not isinstance(crisis, str) else crisis
                         add_volume_crisis(vo_id, crisis_order=i + 1, crisis_event=crisis_text)
 
+            self._check_interrupted()
+            await self._notify_progress("master_outline", "总纲与卷纲已完成", 75)
+
             gf_data_raw = project_data.get("genre_fusion")
             if isinstance(gf_data_raw, dict):
                 gf_data = gf_data_raw.copy()
@@ -848,8 +918,6 @@ class InitExecutor(BaseExecutor):
                     gf_data[key] = self._sanitize_value(gf_data[key], "")
                 add_genre_fusion(project_id, **gf_data)
 
-            self._check_interrupted()
-            await self._notify_progress("character_group", "正在生成角色组...", 85)
             # 构建已有角色名单，注入 llm_context 供 init_character_group prompt 引用
             all_cards = get_character_cards_by_project(project_id)
             _type_label = {
@@ -869,6 +937,9 @@ class InitExecutor(BaseExecutor):
                 _char_lines.append(desc)
             llm_context["existing_characters_section"] = "\n".join(_char_lines) if _char_lines else "（暂无已有角色）"
             character_group_data, character_group_id = await char_builder.build_character_group(project_data, llm_context)
+
+            self._check_interrupted()
+            await self._notify_progress("character_group", "角色组已完成", 85)
 
             add_webnovel_state(project_id, current_chapter=0, total_words=0, current_volume=1)
 
@@ -899,9 +970,6 @@ class InitExecutor(BaseExecutor):
             
             add_idea_bank(project_id, selected_idea, constraints_inherited)
 
-            self._check_interrupted()
-            await self._notify_progress("story_system", "正在生成Story System合同...", 92)
-
             _logger.info(f"[init_executor] 生成Story System合同")
             story_system = StorySystemExecutor(script_id, 0, 0)
             story_system_result = await story_system.execute({})
@@ -909,6 +977,9 @@ class InitExecutor(BaseExecutor):
                 _logger.info(f"[init_executor] Story System合同生成成功")
             else:
                 _logger.warning(f"[init_executor] Story System合同生成失败: {story_system_result.error_message}")
+
+            self._check_interrupted()
+            await self._notify_progress("story_system", "Story System合同已完成", 92)
 
             await self._notify_progress("completed", "深度初始化完成", 100)
 

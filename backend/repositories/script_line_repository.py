@@ -408,10 +408,27 @@ def delete_script_line(line_id: int) -> bool:
 def delete_script_lines_by_chapter(script_id: int, chapter_index: int) -> int:
     conn = _get_conn()
     with _lock:
+        # 先统计该章节各角色的台词数，用于回退角色表的 line_count
+        rows = conn.execute(
+            "SELECT role, COUNT(*) as cnt FROM script_lines "
+            "WHERE script_id=? AND chapter_index=? GROUP BY role",
+            (script_id, chapter_index),
+        ).fetchall()
+        role_counts = {r[0] or "旁白": r[1] for r in rows}
+
         cur = conn.execute(
             "DELETE FROM script_lines WHERE script_id=? AND chapter_index=?",
             (script_id, chapter_index),
         )
+
+        # 回退角色的 line_count
+        for role, count in role_counts.items():
+            conn.execute(
+                "UPDATE script_characters SET line_count = MAX(line_count - ?, 0) "
+                "WHERE script_id=? AND role=?",
+                (count, script_id, role),
+            )
+
         conn.commit()
     return cur.rowcount
 
@@ -458,3 +475,18 @@ def get_script_chapters_with_lines(script_id: int) -> List[int]:
             (script_id,),
         ).fetchall()
     return [r[0] for r in rows]
+
+
+def get_lines_by_role(script_id: int, role: str, limit: int = 5) -> List[Dict[str, Any]]:
+    """按角色名查询台词样本（用于角色属性提取）。"""
+    conn = _get_conn()
+    with _lock:
+        rows = conn.execute(
+            """SELECT id, role, content, instruction, type, chapter_index, line_no
+               FROM script_lines
+               WHERE script_id=? AND role=?
+               ORDER BY chapter_index, line_no
+               LIMIT ?""",
+            (script_id, role, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]

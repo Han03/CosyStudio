@@ -27,6 +27,7 @@ from repositories import (
     get_chapter_sentence_count,
     get_audio_cache,
     save_audio_cache,
+    get_writing_tasks,
 )
 
 router = APIRouter()
@@ -419,6 +420,22 @@ async def get_script_detail(script_id: int):
     if script is None:
         raise HTTPException(status_code=404, detail="剧本不存在")
     chapters = service.get_script_chapters(script_id)
+
+    # 附加 apply_status 字段到每个章节
+    apply_tasks = get_writing_tasks(script_id, None, None) or []
+    apply_running = {t["chapter_index"] for t in apply_tasks
+                     if t.get("task_type") == "apply" and t.get("status") in ("running", "pending")}
+    apply_failed = {t["chapter_index"] for t in apply_tasks
+                    if t.get("task_type") == "apply" and t.get("status") == "failed"}
+    for ch in chapters:
+        idx = ch.get("chapter_index")
+        if idx in apply_running:
+            ch["apply_status"] = "processing"
+        elif idx in apply_failed:
+            ch["apply_status"] = "apply_failed"
+        else:
+            ch["apply_status"] = None
+
     return {"success": True, "script": script, "chapters": chapters}
 
 
@@ -566,6 +583,21 @@ async def update_character_config(script_id: int, role: str, request: Request):
         tts_capability_id=tts_capability_id, cloud_extra_params=cloud_extra_params,
     )
     return {"success": True, "message": "角色配置已更新"}
+
+
+@router.put("/api/books/scripts/characters/profile")
+async def update_character_profile_api(script_id: int, role: str, request: Request):
+    """更新角色属性（性别/年龄/描述）。
+
+    请求体: {"gender": "男", "age": "青年", "description": "..."}
+    """
+    body = await request.json()
+    gender = body.get("gender", "")
+    age = body.get("age", "")
+    description = body.get("description", "")
+    from repositories import update_character_profile
+    update_character_profile(script_id, role, gender=gender, age=age, description=description)
+    return {"success": True, "message": "角色属性已更新"}
 
 
 @router.put("/api/books/scripts/lines")

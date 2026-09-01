@@ -1192,11 +1192,13 @@ function renderConstraintPackages() {
         const isSelected = selectedPackageIndex === index;
         const summaryText = (pkg.core_selling_points || pkg.anti_trope_rule || '').slice(0, 40);
         const optName = escapeHtml(`方案${String.fromCharCode(65 + index)}`);
+        const totalScore = _calcTotalScore(pkg.scoring);
 
         return `<div class="option-summary-row ${isSelected ? 'selected' : ''}" onclick="quickSelectOption(6, ${index})">
             <span class="summary-check"><i class="fas ${isSelected ? 'fa-check-circle' : 'fa-circle'}"></i></span>
             <span class="summary-name">${optName}</span>
             <span class="summary-text">${escapeHtml(summaryText)}${summaryText.length >= 40 ? '...' : ''}</span>
+            <span class="summary-score"><span class="score-num">${totalScore}</span>分</span>
             <button class="summary-detail-btn" onclick="event.stopPropagation(); showPackageDetail(${index})" title="查看详情"><i class="fas fa-eye"></i></button>
         </div>`;
     }).join('') + `</div>`;
@@ -1221,7 +1223,8 @@ function showPackageDetail(index) {
     const hardConstraints = Array.isArray(pkg.hard_constraints) ? pkg.hard_constraints : [];
 
     titleEl.textContent = `方案${String.fromCharCode(65 + index)}`;
-    scoreEl.innerHTML = '';
+    const totalScore = _calcTotalScore(pkg.scoring);
+    scoreEl.innerHTML = `<span>${totalScore}</span><span style="font-size:10px;opacity:0.8">分</span>`;
 
     let html = '';
     html += `<div class="constraint-package-item"><strong>反套路规则：</strong>${escapeHtml(pkg.anti_trope_rule || '')}</div>`;
@@ -1231,7 +1234,23 @@ function showPackageDetail(index) {
     html += `<div class="constraint-package-item"><strong>核心卖点：</strong>${escapeHtml(pkg.core_selling_points || '')}</div>`;
     html += `<div class="constraint-package-item"><strong>开篇钩子：</strong>${escapeHtml(pkg.opening_hook || '')}</div>`;
 
-    contentEl.innerHTML = html;
+    // 五维评分展示
+    let scoringHtml = '';
+    const scoring = pkg.scoring || {};
+    if (Object.keys(scoring).length > 0) {
+        const labels = { creativity: '创意独特性', feasibility: '落地可行性', market_appeal: '市场吸引力', sustainability: '长线可持续性', emotional_impact: '情感冲击力' };
+        scoringHtml = `<div class="constraint-package-scoring">` + Object.entries(scoring).map(([key, s]) => {
+            if (typeof s !== 'object') return '';
+            return `<div class="scoring-row">
+                <span class="scoring-label">${labels[key] || key}</span>
+                <div class="scoring-bar"><div class="scoring-fill" style="width: ${(s.score || 0) * 10}%"></div></div>
+                <span class="scoring-value">${s.score || 0}/10</span>
+                <span class="scoring-reason">${escapeHtml(s.reason || '')}</span>
+            </div>`;
+        }).filter(Boolean).join('') + `</div>`;
+    }
+
+    contentEl.innerHTML = html + scoringHtml;
     selectBtn.textContent = isSelected ? '已选择（点击更新）' : '选择此方案';
 
     overlay.style.display = 'flex';
@@ -1381,10 +1400,8 @@ async function confirmInit() {
 function showInitTaskMask(message) {
     const mask = document.getElementById('initTaskMask');
     const current = document.getElementById('initTaskCurrent');
-    const log = document.getElementById('initTaskLog');
     if (mask) mask.style.display = 'flex';
     if (current) current.textContent = message || '准备中...';
-    if (log) log.innerHTML = '<div style="color:var(--neu-text-muted, #888); text-align:center; font-size:13px;">等待任务启动...</div>';
 }
 
 function hideInitTaskMask() {
@@ -1395,14 +1412,13 @@ function hideInitTaskMask() {
 function appendInitTaskLog(message, status) {
     const log = document.getElementById('initTaskLog');
     if (!log) return;
-    const empty = log.querySelector('div[style*="text-align:center"]');
-    if (empty) log.innerHTML = '';
+    // 只显示最新的一条：每次清空后写入，保证刷新前后显示一致
+    log.innerHTML = '';
     const item = document.createElement('div');
-    item.style.cssText = 'padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05); font-size:13px; line-height:1.6;';
+    item.style.cssText = 'padding:4px 0; font-size:13px; line-height:1.6;';
     const color = status === 'failed' ? '#dc3545' : status === 'completed' ? '#28a745' : 'var(--neu-text, #333)';
     item.innerHTML = `<span style="color:${color};">●</span> <span>${message}</span>`;
     log.appendChild(item);
-    log.scrollTop = log.scrollHeight;
 }
 
 function handleInitProgressMessage(msg) {
@@ -1412,6 +1428,18 @@ function handleInitProgressMessage(msg) {
     const progress = msg.progress || 0;
 
     showInitTaskMask(message);
+
+    // 更新进度条
+    const barEl = document.getElementById('initTaskProgressBar');
+    const fillEl = document.getElementById('initTaskProgressFill');
+    const textEl = document.getElementById('initTaskProgressText');
+    if (barEl) barEl.style.display = 'block';
+    if (fillEl) fillEl.style.width = `${progress}%`;
+    if (textEl) {
+        textEl.style.display = 'block';
+        textEl.textContent = `${progress}%`;
+    }
+
     appendInitTaskLog(message, status);
 
     if (status === 'completed') {
@@ -1462,6 +1490,12 @@ function handleInitProgressMessage(msg) {
                 state.wsReconnectTimer = null;
             }
         }
+        // 终态停止轮询
+        if (typeof stopInitStatusPolling === 'function') stopInitStatusPolling();
+    }
+    if (status === 'completed') {
+        // 完成态也停止轮询
+        if (typeof stopInitStatusPolling === 'function') stopInitStatusPolling();
     }
 }
 
@@ -1495,10 +1529,8 @@ function resetInitButtons() {
 async function cancelInit() {
     if (confirm('确定要取消初始化吗？')) {
         try {
-            await apiRequest('/api/books/scripts/webnovel/init/cancel', {
+            await apiRequest(`/api/books/scripts/webnovel/init/cancel?script_id=${state.scriptId}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ script_id: state.scriptId }),
                 silent: true
             });
         } catch (e) {
@@ -1548,7 +1580,113 @@ function resetInitModal() {
     document.getElementById('initTaskStatus').innerHTML = '';
 }
 
-function cancelInit() {
-    resetInitModal();
+// ============= 初始化状态检测（页面刷新后一次性确认） =============
+// 页面刷新后调用一次 /init/status 确认当前状态，然后依赖 WebSocket 推送
+// 不再持续轮询，避免不必要的请求
+let _initStatusCheckTimer = null;
+
+function startInitStatusPolling() {
+    // 兼容旧调用：改为一次性状态检测
+    if (_initStatusCheckTimer) return;
+    _initStatusCheckTimer = setTimeout(() => {
+        _initStatusCheckTimer = null;
+        checkInitStatusOnce();
+    }, 500); // 延迟 500ms 让页面先渲染
+}
+
+function stopInitStatusPolling() {
+    if (_initStatusCheckTimer) {
+        clearTimeout(_initStatusCheckTimer);
+        _initStatusCheckTimer = null;
+    }
+}
+
+async function checkInitStatusOnce() {
+    if (!state.scriptId) return;
+    try {
+        const data = await apiRequest(`/api/books/scripts/webnovel/init/status?script_id=${state.scriptId}`, { silent: true });
+        if (!data.success) return;
+
+        const isRunning = data.is_running;
+        const scriptStatus = data.status;
+        const progressMsg = data.progress_message || '';
+        const progress = data.progress || 0;
+
+        // 更新遮罩上的当前步骤文本
+        if (progressMsg) {
+            const currentEl = document.getElementById('initTaskCurrent');
+            if (currentEl) currentEl.textContent = progressMsg;
+        }
+
+        // 恢复进度条
+        if (progress > 0) {
+            const barEl = document.getElementById('initTaskProgressBar');
+            const fillEl = document.getElementById('initTaskProgressFill');
+            const textEl = document.getElementById('initTaskProgressText');
+            if (barEl) barEl.style.display = 'block';
+            if (fillEl) fillEl.style.width = `${progress}%`;
+            if (textEl) {
+                textEl.style.display = 'block';
+                textEl.textContent = `${progress}%`;
+            }
+        }
+
+        // 清除日志占位符“等待任务启动...”，并将当前步骤作为第一条日志显示
+        // 这样刷新页面后用户能立即看到有意义的信息，而不是空白或占位文本
+        if (isRunning && progressMsg) {
+            const logEl = document.getElementById('initTaskLog');
+            if (logEl) {
+                const placeholder = logEl.querySelector('div[style*="text-align:center"]');
+                if (placeholder) logEl.innerHTML = '';
+                // 如果日志为空，添加当前步骤作为第一条记录
+                if (logEl.children.length === 0) {
+                    appendInitTaskLog(progressMsg, 'running');
+                }
+            }
+        }
+
+        if (isRunning) {
+            // 任务正在运行：依赖 WebSocket 推送进度，不再轮询
+            console.log('[init] 任务正在运行，依赖 WebSocket 推送');
+            return;
+        }
+
+        // 任务未运行，根据状态处理
+        if (scriptStatus === 'initializing') {
+            // 僵尸状态：服务器重启后内存任务丢失
+            if (state.scriptData) state.scriptData.status = 'failed';
+            updateStatusBadge('failed');
+            const btn = document.getElementById('initInterruptBtn');
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-times"></i> 关闭';
+                btn.onclick = () => {
+                    hideInitTaskMask();
+                    if (typeof showInitModal === 'function') {
+                        showInitModal({ locked: true, startStep: 2 });
+                    }
+                };
+            }
+            showToast('初始化任务已丢失（服务器可能重启），请重新开始', 'warning');
+            return;
+        }
+
+        // 任务已结束
+        if (scriptStatus === 'ready') {
+            state.webnovelInitialized = true;
+            hideInitTaskMask();
+            await loadScriptInfo();
+            await loadCharacters();
+            renderChapterList();
+            showToast('深度初始化完成！', 'success');
+            if (typeof showWorldModal === 'function') showWorldModal();
+        } else if (scriptStatus === 'failed') {
+            if (state.scriptData) state.scriptData.status = 'failed';
+            updateStatusBadge('failed');
+            hideInitTaskMask();
+            showToast('深度初始化失败: ' + progressMsg, 'error');
+        }
+    } catch (e) {
+        console.warn('[init] 检测初始化状态失败:', e);
+    }
 }
 

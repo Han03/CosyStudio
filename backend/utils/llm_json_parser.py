@@ -14,6 +14,8 @@ except ImportError:
 
 
 # 策略列表（名称、描述），与执行顺序一致
+# ⚠️ 裸换行符转义（escape_newlines_in_strings）已提升为预处理步骤，
+#   在策略链之前执行，避免 json_repair 静默吞并内容。
 _PARSE_STRATEGIES = [
     ("direct", "直接解析/ json_repair 容错解析"),
     ("normalize_quotes", "统一中文引号到英文引号"),
@@ -21,7 +23,6 @@ _PARSE_STRATEGIES = [
     ("fix_string_end_key", "修复字符串结束后直接跟'key':"),
     ("fix_merged_keys", "修复被合并的键值对"),
     ("repair_json_quotes", "修复未转义的引号"),
-    ("escape_newlines_in_strings", "转义字符串内的裸换行符"),
     ("fix_missing_colons", "修复缺失的冒号"),
     ("remove_trailing_commas", "移除尾逗号"),
     ("fix_missing_braces", "修复缺失的对象/数组闭合括号"),
@@ -150,10 +151,41 @@ def parse_llm_json(
         content = picked or blocks[-1]
 
     # 提取最外层的 JSON 对象
+    # 使用括号深度计数找到首个 { 的匹配 }，而非 rfind("}")，
+    # 避免 LLM 在 JSON 后附加解释文本（含 } 字符）时截取范围过大导致解析失败。
     first_brace = content.find("{")
-    last_brace = content.rfind("}")
-    if first_brace != -1 and last_brace != -1:
-        content = content[first_brace:last_brace + 1].strip()
+    if first_brace != -1:
+        depth = 0
+        in_string = False
+        escape_next = False
+        matching_brace = -1
+        for i in range(first_brace, len(content)):
+            ch = content[i]
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == '\\' and in_string:
+                escape_next = True
+                continue
+            if ch == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    matching_brace = i
+                    break
+        if matching_brace != -1:
+            content = content[first_brace:matching_brace + 1].strip()
+        else:
+            # 回退：括号匹配失败时用 rfind（兼容旧逻辑）
+            last_brace = content.rfind("}")
+            if last_brace > first_brace:
+                content = content[first_brace:last_brace + 1].strip()
 
     # 尝试解析
     def try_parse(text: str) -> Optional[Dict[str, Any]]:
@@ -181,7 +213,6 @@ def parse_llm_json(
         ("fix_string_end_key", _fix_string_end_key),
         ("fix_merged_keys", _fix_merged_keys),
         ("repair_json_quotes", _repair_json_quotes),
-        ("escape_newlines_in_strings", _escape_newlines_in_strings),
         ("fix_missing_colons", _fix_missing_colons),
         ("remove_trailing_commas", _remove_trailing_commas),
         ("fix_missing_braces", _fix_missing_braces),
@@ -210,6 +241,45 @@ def parse_llm_json(
             working = candidate
             break
         working = candidate
+
+    # ⚠️ 裸换行符 + 未转义引号的复合陷阱防御（双路径取最优）
+    # LLM（尤其 glm 系列）常在 JSON 字符串值中同时输出：
+    #   1) 未转义的裸换行符（0x0A）
+    #   2) 未转义的内部引号（如中文对话 "快跑！"）
+    # json_repair 会"静默成功"但只解析出部分内容（如 content 截断到 478 字），
+    # 剩余文本被错误解析为 JSON 顶层 key，导致下游数据丢失。
+    # 此处用正则从原始文本中直接提取最长字符串字段的值，
+    # 若比 json_repair 结果更长则采用，作为安全网。
+    if result is not None:
+        _max_val_len = max((len(v) for v in result.values() if isinstance(v, str)), default=0)
+        # 用正则从原始 content 中提取 "content"/"text" 等主字段的完整值
+        # 匹配模式："key"\s*:\s*" 之后到最后一个 "\s*[,}\n] 之前的所有内容
+        for _key_pattern in [r'"content"', r'"text"', r'"polished_content"']:
+            _m = re.search(_key_pattern + r'\s*:\s*"', content)
+            if not _m:
+                continue
+            _val_start = _m.end()
+            # 从文本末尾向前找最后一个 "  followed by 可选空白和 } 或 ,
+            _end_search = content.rfind('}', _val_start)
+            if _end_search < _val_start:
+                _end_search = len(content)
+            # 从 } 位置向前找最后一个 "
+            _val_end = content.rfind('"', _val_start, _end_search)
+            if _val_end > _val_start:
+                _raw_val = content[_val_start:_val_end]
+                # 还原 JSON 转义序列（\\n → 换行, \\\" → " 等）
+                # 注意：不能用 unicode_escape（会破坏 UTF-8 中文），
+                # 而是手动替换常见的 JSON 转义序列
+                _raw_val = _raw_val.replace('\\n', '\n')
+                _raw_val = _raw_val.replace('\\t', '\t')
+                _raw_val = _raw_val.replace('\\r', '\r')
+                _raw_val = _raw_val.replace('\\"', '"')
+                _raw_val = _raw_val.replace('\\\\', '\\')
+                if len(_raw_val) > _max_val_len * 1.5 and len(_raw_val) > 200:
+                    # 正则提取的结果显著更长，说明 json_repair 截断了内容
+                    _key_name = _key_pattern.strip('"')
+                    result[_key_name] = _raw_val
+                    success_strategy += "+raw_extract"
 
     if enable_logging:
         log_kwargs = _build_log_kwargs(

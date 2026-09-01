@@ -21,7 +21,7 @@ from core.model_executor import get_model_executor
 from utils.llm_json_parser import parse_llm_json
 from webnovel.repositories import (
     get_webnovel_project_by_script, get_character_cards_by_project,
-    get_volume_outlines_by_project, get_golden_finger_by_project,
+    get_volume_outline, get_volume_outlines_by_project, get_golden_finger_by_project,
     get_power_system_by_project, get_worldview_by_project,
     get_villain_by_project, get_idea_bank_by_project,
     add_volume_outline, add_volume_crisis, update_volume_outline,
@@ -73,7 +73,7 @@ class PlanExecutor(BaseExecutor):
         try:
             obj_context = {k: self._dict_to_obj(v) if isinstance(v, dict) else v for k, v in context_data.items()}
             user_prompt = prompt_data["user_prompt"].format(**obj_context)
-            logger.info(f"[plan_executor] 调用LLM生成 {prompt_name}，prompt长度: {len(user_prompt)}")
+            logger.info(f"[plan_executor] 调用LLM生成 {prompt_name}")
 
             project_id = 0
             try:
@@ -100,7 +100,6 @@ class PlanExecutor(BaseExecutor):
 
             content = result.get("content", "") if result else ""
             content = content.strip()
-            logger.info(f"[plan_executor] LLM返回内容长度: {len(content)}")
 
             json_result = parse_llm_json(
                 content,
@@ -119,9 +118,7 @@ class PlanExecutor(BaseExecutor):
                 logger.info(f"[plan_executor] JSON解析成功，键: {list(json_result.keys())}")
                 return json_result
 
-            logger.error(f"[plan_executor] JSON解析失败，内容前500字符:\n{content[:500]}")
-            logger.error(f"[plan_executor] JSON解析失败，内容后500字符:\n{content[-500:]}")
-            logger.error(f"[plan_executor] JSON解析失败，完整内容长度: {len(content)}")
+            logger.error(f"[plan_executor] JSON解析失败")
 
             import json
             try:
@@ -271,6 +268,16 @@ class PlanExecutor(BaseExecutor):
             )
             if beat_sheet:
                 self._update_volume_with_beat_sheet(vo_id, beat_sheet)
+
+            # 卷纲关键字段完整性校验：从 DB 重新读取并检测空值字段
+            _critical_fields = ["catalyst_event", "protagonist_goal", "mid_reversal"]
+            _updated_vo = get_volume_outline(project["id"], vo_id) if beat_sheet else volume_outline
+            _empty_fields = [f for f in _critical_fields if not (_updated_vo or {}).get(f)]
+            if _empty_fields:
+                _logger.warning(
+                    f"[plan_executor] 卷纲 vo_id={vo_id} 关键字段为空: {_empty_fields}，"
+                    f"下游 prompt 将渲染为“（未设定）”，建议检查 LLM 输出或重新生成"
+                )
 
             chapter_plans = await self._generate_chapter_plans(
                 project, volume_outline, protagonist, volume_number,
@@ -610,6 +617,70 @@ class PlanExecutor(BaseExecutor):
         all_plans = []
         batch_summaries = []  # 每批的摘要，供后续批次参考
 
+        # 预填充前序批次摘要：确保后续批次能通过 previous_batch_summary 获取前文上下文
+        # 注入章节规划概述（关键事件+伏笔+收尾）而非纯概要，更适合规划衔接
+        vo_id = volume_outline.get("id", 0)
+        project_id = project.get("id", 0)
+
+        def _format_plan_overview(plans: list) -> str:
+            """将章节规划格式化为规划概述，包含关键事件、伏笔、收尾方式"""
+            lines = []
+            for p in plans:
+                ch_idx = p.get("chapter_index", "?")
+                title = p.get("chapter_title", "")
+                #概述
+                summary = p.get("summary", "")[:180]
+                # 关键事件（取前3个）
+                key_events = p.get("key_events", [])
+                if isinstance(key_events, list):
+                    events_str = "；".join(str(e) for e in key_events[:3])
+                else:
+                    events_str = str(key_events)[:120]
+                # 伏笔
+                foreshadowing = p.get("foreshadowing", "")[:80]
+                # 收尾方式
+                hook = p.get("chapter_hook", "")[:60]
+
+                parts = [f"第{ch_idx}章 {title}"]
+                if summary:
+                    parts.append(f"  概述：{summary}")
+                if events_str:
+                    parts.append(f"  事件：{events_str}")
+                if foreshadowing:
+                    parts.append(f"  伏笔：{foreshadowing}")
+                if hook:
+                    parts.append(f"  收尾：{hook}")
+                lines.append("\n".join(parts))
+            return "\n".join(lines)
+
+        if chapter_start > vo_chapter_start and vo_id:
+            # 场景1：同卷内追加（如单章回退路径规划第2章，第1章已存在）
+            existing_plans = get_chapter_plans_by_volume(vo_id)
+            prev_plans = [p for p in existing_plans if p.get("chapter_index", 0) < chapter_start]
+            if prev_plans:
+                overview = _format_plan_overview(prev_plans)
+                batch_summaries.append(
+                    f"【前序章节规划概述（第{prev_plans[0].get('chapter_index', '?')}-{prev_plans[-1].get('chapter_index', '?')}章）】\n"
+                    + overview
+                )
+        elif chapter_start == vo_chapter_start and vo_chapter_start > 1 and project_id:
+            # 场景2：跨卷衔接（如第二卷从第31章开始，需获取第一卷末尾章节规划）
+            all_outlines = get_volume_outlines_by_project(project_id)
+            prev_volume = next(
+                (o for o in all_outlines if o.get("volume_number") == volume_number - 1),
+                None
+            )
+            if prev_volume:
+                prev_vol_plans = get_chapter_plans_by_volume(prev_volume.get("id", 0))
+                # 取上一卷最后 3 章的规划概述，提供跨卷衔接上下文
+                tail_plans = prev_vol_plans[-3:] if prev_vol_plans else []
+                if tail_plans:
+                    overview = _format_plan_overview(tail_plans)
+                    batch_summaries.append(
+                        f"【上一卷末尾章节规划概述（第{tail_plans[0].get('chapter_index', '?')}-{tail_plans[-1].get('chapter_index', '?')}章）】\n"
+                        + overview
+                    )
+
         # 将角色组成员列表预格式化为字符串，供 prompt 模板使用
         cg_members_str = self._format_char_group_members(char_group, char_group_members, project.get("id", 0))
 
@@ -622,6 +693,15 @@ class PlanExecutor(BaseExecutor):
 
         # 危机链数据：从独立表查询并格式化为文本，注入 volume_outline context
         vo_ctx = dict(volume_outline)
+
+        # 空值字段在 prompt 中渲染为"（未设定）"，避免占位符后为空（如"催化事件："）
+        for _field in ("core_conflict", "volume_climax", "promise_description",
+                       "catalyst_event", "mid_reversal", "protagonist_goal",
+                       "irreversible_change", "reversal_insight",
+                       "lowest_point_event", "lowest_point_cost",
+                       "protagonist_choice", "new_hook", "unresolved_issues"):
+            vo_ctx[f"{_field}_desc"] = vo_ctx.get(_field, "") or "（未设定）"
+
         if not vo_ctx.get("crises"):
             from webnovel.repositories import get_volume_crises
             crises_list = get_volume_crises(vo_ctx.get("id", 0))

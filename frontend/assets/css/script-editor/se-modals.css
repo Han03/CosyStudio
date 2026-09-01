@@ -2223,6 +2223,7 @@
 .task-card.running { border-left-color: #3b82f6; }
 .task-card.completed { border-left-color: #10b981; }
 .task-card.failed { border-left-color: #ef4444; }
+.task-card.cancelled { border-left-color: #a1a1aa; }
 
 .task-card-header {
     display: flex;
@@ -2247,6 +2248,7 @@
 .task-card-status.running { background: #dbeafe; color: #1e40af; }
 .task-card-status.completed { background: #d1fae5; color: #065f46; }
 .task-card-status.failed { background: #fee2e2; color: #991b1b; }
+.task-card-status.cancelled { background: #f4f4f5; color: #52525b; }
 
 .task-card-meta {
     display: flex;

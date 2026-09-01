@@ -133,6 +133,8 @@ const state = {
     continueTargetChapter: -1,
     continueResultText: '',
     selectedContinueChapter: null,
+    applyingChapterIndex: null,   // 正在应用创作结果的章节索引
+    applyTaskId: null,            // 当前应用任务ID
     chapterPlanSelectorData: null,
     webnovelInitialized: false,
 };
@@ -206,6 +208,10 @@ async function init() {
     if (!ok) return;
     await loadCharacters();
     renderChapterList();
+    // 恢复应用任务状态（检查章节列表中的 apply_status 字段）
+    if (typeof restoreApplyStateFromChapters === 'function') {
+        restoreApplyStateFromChapters();
+    }
     if (state.chapters.length > 0) {
         const firstWithLines = state.chapters.find(c => c.has_lines) || state.chapters[0];
         await selectChapter(firstWithLines.chapter_index);
@@ -229,7 +235,39 @@ async function checkInitStatus() {
         });
         if (data.success) {
             state.webnovelInitialized = !!data.initialized;
-            if (!data.initialized) {
+            if (data.is_initializing) {
+                // 正在初始化中：展示任务进度遮罩，而非步骤向导模态框
+                if (state.scriptData) state.scriptData.status = 'initializing';
+                updateStatusBadge('initializing');
+                const initMsg = data.init_progress_message || '深度初始化中...';
+                const initProgress = data.init_progress || 0;
+                if (typeof showInitTaskMask === 'function') {
+                    showInitTaskMask(initMsg);
+                }
+                // 恢复进度条
+                const barEl = document.getElementById('initTaskProgressBar');
+                const fillEl = document.getElementById('initTaskProgressFill');
+                const textEl = document.getElementById('initTaskProgressText');
+                if (barEl) barEl.style.display = 'block';
+                if (fillEl) fillEl.style.width = `${initProgress}%`;
+                if (textEl) {
+                    textEl.style.display = 'block';
+                    textEl.textContent = `${initProgress}%`;
+                }
+                // 清除日志占位符“等待任务启动...”，将当前步骤作为第一条日志
+                const logEl = document.getElementById('initTaskLog');
+                if (logEl) {
+                    const placeholder = logEl.querySelector('div[style*="text-align:center"]');
+                    if (placeholder) logEl.innerHTML = '';
+                    if (logEl.children.length === 0 && typeof appendInitTaskLog === 'function') {
+                        appendInitTaskLog(initMsg, 'running');
+                    }
+                }
+                // 一次性检测当前状态，然后依赖 WebSocket 推送
+                if (typeof startInitStatusPolling === 'function') {
+                    startInitStatusPolling();
+                }
+            } else if (!data.initialized) {
                 // 未初始化：自动展示锁定模态框（从 Step 2 开始，因为已有 script_id）
                 if (typeof showInitModal === 'function') {
                     await showInitModal({ locked: true, startStep: 2 });
@@ -319,6 +357,10 @@ async function loadScriptInfo() {
             document.getElementById('scriptMeta').textContent =
                 `${state.scriptData.chapter_count} 章 · ${state.scriptData.line_count || 0} 句 · ${state.scriptData.created_at_str || ''}`;
             updateStatusBadge(state.scriptData.status || 'ready');
+            // 检测生成中状态，展示边缘进度条
+            if (state.scriptData.status === 'running') {
+                showGenerationProgress();
+            }
             // 检测初始化中状态，展示任务遮罩
             if (state.scriptData.status === 'initializing') {
                 if (typeof showInitTaskMask === 'function') {

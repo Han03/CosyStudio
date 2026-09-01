@@ -90,6 +90,9 @@ from .csv_pack_repository import (
     get_csv_pack_count, get_unique_categories, get_unique_category_groups,
     format_pack_for_prompt
 )
+from .csv_knowledge_repository import (
+    query_csv_knowledge, format_csv_knowledge_for_prompt, build_csv_knowledge_chunk_text
+)
 from .story_system_repository import (
     save_master_setting, get_master_setting, delete_master_setting,
     save_anti_patterns, get_anti_patterns, delete_anti_patterns
