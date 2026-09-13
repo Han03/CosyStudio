@@ -14,8 +14,17 @@ user_prompt: |
   - 核心冲突: {volume_conflict}
   - 主角目标: {volume_goal}
 
-  【主角】
-  {protagonist_info}
+  【角色与金手指】
+  {characters_detail}
+
+  【世界观规则】
+  {world_settings_text}
+
+  【活跃伏笔】
+  {foreshadow_text}
+
+  【不可提前揭示的伏笔（不得要求或暗示提前回收）】
+  {undisclosed_text}
 
   【审查维度】
   {dimensions_text}

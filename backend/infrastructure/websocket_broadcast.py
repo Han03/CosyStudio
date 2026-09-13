@@ -1,4 +1,3 @@
-import asyncio
 import json
 import threading
 from typing import Dict, Set
@@ -27,7 +26,6 @@ class WebSocketBroadcastManager:
     def _init(self):
         """初始化广播管理器"""
         self._script_connections: Dict[int, Set] = {}
-        self._loop = asyncio.get_event_loop()
 
     def register_connection(self, script_id: int, websocket):
         """注册剧本WebSocket连接"""

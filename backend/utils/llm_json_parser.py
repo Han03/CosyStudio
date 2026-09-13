@@ -333,7 +333,19 @@ def parse_llm_json(
                 except Exception:
                     pass
         else:
-            _enqueue_log(log_kwargs)
+            # 无桥接 log_id：本次解析并非来自 execute_text_chat 的真实 LLM 调用
+            # （探针/测试/内部直接喂文本解析），不落 llm_call_logs，避免产生
+            # user_prompt/system_prompt 为空的假日志污染日志库、干扰问题分析。
+            # 真实 LLM 调用必经 execute_text_chat（统一入口必落库），解析只负责回写。
+            try:
+                from utils.logger import log_manager
+                log_manager.get_logger("llm_call_log").warning(
+                    f"[PARSE_NO_LLM_BRIDGE] 跳过落库（非LLM调用解析）: "
+                    f"executor={executor_name or '-'} prompt={prompt_name or '-'} "
+                    f"raw_len={len(original_raw or '')}"
+                )
+            except Exception:
+                pass
 
     return result
 

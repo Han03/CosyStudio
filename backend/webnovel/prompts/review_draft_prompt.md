@@ -12,6 +12,9 @@ user_prompt: |
   【前文衔接窗口】
   {previous_chapter_tail}
 
+  【上章末角色状态（状态/物品/知识边界核验基准）】
+  {character_states_text}
+
   【世界观设定】
   {world_settings_text}
 
@@ -23,6 +26,9 @@ user_prompt: |
 
   【草稿内容】
   {draft}
+
+  【一致性审查要点】
+  {consistency_notes}
 
   【评分锚点】
   - 9-10分：该维度无任何值得修改之处

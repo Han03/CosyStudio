@@ -26,6 +26,12 @@ user_prompt: |
 
   【上一章结尾状态（自然衔接）】
   {previous_hook}
+
+  【上章末角色状态】
+  {character_states_text}
+
+  【不可提前揭示的伏笔】
+  {undisclosed_text}
   若上一章结束于安静节拍或动作中途，直接从该状态接续，不要强行重启紧张感。
 
   【主角】
@@ -48,6 +54,9 @@ user_prompt: |
 
   【历史参考（来自 RAG 语义检索，包含相关历史章节摘要、伏笔、角色设定等）】
   {rag_context}
+
+  【一致性约束】
+  {consistency_notes}
 
   【输出格式】
   请严格按照JSON格式输出，包含以下字段：

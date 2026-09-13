@@ -13,7 +13,10 @@ from webnovel.repositories import (
     get_character_cards_by_project, add_character_relationship, update_character_card,
     add_character_growth, get_character_power, add_character_power, add_character_card,
     delete_character_card, reassign_character_data,
-    upsert_character_item, mark_character_item_lost
+    upsert_character_item, mark_character_item_lost,
+    add_open_loop, add_cool_point, get_active_open_loops,
+    update_open_loop_resolved, update_open_loop_urgency, get_open_loops_by_project,
+    get_chapter_meta, update_chapter_meta, upsert_character_state,
 )
 
 
@@ -21,6 +24,15 @@ from webnovel.repositories import (
 # 获得类动词 → 累加数量；其他动词（失去/损毁/赠予等）→ 扣减数量
 _GAIN_ACTIONS = {"获得", "得到", "收下", "缴获", "抢得", "抢走", "夺得",
                  "买下", "买得", "拾得", "捡到", "接过"}
+
+# 伏笔/爽点类型（与 extract_foreshadow_cool_point 定义一致）
+COOL_POINT_TYPES = [
+    "装逼打脸", "扮猪吃虎", "越级反杀", "打脸权威", "反派翻车",
+    "甜蜜超预期", "突破", "升级", "寻宝", "奇遇",
+    "逆袭", "情感", "解谜", "反转", "发现"
+]
+
+FORESHA_DOW_TIERS = ["核心", "支线", "装饰"]
 
 
 class FactRecorderExecutor(BaseExecutor):
@@ -31,12 +43,12 @@ class FactRecorderExecutor(BaseExecutor):
     step_weight = 10
 
     async def execute(self, context: Dict[str, Any]) -> ExecutorResult:
-        """执行事实记录。"""
+        """执行事实记录（归口：事实/伏笔爽点/结尾钩子/角色状态 一次提取 + 回收检查 + 新角色建卡）。"""
         try:
             script_id = self.script_id
-            
+
             polished_content = context.get("polished_content", "") or context.get("revised_draft", "") or context.get("draft_content", "")
-            
+
             if not polished_content:
                 return ExecutorResult(
                     success=True,
@@ -44,10 +56,10 @@ class FactRecorderExecutor(BaseExecutor):
                     output_data={"facts": []}
                 )
 
-            writing_context = context.get("writing_context", {})
+            inventory = context.get("context_inventory", {})
 
             world_settings_text = []
-            for s in writing_context.get('world_settings', []):
+            for s in inventory.get('world_settings', []):
                 if isinstance(s, dict):
                     if s.get('name'):
                         world_settings_text.append(s['name'])
@@ -55,20 +67,20 @@ class FactRecorderExecutor(BaseExecutor):
                         world_settings_text.append(s['world_summary'][:50])
                     else:
                         world_settings_text.append("世界观设定")
-            
+
             characters_text = []
-            for c in writing_context.get('characters', []):
+            for c in inventory.get('characters', []):
                 if isinstance(c, dict):
-                    if c.get('character_name'):
-                        characters_text.append(c['character_name'])
-                    elif c.get('role'):
-                        characters_text.append(c['role'])
+                    if c.get('name'):
+                        characters_text.append(c['name'])
+                    elif c.get('type'):
+                        characters_text.append(c['type'])
                     else:
                         characters_text.append("角色")
 
             # 从 .md 文件加载 prompt 模板
             prompt_data = self._load_prompt("fact_record")
-            # 事实记录需要覆盖全章内容，截断过短会遗漏核心事件（如升级突破、物品消耗）。
+            # 事实提取需要覆盖全章内容，截断过短会遗漏核心事件（如升级突破、物品消耗）。
             # 成品章节 3000-5000 字，取前 4000 字可覆盖大部分关键事件。
             chapter_content = polished_content[:4000] if len(polished_content) > 4000 else polished_content
             prompt = prompt_data["user_prompt"].format(
@@ -87,7 +99,7 @@ class FactRecorderExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=prompt,
                 system_prompt=system_prompt,
-                max_tokens=800,
+                max_tokens=3000,
                 script_id=script_id,
                 project_id=project_id,
                 executor_name=self.step_name,
@@ -95,56 +107,62 @@ class FactRecorderExecutor(BaseExecutor):
             )
 
             content = result.get("content", "") if result else ""
-            facts = []
+            item_changes, character_updates, open_loops, cool_points, hook, character_states = self._parse_all(
+                content, script_id, project_id)
 
-            # 尝试JSON解析
-            fact_data = parse_llm_json(
-                content,
-                script_id=script_id,
-                project_id=project_id,
-                executor_name=self.step_name,
-                prompt_name="fact_record",
-            )
+            # 1. 结构化物品变化落库（item_changes）
+            rag_affected = set()
+            if item_changes:
+                rag_affected.update(self._save_item_changes(script_id, self.chapter_index, item_changes))
 
-            if fact_data and "facts" in fact_data:
-                for fact in fact_data["facts"]:
-                    if isinstance(fact, dict) and fact.get("type") and fact.get("content"):
-                        facts.append({
-                            "type": fact["type"],
-                            "content": fact["content"]
-                        })
-            else:
-                # JSON解析失败，回退到旧的文本格式解析
-                for line in content.split("\n"):
-                    line = line.strip()
-                    if line.startswith("- "):
-                        parts = line[2:].split(":", 1)
-                        if len(parts) == 2:
-                            fact_type = parts[0].strip()
-                            fact_content = parts[1].strip()
-                            facts.append({
-                                "type": fact_type,
-                                "content": fact_content
-                            })
+            # 2. 结构化角色更新落库（关系/身份揭露/成长/能力）
+            if character_updates:
+                rag_affected.update(await self._save_character_updates(
+                    script_id, self.chapter_index, character_updates))
 
-            if facts:
-                # 根据事实更新角色关系和角色卡片
-                await self._update_characters_from_facts(script_id, self.chapter_index, facts, writing_context)
+            # 2.5 角色卡 RAG 增量重建（物品/身份/改名涉及的角色）
+            if rag_affected and project_id:
+                try:
+                    from webnovel.services.webnovel_service import WebnovelService
+                    await WebnovelService().reindex_character_cards(project_id, list(rag_affected))
+                except Exception:
+                    pass  # 索引失败不阻断主流程
 
-            # 检测并创建新角色
-            await self._create_new_characters(script_id, polished_content, writing_context)
+            # 2. 伏笔爽点落库（含标签补充+跨章去重）+ 3. 结尾钩子 + 4. 角色状态 + 5. 伏笔回收检查
+            newly_planted_ids = set()
+            if project_id:
+                newly_planted_ids = await self._save_foreshadow_and_cool_point(
+                    project_id, self.chapter_index, open_loops, cool_points, polished_content)
+                await self._save_hook(project_id, self.chapter_index, hook)
+                await self._save_character_states(project_id, self.chapter_index, character_states)
+                await self._check_resolved_loops(
+                    project_id, self.chapter_index, polished_content, exclude_ids=newly_planted_ids)
 
-            summary = f"事实记录完成：共{len(facts)}条"
-            
+            # 6. 检测并创建新角色
+            await self._create_new_characters(script_id, polished_content, inventory)
+
+            item_change_count = len(item_changes)
+            char_update_count = len(character_updates)
+            item_tail = f"，{item_change_count}条物品变化" if item_change_count else ""
+            char_tail = f"，{char_update_count}条角色更新" if char_update_count else ""
+            summary = (f"事实记录完成：{len(open_loops)}个伏笔，"
+                       f"{len(cool_points)}个爽点，{len(character_states)}条角色状态"
+                       f"{item_tail}{char_tail}")
+
             return ExecutorResult(
                 success=True,
                 step_summary=summary,
                 output_data={
-                    "facts": facts,
-                    "facts_count": len(facts)
+                    "item_changes": item_changes,
+                    "item_changes_count": item_change_count,
+                    "character_updates": character_updates,
+                    "character_updates_count": char_update_count,
+                    "open_loops_count": len(open_loops),
+                    "cool_points_count": len(cool_points),
+                    "character_states_count": len(character_states),
                 }
             )
-            
+
         except Exception as e:
             return ExecutorResult(
                 success=False,
@@ -152,8 +170,277 @@ class FactRecorderExecutor(BaseExecutor):
                 step_summary="事实记录执行失败"
             )
 
+    def _parse_all(self, content: str, script_id: int, project_id: int):
+        """解析六块提取结果：item_changes / character_updates / open_loops / cool_points / hook / character_states（容错）。"""
+        item_changes, character_updates, open_loops, cool_points, hook, character_states = [], [], [], [], {}, []
+        if not content:
+            return item_changes, character_updates, open_loops, cool_points, hook, character_states
+
+        fact_data = parse_llm_json(
+            content,
+            script_id=script_id,
+            project_id=project_id,
+            executor_name=self.step_name,
+            prompt_name="fact_record",
+        )
+        if fact_data and isinstance(fact_data, dict):
+            item_changes = [i for i in (fact_data.get("item_changes") or [])
+                           if isinstance(i, dict) and i.get("character") and i.get("item")]
+            character_updates = [u for u in (fact_data.get("character_updates") or [])
+                                if isinstance(u, dict) and u.get("type")]
+            open_loops = [l for l in (fact_data.get("open_loops") or [])
+                          if isinstance(l, dict) and l.get("content")]
+            cool_points = [c for c in (fact_data.get("cool_points") or [])
+                           if isinstance(c, dict) and c.get("content")]
+            hook = fact_data.get("hook") or {}
+            if not isinstance(hook, dict):
+                hook = {}
+            character_states = [s for s in (fact_data.get("character_states") or [])
+                                if isinstance(s, dict) and s.get("character_id")]
+        # JSON 解析失败或缺失：全部结构化块为空（无文本兜底）
+        return item_changes, character_updates, open_loops, cool_points, hook, character_states
+
+
+    async def _save_foreshadow_and_cool_point(
+        self, project_id: int, chapter_index: int,
+        open_loops: List[Dict], cool_points: List[Dict], content: str
+    ) -> set:
+        """落库伏笔与爽点（含标签补充、跨章去重），返回本章新埋伏笔 id 集合。"""
+        open_loops = list(open_loops) + self._extract_from_tags(content)
+        cool_points = list(cool_points) + self._extract_cool_points_from_tags(content)
+        open_loops = self._deduplicate_loops(open_loops)
+        cool_points = self._deduplicate_cool_points(cool_points)
+        open_loops = self._deduplicate_against_existing(open_loops, project_id)
+
+        newly_planted_ids = set()
+        for loop in open_loops:
+            saved = add_open_loop(
+                project_id=project_id,
+                content=loop["content"],
+                tier=loop.get("tier", ""),
+                planted_chapter=chapter_index,
+                target_chapter=loop.get("target_chapter", 0),
+                evidence=loop.get("evidence", "")
+            )
+            if saved and saved.get("id"):
+                newly_planted_ids.add(saved["id"])
+
+        for cp in cool_points:
+            add_cool_point(
+                project_id=project_id,
+                chapter_number=chapter_index,
+                content=cp["content"],
+                cool_point_type=cp.get("cool_point_type", ""),
+                execution_mode=cp.get("execution_mode", ""),
+                structure_stage=cp.get("structure_stage", ""),
+                pressure_level=cp.get("pressure_level", 0),
+                release_level=cp.get("release_level", 0),
+                reader_emotion=cp.get("reader_emotion", ""),
+                impact_score=cp.get("impact_score", 0),
+                evidence=cp.get("evidence", "")
+            )
+
+        update_open_loop_urgency(project_id, chapter_index)
+        return newly_planted_ids
+
+    async def _save_hook(self, project_id: int, chapter_index: int, hook: Dict):
+        """落库结尾钩子到 chapter_meta（不回写 hook_type，该字段由调用方标记状态）。"""
+        try:
+            if not hook or not hook.get("hook_content"):
+                return
+            chapter_meta = get_chapter_meta(project_id, chapter_index)
+            if not chapter_meta:
+                return
+            update_chapter_meta(
+                chapter_meta["id"],
+                hook_content=hook.get("hook_content", ""),
+                hook_strength=hook.get("hook_strength", "中"),
+                hook_pattern=hook.get("hook_pattern", ""),
+                ending_emotion=hook.get("ending_emotion", ""),
+                ending_time=hook.get("ending_time", ""),
+                ending_location=hook.get("ending_location", ""),
+            )
+            from utils.logger import log_manager
+            logger = log_manager.get_logger("fact_recorder")
+            logger.info(f"[fact_recorder] 已保存第{chapter_index}章结尾钩子")
+        except Exception:
+            pass
+
+    async def _save_character_states(
+        self, project_id: int, chapter_index: int, states: List[Dict]
+    ) -> int:
+        """落库章末角色状态到 character_state（每章覆盖 upsert）。"""
+        count = 0
+        try:
+            for s in states:
+                cid = s.get("character_id")
+                if not cid:
+                    continue
+                upsert_character_state(
+                    project_id=project_id,
+                    character_id=cid,
+                    character_name=s.get("character_name", ""),
+                    chapter_number=chapter_index,
+                    location=s.get("location", ""),
+                    state_summary=s.get("state_summary", ""),
+                    emotion=s.get("emotion", ""),
+                    knowledge=s.get("knowledge", ""),
+                    notes=s.get("notes", ""),
+                )
+                count += 1
+            if count:
+                from utils.logger import log_manager
+                logger = log_manager.get_logger("fact_recorder")
+                logger.info(f"[fact_recorder] 角色状态记录完成：{count} 条（第{chapter_index}章）")
+        except Exception:
+            pass
+        return count
+
+    async def _check_resolved_loops(
+        self, project_id: int, chapter_index: int, content: str, exclude_ids: set = None
+    ):
+        """检查是否有伏笔在本章被回收。
+
+        exclude_ids: 本章新埋的伏笔 ID 集合，这些伏笔不可能在本章被回收，
+        必须排除以避免"同章埋设+回收"的矛盾。
+        """
+        active_loops = get_active_open_loops(project_id)
+        if not active_loops:
+            return
+        if exclude_ids:
+            active_loops = [lp for lp in active_loops if lp.get("id") not in exclude_ids]
+            if not active_loops:
+                return
+
+        from core.model_executor import get_model_executor
+
+        loops_text = "\n".join([
+            f"- [{loop['tier']}] {loop['content']} (第{loop['planted_chapter']}章埋下)"
+            for loop in active_loops
+        ])
+
+        prompt_data = self._load_prompt("check_resolved_loops")
+        prompt = prompt_data["user_prompt"].format(
+            loops_text=loops_text,
+            content=content[:2000],
+        )
+        system_prompt = prompt_data["system_prompt"] or "你是一位专业的故事分析助手，擅长识别伏笔的回收"
+
+        executor = get_model_executor()
+        result = await executor.execute_text_chat(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            max_tokens=500,
+            script_id=self.script_id,
+            project_id=project_id,
+            executor_name=self.step_name,
+            prompt_name="check_resolved_loops",
+        )
+        response_content = result.get("content", "") if result else ""
+        try:
+            data = parse_llm_json(
+                response_content,
+                script_id=self.script_id,
+                project_id=project_id,
+                executor_name=self.step_name,
+                prompt_name="check_resolved_loops",
+            )
+            resolved_indices = data.get("resolved_indices", [])
+            for idx in resolved_indices:
+                if 0 <= idx < len(active_loops):
+                    loop_id = active_loops[idx]["id"]
+                    update_open_loop_resolved(loop_id, chapter_index)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _extract_from_tags(content: str) -> List[Dict]:
+        """从内容中的[伏笔: ...]标记提取伏笔。"""
+        pattern = r'\[伏笔:\s*(.*?)\]'
+        matches = re.findall(pattern, content)
+        loops = []
+        for match in matches:
+            parts = match.strip().split('|')
+            content_text = parts[0].strip()
+            tier = parts[1].strip() if len(parts) > 1 else "装饰"
+            loops.append({
+                "content": content_text,
+                "tier": tier,
+                "target_chapter": 0,
+                "evidence": f"[伏笔: {match}]"
+            })
+        return loops
+
+    @staticmethod
+    def _extract_cool_points_from_tags(content: str) -> List[Dict]:
+        """从内容中的[爽点: ...]标记提取爽点。"""
+        pattern = r'\[爽点:\s*(.*?)\]'
+        matches = re.findall(pattern, content)
+        cool_points = []
+        for match in matches:
+            parts = match.strip().split('/')
+            cp_type = parts[0].strip() if len(parts) > 0 else ""
+            cp_desc = parts[1].strip() if len(parts) > 1 else cp_type
+            cool_points.append({
+                "content": cp_desc,
+                "cool_point_type": cp_type,
+                "execution_mode": cp_type,
+                "structure_stage": "爆发",
+                "pressure_level": 3,
+                "release_level": 4,
+                "reader_emotion": "爽",
+                "impact_score": 7,
+                "evidence": f"[爽点: {match}]"
+            })
+        return cool_points
+
+    @staticmethod
+    def _deduplicate_loops(loops: List[Dict]) -> List[Dict]:
+        """去重伏笔列表。"""
+        seen = set()
+        result = []
+        for loop in loops:
+            key = loop.get("content", "")[:100]
+            if key not in seen:
+                seen.add(key)
+                result.append(loop)
+        return result
+
+    @staticmethod
+    def _deduplicate_cool_points(cool_points: List[Dict]) -> List[Dict]:
+        """去重爽点列表。"""
+        seen = set()
+        result = []
+        for cp in cool_points:
+            key = cp.get("content", "")[:100]
+            if key not in seen:
+                seen.add(key)
+                result.append(cp)
+        return result
+
+    def _deduplicate_against_existing(self, loops: List[Dict], project_id: int) -> List[Dict]:
+        """跨章去重：与数据库中已有伏笔比对，过滤重复埋线。"""
+        if not loops or not project_id:
+            return loops
+        try:
+            existing = get_open_loops_by_project(project_id)
+        except Exception:
+            return loops
+        if not existing:
+            return loops
+        existing_contents = [e.get("content", "") for e in existing if e.get("content")]
+        result = []
+        for loop in loops:
+            new_key = loop.get("content", "")[:50]
+            if not new_key:
+                continue
+            is_dup = any(new_key in ec or ec[:50] in new_key for ec in existing_contents)
+            if not is_dup:
+                result.append(loop)
+        return result
+
     async def _create_new_characters(
-        self, script_id: int, draft_content: str, writing_context: Dict[str, Any]
+        self, script_id: int, draft_content: str, inventory: Dict[str, Any]
     ):
         """检测正文中的新角色并自动创建角色卡。"""
         try:
@@ -296,131 +583,98 @@ class FactRecorderExecutor(BaseExecutor):
         except Exception:
             pass
 
-    async def _update_characters_from_facts(
+    async def _save_character_updates(
         self, script_id: int, chapter_index: int,
-        facts: List[Dict[str, Any]], writing_context: Dict[str, Any]
-    ):
-        """根据事实更新角色关系和角色卡片。"""
+        character_updates: List[Dict[str, Any]]
+    ) -> set:
+        """落库结构化角色更新（character_updates 主通道）。
+
+        type 枚举：关系 / 身份揭露 / 成长 / 能力。
+        返回受影响 char_id 集合（供 RAG 增量重建）。单条失败不阻断，记日志。
+        """
+        changed = set()
         try:
+            from utils.logger import log_manager
+            logger = log_manager.get_logger("fact_recorder")
+
             project = get_webnovel_project_by_script(script_id)
             if not project:
-                return
+                return changed
             project_id = project["id"]
-
             all_chars = get_character_cards_by_project(project_id)
             char_name_map = {}
             for c in all_chars:
                 name = c.get("name", "") or c.get("character_name", "")
                 if name:
                     char_name_map[name] = c
-
-            # 按名字长度降序排列，确保最长匹配优先（"张小凡" 优先于 "张"）
             sorted_names = sorted(char_name_map.keys(), key=len, reverse=True)
 
-            # 身份揭露/改名/合并涉及的角色卡，循环结束后统一增量重建 RAG 索引
-            changed_char_ids = set()
-
-            for fact in facts:
-                fact_type = fact.get("type", "")
-                fact_content = fact.get("content", "")
-
-                # 身份揭露/别名揭晓：合并或重命名化名角色卡（优先处理，避免被关系类事实抢先消费）
-                if any(k in fact_type for k in ("身份", "揭露", "别名", "真身", "揭晓")):
-                    affected = await self._handle_identity_reveal(
-                        project_id, char_name_map, fact_content, chapter_index
-                    )
-                    changed_char_ids.update(affected)
-                    continue
-
-                # 物品变化：更新角色持有物品清单（优先于"能力/技能获得"分支，
-                # 避免"物品获得"被能力分支误消费；处理后 continue 防止被后续分支重复消费）
-                if any(k in fact_type for k in ("物品", "武器", "装备", "道具", "宝物")):
-                    affected = self._handle_item_change(
-                        char_name_map, sorted_names, fact_content, chapter_index
-                    )
-                    changed_char_ids.update(affected)
-                    continue
-
-                # 角色关系变化
-                if "关系" in fact_type or "关系" in fact_content:
-                    matched_chars = [n for n in sorted_names if n in fact_content]
-                    if len(matched_chars) >= 2:
-                        add_character_relationship(
-                            character_id=char_name_map[matched_chars[0]]["id"],
-                            relation_type=fact_type,
-                            target_character_id=char_name_map[matched_chars[1]]["id"],
-                            target_name=matched_chars[1],
-                            description=f"第{chapter_index}章: {fact_content[:100]}"
-                        )
-
-                # 角色成长/升级
-                if "升级" in fact_type or "突破" in fact_type or "成长" in fact_type:
-                    for name in sorted_names:
-                        if name in fact_content:
-                            add_character_growth(
-                                character_id=char_name_map[name]["id"],
-                                stage=f"第{chapter_index}章",
-                                description=fact_content[:200]
-                            )
-                            break
-
-                # 角色能力/状态更新
-                if "能力" in fact_type or "技能" in fact_type or "实力" in fact_type:
-                    for name in sorted_names:
-                        if name in fact_content:
-                            existing_power = get_character_power(char_name_map[name]["id"])
-                            if existing_power:
-                                update_notes = existing_power.get("signature_skills", "")
-                                if fact_content[:50] not in update_notes:
-                                    new_skills = update_notes + f"; 第{chapter_index}章: {fact_content[:100]}"
-                                    update_character_card(char_name_map[name]["id"], ability_limit=new_skills[:500])
-                            break
-
-            # 角色卡变更后按 char_id 增量重建 RAG 片段（含已删除卡的旧片段清理）
-            if changed_char_ids:
+            for cu in character_updates:
                 try:
-                    from webnovel.services.webnovel_service import WebnovelService
-                    await WebnovelService().reindex_character_cards(project_id, list(changed_char_ids))
-                except Exception:
-                    pass  # 索引失败不阻断主流程
+                    utype = str(cu.get("type", "") or "").strip()
+                    if utype not in ("关系", "身份揭露", "成长", "能力"):
+                        logger.warning(f"[fact_recorder] character_updates 非法类型已跳过: {cu}")
+                        continue
+                    desc = str(cu.get("description", "") or "").strip()
 
+                    if utype == "关系":
+                        character = str(cu.get("character", "") or "").strip()
+                        target = str(cu.get("target", "") or "").strip()
+                        if character in char_name_map and target in char_name_map:
+                            add_character_relationship(
+                                character_id=char_name_map[character]["id"],
+                                relation_type=utype,
+                                target_character_id=char_name_map[target]["id"],
+                                target_name=target,
+                                description=f"第{chapter_index}章: {desc[:100]}"
+                            )
+                            changed.add(char_name_map[character]["id"])
+                            changed.add(char_name_map[target]["id"])
+                            logger.info(f"[fact_recorder] 角色关系：'{character}' ↔ '{target}'")
+                        else:
+                            logger.warning(f"[fact_recorder] 关系角色未匹配: {character!r}/{target!r}")
+                        continue
+
+                    if utype == "身份揭露":
+                        alias_name = str(cu.get("alias", "") or "").strip()
+                        real_name = self._extract_name(str(cu.get("real_name", "") or ""))
+                        affected = await self._handle_identity_reveal(
+                            project_id, char_name_map, alias_name, real_name, desc, chapter_index
+                        )
+                        changed.update(affected)
+                        continue
+
+                    character = str(cu.get("character", "") or "").strip()
+                    matched = (character if character in char_name_map
+                               else next((n for n in sorted_names if n in character), None))
+                    if matched is None:
+                        logger.warning(f"[fact_recorder] character_updates 角色未匹配: {character!r}")
+                        continue
+                    char_id = char_name_map[matched]["id"]
+
+                    if utype == "成长":
+                        add_character_growth(
+                            character_id=char_id, stage=f"第{chapter_index}章",
+                            description=desc[:200]
+                        )
+                        logger.info(f"[fact_recorder] 角色成长：'{matched}'")
+                    else:  # 能力：直接追加 ability_limit（不再依赖 power 记录存在）
+                        ability = str(cu.get("ability", "") or "").strip()
+                        card = char_name_map[matched]
+                        existing = str(card.get("ability_limit", "") or "").strip()
+                        piece = f"{ability}: {desc[:80]}" if ability else desc[:100]
+                        if piece not in existing:
+                            new_limit = (f"{existing}；第{chapter_index}章 {piece}"[:500]
+                                         if existing else f"第{chapter_index}章 {piece}"[:500])
+                            update_character_card(char_id, ability_limit=new_limit)
+                            card["ability_limit"] = new_limit
+                            logger.info(f"[fact_recorder] 角色能力更新：'{matched}' + {ability or desc[:20]}")
+                    changed.add(char_id)
+                except Exception as e:
+                    logger.warning(f"[fact_recorder] character_updates 处理失败: {cu} -> {e}")
         except Exception:
             pass
-
-    def _parse_identity_reveal(self, content: str) -> Tuple[str, str, str]:
-        """解析身份揭露事实内容，返回 (曾用名, 真名, 身份说明)。
-
-        主格式（prompt 约定）："曾用名 => 真名: 身份说明"；
-        兜底支持 "A原来是B"、"A正是B" 等口语化表述。
-        """
-        content = (content or "").strip()
-        if not content:
-            return "", "", ""
-
-        left, right = None, None
-        for sep in ("=>", "→", "＝>", ">"):
-            if sep in content:
-                left, right = content.split(sep, 1)
-                break
-
-        if left is None:
-            # 兜底：口语化表述，例如"神秘黑袍男人原来是李岩，总兵府护卫统领"
-            m = re.search(
-                r"([^，。；]{1,12}?)\s*(?:原来是|正是|其实是|真身是|真实身份是|本名是|就是)\s*([^，。；]{1,12})",
-                content
-            )
-            if not m:
-                return "", "", ""
-            alias = m.group(1).strip()
-            real_name = self._extract_name(m.group(2))
-            desc = content[m.end():].strip().lstrip("，。；：: ")
-            return alias, real_name, desc
-
-        # 标准格式：右侧为 "真名: 身份说明" 或仅 "真名"
-        parts = re.split(r"[：:]", right, 1)
-        real_name = self._extract_name(parts[0])
-        desc = parts[1].strip() if len(parts) > 1 else ""
-        return left.strip(), real_name, desc
+        return changed
 
     @staticmethod
     def _extract_name(text: str) -> str:
@@ -429,92 +683,87 @@ class FactRecorderExecutor(BaseExecutor):
         text = re.split(r"[（(，,。]", text, 1)[0]
         return text.strip()
 
-    def _parse_item_change(self, content: str) -> Tuple[str, str, str, str, int]:
-        """解析物品变化事实内容，返回 (角色名, 动作, 物品名, 说明, 数量)。
+    def _save_item_changes(
+        self, script_id: int, chapter_index: int,
+        item_changes: List[Dict[str, Any]]
+    ) -> set:
+        """落库结构化物品变化（item_changes 主通道）。
 
-        主格式（prompt 约定）："角色名 获得|失去 物品名: 变化说明"；
-        数量约定：说明中包含 "xN" 或 "×N" 表示数量（默认 1）。
-        动词集与 _GAIN_ACTIONS/_GIFT_ACTIONS 及 prompt 约定保持一致。
+        action=获得 → upsert_character_item 累加；失去 → mark_character_item_lost 扣减
+        （quantity=0 表示全部失去）。单条失败不阻断，记日志。
+        返回受影响 char_id 集合（供调用方 RAG 增量重建）。
         """
-        content = (content or "").strip()
-        if not content:
-            return "", "", "", "", 1
-        m = re.search(
-            r"([^，。；:：]{1,12}?)[，,、\s]*"
-            r"(获得|得到|收下|缴获|抢得|抢走|夺得|买下|买得|拾得|捡到|接过|"
-            r"失去|丢失|遗失|损毁|损坏|赠予|赠送|送给|交给|交出|被夺|被抢|丢弃)"
-            r"[，,、\s]*([^，。；:：]{1,20})\s*[：:]?\s*(.*)",
-            content
-        )
-        if not m:
-            return "", "", "", "", 1
-        note_raw = m.group(4).strip()
-        # 从说明中解析数量：匹配 xN、×N、XN、N个、N把、N枚 等
-        qty = 1
-        qty_m = re.search(r"[x×X](\d+)|(\d+)[个把枚枚块瓶壶柄支条颗粒袋份副套双箱桶包罐]|数量[：:]\s*(\d+)", note_raw)
-        if qty_m:
-            qty = int(qty_m.group(1) or qty_m.group(2) or qty_m.group(3) or 1)
-            # 从说明中移除数量标记，保留其余说明文字
-            note_raw = (note_raw[:qty_m.start()] + note_raw[qty_m.end():]).strip().strip("，,、:：")
-        return m.group(1).strip(), m.group(2), m.group(3).strip(), note_raw, qty
-
-    def _handle_item_change(
-        self, char_name_map: Dict[str, dict], sorted_names: List[str],
-        fact_content: str, chapter_index: int
-    ) -> List[int]:
-        """处理物品变化事实：获得→upsert 持有记录，失去→翻转状态。
-
-        返回受影响的 char_id 列表（供增量重建 RAG 索引）。
-        """
+        affected = set()
         try:
             from utils.logger import log_manager
             logger = log_manager.get_logger("fact_recorder")
 
-            char_raw, action, item_name, note, quantity = self._parse_item_change(fact_content)
-            if not action or not item_name:
-                return []
+            project = get_webnovel_project_by_script(script_id)
+            if not project:
+                return affected
+            all_chars = get_character_cards_by_project(project["id"])
+            char_name_map = {}
+            for c in all_chars:
+                name = c.get("name", "") or c.get("character_name", "")
+                if name:
+                    char_name_map[name] = c
+            sorted_names = sorted(char_name_map.keys(), key=len, reverse=True)
 
-            # 角色匹配：最长名字优先扫描事实全文（与其他事实分支策略一致）
-            matched_name = next((n for n in sorted_names if n in fact_content), None)
-            if matched_name is None:
-                return []
-            char_id = char_name_map[matched_name]["id"]
-
-            qty_note = f"x{quantity}" if quantity > 1 else ""
-            full_note = f"第{chapter_index}章{action}{qty_note}: {note[:100]}" if note else f"第{chapter_index}章{action}{qty_note}"
-
-            if action in _GAIN_ACTIONS:
-                upsert_character_item(
-                    char_id, item_name,
-                    source=note[:200],
-                    chapter=chapter_index,
-                    note=full_note,
-                    quantity=quantity,
-                )
-                logger.info(f"[fact_recorder] 角色 '{matched_name}' 获得物品 '{item_name}' x{quantity}")
-            else:
-                ok = mark_character_item_lost(
-                    char_id, item_name,
-                    chapter=chapter_index, note=f"第{chapter_index}章: {fact_content[:100]}",
-                    quantity=quantity,
-                )
-                if not ok:
-                    # 角色没有该物品却"失去"：不一致信号，记日志不阻断，不凭空建记录
-                    logger.warning(
-                        f"[fact_recorder] 角色 '{matched_name}' 失去未持有物品 '{item_name}'"
-                        f"（第{chapter_index}章），疑似正文不一致"
-                    )
-                    return []
-                logger.info(f"[fact_recorder] 角色 '{matched_name}' 失去物品 '{item_name}' x{quantity}")
-            return [char_id]
+            for ic in item_changes:
+                try:
+                    character = str(ic.get("character", "") or "").strip()
+                    action = str(ic.get("action", "") or "").strip()
+                    item = str(ic.get("item", "") or "").strip()
+                    note = str(ic.get("note", "") or "").strip()
+                    qty = ic.get("quantity")
+                    if qty is None or (isinstance(qty, str) and not qty.strip()):
+                        qty = 1  # 缺失默认 1（绝不默认全部失去）
+                    else:
+                        try:
+                            qty = int(float(qty))
+                        except (TypeError, ValueError):
+                            qty = 1
+                    if action not in ("获得", "失去") or not character or not item:
+                        logger.warning(f"[fact_recorder] item_changes 非法项已跳过: {ic}")
+                        continue
+                    matched_name = (character if character in char_name_map
+                                    else next((n for n in sorted_names if n in character), None))
+                    if matched_name is None:
+                        logger.warning(f"[fact_recorder] item_changes 角色未匹配: {character!r}")
+                        continue
+                    char_id = char_name_map[matched_name]["id"]
+                    if action == "获得":
+                        upsert_character_item(
+                            char_id, item, source=note[:200], chapter=chapter_index,
+                            note=f"第{chapter_index}章获得: {note[:100]}",
+                            quantity=max(qty, 1),
+                        )
+                        logger.info(f"[fact_recorder] 角色 '{matched_name}' 获得物品 '{item}' x{max(qty, 1)}")
+                    else:
+                        ok = mark_character_item_lost(
+                            char_id, item, chapter=chapter_index,
+                            note=f"第{chapter_index}章: {note[:100]}",
+                            quantity=max(qty, 0),
+                        )
+                        if not ok:
+                            logger.warning(
+                                f"[fact_recorder] 角色 '{matched_name}' 失去未持有物品 '{item}'"
+                                f"（第{chapter_index}章），疑似正文不一致"
+                            )
+                            continue
+                        logger.info(f"[fact_recorder] 角色 '{matched_name}' 失去物品 '{item}' x{qty}")
+                    affected.add(char_id)
+                except Exception as e:
+                    logger.warning(f"[fact_recorder] item_changes 处理失败: {ic} -> {e}")
         except Exception:
-            return []
+            pass
+        return affected
 
     async def _handle_identity_reveal(
         self, project_id: int, char_name_map: Dict[str, dict],
-        fact_content: str, chapter_index: int
+        alias_name: str, real_name: str, identity_desc: str, chapter_index: int
     ) -> List[int]:
-        """处理身份揭露事实：真名卡已存在则合并并删除旧卡，否则将化名卡改名。
+        """处理身份揭露（结构化参数）：真名卡已存在则合并并删除旧卡，否则将化名卡改名。
 
         返回受影响的 char_id 列表（含已删除卡，供增量重建 RAG 索引时清理旧片段）。
         """
@@ -522,7 +771,6 @@ class FactRecorderExecutor(BaseExecutor):
             from utils.logger import log_manager
             logger = log_manager.get_logger("fact_recorder")
 
-            alias_name, real_name, identity_desc = self._parse_identity_reveal(fact_content)
             if not alias_name or not real_name or alias_name == real_name:
                 return []
             if len(real_name) > 10:

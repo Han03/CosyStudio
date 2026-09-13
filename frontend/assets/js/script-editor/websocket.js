@@ -21,6 +21,11 @@ function connectWebSocket() {
         if (state.scriptData && state.scriptData.status === 'running') {
             loadCharacters();
         }
+        // 重连后恢复/关闭创作流程进度条：任务已完成或失败时兜底关闭，
+        // 任务仍在运行时恢复节点渲染，避免 WS 断连期间消息丢失导致进度条残留
+        if (typeof restoreWorkflowProgressBar === 'function') {
+            restoreWorkflowProgressBar();
+        }
     };
     state.ws.onmessage = (event) => {
         try {

@@ -1,6 +1,7 @@
 from .chapter_splitter_executor import ChapterSplitterExecutor
 from .timeline_fixer_executor import TimelineFixerExecutor
 from .setting_recorder_executor import SettingRecorderExecutor
+from .character_state_recorder_executor import CharacterStateRecorderExecutor
 from .context_builder_executor import ContextBuilderExecutor
 from .draft_generator_executor import DraftGeneratorExecutor
 from .draft_reviewer_executor import DraftReviewerExecutor
@@ -26,6 +27,7 @@ EXECUTORS = [
     DraftGeneratorExecutor,
     DraftReviewerExecutor,
     DraftPolisherExecutor,
+    CharacterStateRecorderExecutor,
     FactRecorderExecutor,
     TaskArchiverExecutor,
     InitExecutor,

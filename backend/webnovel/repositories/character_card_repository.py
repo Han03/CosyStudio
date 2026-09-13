@@ -302,34 +302,38 @@ def mark_character_item_lost(
     with _lock:
         conn = _get_conn()
         cursor = conn.execute(
-            "SELECT id, item_name, quantity FROM webnovel_character_item WHERE character_id = ?",
+            "SELECT id, item_name, quantity, change_note FROM webnovel_character_item WHERE character_id = ?",
             (safe_int(character_id),)
         )
         rows = cursor.fetchall()
         target_id = None
         target_qty = 1
+        target_note = ""
         for row in rows:
             if row["item_name"] == item_name:
                 target_id = row["id"]
                 target_qty = safe_int(row["quantity"])
+                target_note = safe_str(row["change_note"])
                 break
         if target_id is None:
             for row in rows:
                 if item_name in row["item_name"] or row["item_name"] in item_name:
                     target_id = row["id"]
                     target_qty = safe_int(row["quantity"])
+                    target_note = safe_str(row["change_note"])
                     break
         if target_id is None:
             return False
         # 数量扣减逻辑
         if quantity > 0 and quantity < target_qty:
-            # 部分失去：仅扣减数量
+            # 部分失去：仅扣减数量（change_note 追加流水，保留获得记录可追溯）
             remaining = target_qty - quantity
+            merged_note = f"{target_note} | {note}" if target_note else note
             conn.execute(
                 """UPDATE webnovel_character_item
                    SET quantity = ?, change_note = ?, updated_at = ?
                    WHERE id = ?""",
-                (remaining, safe_str(note), now, target_id)
+                (remaining, safe_str(merged_note), now, target_id)
             )
         else:
             # 全部失去：数量归零，记录失去章节
