@@ -19,6 +19,11 @@ from .character_card_repository import (
     get_character_items, get_character_items_by_project,
     get_active_character_ids
 )
+from .character_state_repository import (
+    upsert_character_state,
+    get_character_states_by_chapter,
+    get_character_states_before_chapter
+)
 from .character_group_repository import (
     add_character_group, get_character_group, get_character_group_by_project,
     add_character_group_member, get_character_group_members,

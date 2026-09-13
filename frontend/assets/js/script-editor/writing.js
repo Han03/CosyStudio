@@ -97,7 +97,13 @@ async function restoreWorkflowProgressBar() {
         if (!data.success || !data.task) return;
 
         const task = data.task;
-        if (task.status !== 'running') return;
+        if (task.status !== 'running') {
+            // 任务已终态（完成/失败/取消）且进度条仍显示时兜底关闭，
+            // 覆盖 WS 断连导致 completed 消息未到达的场景
+            const bar = document.getElementById('workflowProgressBar');
+            if (bar) bar.style.display = 'none';
+            return;
+        }
 
         // 设置 taskId，使后续 WebSocket 的 handleContinueTaskUpdate 能正常匹配
         state.continueTaskId = task.id;
@@ -407,6 +413,7 @@ function updateWorkflowProgress(stepName, taskStatus) {
         '时间线修补':       { num: 1,  label: '准备' },
         '设定记录':         { num: 1,  label: '准备' },
         '上下文构建':       { num: 1,  label: '准备' },
+        '上下文盘点':       { num: 1,  label: '准备' },
         // 节点2: 剧情（剧情生成和审查）
         '剧情生成':         { num: 2,  label: '剧情' },
         '剧情审查':         { num: 2,  label: '剧情' },
@@ -416,9 +423,7 @@ function updateWorkflowProgress(stepName, taskStatus) {
         '草稿审查':         { num: 4,  label: '审查' },
         // 节点5: 润色
         '草稿润色':         { num: 5,  label: '润色' },
-        // 节点6: 归档
-        '任务归档':         { num: 6,  label: '归档' }
-    };
+};
 
     const cfg = stepConfig[stepName];
     const stepNum = cfg ? cfg.num : undefined;

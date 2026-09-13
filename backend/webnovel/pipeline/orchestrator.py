@@ -24,7 +24,6 @@ class PipelineOrchestrator:
         "draft_generator",
         "draft_reviewer",
         "draft_polisher",
-        "task_archiver",
     ]
 
     WORKFLOW_MODELS = {
@@ -37,6 +36,7 @@ class PipelineOrchestrator:
             "draft_generator",
             "draft_reviewer",
             "draft_polisher",
+            "character_state_recorder",
             "setting_recorder",
         ],
         "write_fast": [
@@ -82,12 +82,35 @@ class PipelineOrchestrator:
             "task_id": task_id,
             "start_time": datetime.now().isoformat(),
             "step_results": {},
+            "step_selections": {},
+        }
+
+    def _normalize_word_config(self):
+        """单章目标字数归一化：chapter_words（成品目标，默认 4000）→ 各节点区间。
+
+        写入 self._context["word_config"]，供 draft_generator / draft_reviewer(修改) /
+        draft_polisher 读取。默认值=现状量级（成品 3000-5000 / 白描 1200-1800）。
+        """
+        raw = int(self._context.get("chapter_words", 0) or 0)
+        if raw <= 0:
+            raw = 4000
+        polish_min = round(raw * 0.8)
+        polish_max = round(raw * 1.2)
+        draft_min = round(polish_min * 0.4)
+        draft_max = round(polish_max * 0.4)
+        self._context["word_config"] = {
+            "chapter_words": raw,
+            "polish_word_min": polish_min,
+            "polish_word_max": polish_max,
+            "draft_word_min": draft_min,
+            "draft_word_max": draft_max,
         }
 
     async def execute_workflow(self, mode: str, context_data: Dict[str, Any] = None, user_prompt: str = "", enable_polish: bool = True) -> Dict[str, Any]:
         """根据模式执行对应工作流。"""
         if context_data:
             self._context.update(context_data)
+        self._normalize_word_config()
 
         steps = list(self.WORKFLOW_MODELS.get(mode, self.DEFAULT_STEPS))
         if not enable_polish and "draft_polisher" in steps:

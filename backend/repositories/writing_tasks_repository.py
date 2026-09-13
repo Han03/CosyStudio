@@ -122,3 +122,40 @@ def get_active_writing_tasks() -> List[dict]:
             "SELECT * FROM script_writing_tasks WHERE status IN ('pending', 'running') ORDER BY created_at DESC"
         )
         return [dict(row) for row in cursor.fetchall()]
+
+
+def add_pipeline_log(script_id: int, chapter_index: int, task_id: int,
+                     step_name: str, step_result: str = "",
+                     success: bool = True, error_message: str = "",
+                     duration_ms: int = 0) -> dict:
+    """写入流程执行日志到 script_writing_pipeline_logs。
+
+    由 task_archiver 在归档阶段逐条调用（记录创作阶段各步骤的执行结果）。
+    表无 created_at 默认值，必须显式写入时间戳。
+    """
+    with _lock:
+        conn = _get_conn()
+        now = time.time()
+        cursor = conn.execute(
+            """
+            INSERT INTO script_writing_pipeline_logs
+                (script_id, chapter_index, task_id, step_name, step_result,
+                 success, error_message, duration_ms, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (script_id, chapter_index, task_id, step_name, step_result,
+             int(1 if success else 0), error_message, duration_ms, now)
+        )
+        conn.commit()
+        return {
+            "id": cursor.lastrowid,
+            "script_id": script_id,
+            "chapter_index": chapter_index,
+            "task_id": task_id,
+            "step_name": step_name,
+            "step_result": step_result,
+            "success": bool(success),
+            "error_message": error_message,
+            "duration_ms": duration_ms,
+            "created_at": now,
+        }

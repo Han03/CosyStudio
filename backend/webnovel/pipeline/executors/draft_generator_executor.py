@@ -1,8 +1,7 @@
 """执行器7：草稿生成器（剧情创作）。
 
 基于章节剧情生成器输出的详细剧情列表创作白描草稿。
-prompt 仅包含写作要求、输出格式和剧情列表，大幅精简上下文。
-草稿定位为白描骨架稿（便于后续多轮审查），文笔细节由润色阶段完成。
+上下文通过 ContextAnalyzer 按需组装，替代原有全量加载策略。
 
 输出要求：
 1. 白描草稿内容（1200-1800字），只叙述事件、行为和关键对话
@@ -13,6 +12,7 @@ prompt 仅包含写作要求、输出格式和剧情列表，大幅精简上下�
 
 from typing import Dict, Any
 from ..base_executor import BaseExecutor, ExecutorResult
+from ..context_analyzer import ContextAnalyzer
 from core.model_executor import get_model_executor
 from utils.llm_json_parser import parse_llm_json
 from webnovel.repositories import get_webnovel_project_by_script
@@ -44,6 +44,29 @@ class DraftGeneratorExecutor(BaseExecutor):
 
             project_id = project["id"]
 
+            # ── 通过 ContextAnalyzer 按需组装上下文 ──
+            analyzer = ContextAnalyzer(script_id, chapter_index)
+            step_ctx = await analyzer.analyze_and_assemble(
+                step_name="draft_generator",
+                inventory=context.get("context_inventory", {}),
+                structural_data=context.get("structural_data", {}),
+                script_id=script_id,
+                project_id=project_id,
+                prev_selections=context.get("step_selections"),
+            )
+
+            # 记录本步骤的选择结果
+            if "step_selections" not in context:
+                context["step_selections"] = {}
+            selection = step_ctx.get("_selection", {})
+            context["step_selections"]["draft_generator"] = {
+                "character_ids": selection.get("character_ids", []),
+                "character_names": [
+                    c.get("character_name", "") for c in step_ctx.get("characters", [])
+                ],
+                "consistency_notes": selection.get("consistency_notes", []),
+            }
+
             # ── 构建剧情列表文本 ──
             chapter_plot = context.get("chapter_plot", [])
             plot_list_text = self._format_plot_list(chapter_plot, chapter_index)
@@ -51,56 +74,47 @@ class DraftGeneratorExecutor(BaseExecutor):
             # ── 构建动态 section ──
             continue_prev = "开篇直接承接上一章结尾，不要有剧情中断感觉;" if chapter_index > 1 else ""
 
-            # 前文回顾：上一章由 context_builder 整章注入（已限长），不再截断；
-            # 更早章节为结构化摘要（自带“第N章摘要”标题）或开头截取回退。
-            writing_context = context.get("writing_context", {})
-            previous_chapters_text = ""
-            if writing_context.get("previous_chapters"):
-                pc_parts = ["\n\n【前文回顾】"]
-                for prev in writing_context["previous_chapters"]:
-                    if prev.get("is_latest"):
-                        pc_parts.append(f"第{prev['chapter_index']}章（上一章，请仔细承接）:\n{prev['content']}")
-                    elif prev.get("is_summary"):
-                        pc_parts.append(prev["content"])
-                    else:
-                        pc_parts.append(f"第{prev['chapter_index']}章: {prev['content'][:500]}")
-                previous_chapters_text = "\n".join(pc_parts)
+            # 前文回顾（来自 step_ctx）
+            previous_chapters_text = self._format_previous_chapters(
+                step_ctx.get("previous_chapters", []))
 
             # 用户要求
             user_prompt_section = ""
             if user_prompt:
                 user_prompt_section = f"\n\n【用户要求】\n{user_prompt}"
 
-            # 角色速写（本章剧情涉及的角色）
-            character_info = self._build_character_info(chapter_plot, writing_context)
+            # 角色速写（来自 step_ctx 精选的角色）
+            character_info = self._build_character_info(step_ctx.get("characters", []))
 
-            # RAG 语义检索上下文（来自 context_builder 的多轮查询结果）
-            rag_context_section = ""
-            rag_results = writing_context.get("rag_context", [])
-            if rag_results:
-                rag_parts = []
-                for r in rag_results[:5]:
-                    if isinstance(r, str):
-                        rag_parts.append(r[:200])
-                    elif isinstance(r, dict):
-                        content = r.get("content", "")[:200]
-                        chunk_type = r.get("chunk_type", "")
-                        ch_num = r.get("chapter_number", 0)
-                        if chunk_type and ch_num:
-                            rag_parts.append(f"[第{ch_num}章/{chunk_type}] {content}")
-                        else:
-                            rag_parts.append(content)
-                rag_context_section = "\n".join(rag_parts)
+            # RAG 检索结果（来自 step_ctx）
+            rag_context_section = self._format_rag_results(
+                step_ctx.get("rag_results", []))
+
+            # 一致性约束
+            consistency_notes = step_ctx.get("consistency_notes", [])
+            consistency_text = "\n".join(f"- {note}" for note in consistency_notes) if consistency_notes else ""
+
+            # 上章末角色状态 + 不可提前揭示的伏笔
+            character_states_text = self._format_character_states(
+                step_ctx.get("last_character_states", []))
+            undisclosed_text = self._format_undisclosed(
+                step_ctx.get("undisclosed_foreshadows", []))
 
             # 从 .md 文件加载 prompt 模板
             prompt_data = self._load_prompt("draft_generate")
+            word_cfg = (step_ctx.get("word_config") or {})
             full_prompt = prompt_data["user_prompt"].format(
                 continue_prev=continue_prev,
                 plot_list=plot_list_text,
                 character_info=character_info,
                 previous_chapters=previous_chapters_text,
+                character_states_text=character_states_text,
+                undisclosed_text=undisclosed_text,
                 user_prompt_section=user_prompt_section,
                 rag_context=rag_context_section,
+                consistency_notes=consistency_text,
+                draft_word_min=int(word_cfg.get("draft_word_min", 1200)),
+                draft_word_max=int(word_cfg.get("draft_word_max", 1800)),
             )
             system_prompt = prompt_data["system_prompt"] or "你是一位畅销网文作家，擅长创作精彩的网络小说章节"
 
@@ -109,7 +123,7 @@ class DraftGeneratorExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=full_prompt,
                 system_prompt=system_prompt,
-                max_tokens=3500,
+                max_tokens=max(3500, int((step_ctx.get("word_config") or {}).get("draft_word_max", 1800)) * 3),
                 script_id=script_id,
                 project_id=project_id,
                 executor_name=self.step_name,
@@ -160,6 +174,8 @@ class DraftGeneratorExecutor(BaseExecutor):
                 step_summary="草稿生成执行失败"
             )
 
+    # ── 格式化方法 ──────────────────────────────────────────
+
     def _format_plot_list(self, plot_list: list, chapter_index: int) -> str:
         """将剧情列表格式化为可读文本。"""
         if not plot_list:
@@ -189,37 +205,18 @@ class DraftGeneratorExecutor(BaseExecutor):
 
         return "\n\n".join(lines)
 
-    def _build_character_info(self, chapter_plot: list, writing_context: dict) -> str:
-        """构建本章涉及角色的速写文本。"""
-        # 从剧情列表中提取涉及的角色名
-        plot_char_names = set()
-        for plot in chapter_plot:
-            if isinstance(plot, dict):
-                chars = plot.get("characters", [])
-                if isinstance(chars, list):
-                    for c in chars:
-                        if isinstance(c, str) and c.strip():
-                            plot_char_names.add(c.strip())
-
-        if not plot_char_names:
+    def _build_character_info(self, characters: list) -> str:
+        """构建精选角色的速写文本。"""
+        if not characters:
             return ""
 
-        # 匹配 writing_context 中的角色数据
-        characters = writing_context.get("characters", [])
-        matched = []
+        lines = ["【角色速写】"]
         for char in characters:
             if not isinstance(char, dict):
                 continue
             name = char.get("character_name", "")
-            if name and name in plot_char_names:
-                matched.append(char)
-
-        if not matched:
-            return ""
-
-        lines = ["【角色速写】"]
-        for char in matched:
-            name = char.get("character_name", "")
+            if not name:
+                continue
             parts = [name]
             identity = char.get("identity", "")
             if identity:
@@ -233,7 +230,7 @@ class DraftGeneratorExecutor(BaseExecutor):
             goals = char.get("goals", "")
             if goals:
                 parts.append(f"目标:{goals}")
-            # 持有物品清单（事实记录阶段维护，无记录时明示"无"，杜绝凭空掏出物品）
+            # 持有物品清单
             items = char.get("items", []) or []
             item_strs = []
             for it in items:
@@ -250,3 +247,35 @@ class DraftGeneratorExecutor(BaseExecutor):
         )
 
         return "\n".join(lines)
+
+    def _format_previous_chapters(self, previous_chapters: list) -> str:
+        """格式化前文回顾文本。"""
+        if not previous_chapters:
+            return ""
+        pc_parts = ["\n\n【前文回顾】"]
+        for prev in previous_chapters:
+            if prev.get("is_latest"):
+                pc_parts.append(f"第{prev['chapter_index']}章（上一章，请仔细承接）:\n{prev['content']}")
+            elif prev.get("is_summary"):
+                pc_parts.append(prev["content"])
+            else:
+                pc_parts.append(f"第{prev['chapter_index']}章: {prev['content'][:500]}")
+        return "\n".join(pc_parts)
+
+    def _format_rag_results(self, rag_results: list) -> str:
+        """格式化 RAG 检索结果。"""
+        if not rag_results:
+            return ""
+        rag_parts = []
+        for r in rag_results[:5]:
+            if isinstance(r, str):
+                rag_parts.append(r[:200])
+            elif isinstance(r, dict):
+                content = r.get("content", "")[:200]
+                chunk_type = r.get("chunk_type", "")
+                ch_num = r.get("chapter_number", 0)
+                if chunk_type and ch_num:
+                    rag_parts.append(f"[第{ch_num}章/{chunk_type}] {content}")
+                else:
+                    rag_parts.append(content)
+        return "\n".join(rag_parts)

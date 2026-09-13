@@ -683,6 +683,7 @@ def update_webnovel_chapter_plan(script_id: int, plan_id: int, data: dict = Body
 class WriteRequest(BaseModel):
     chapter_index: int = 1
     mode: str = "write"
+    chapter_words: int = 0
 
 
 @router.post("/write")
@@ -699,18 +700,23 @@ async def webnovel_write(script_id: int, data: WriteRequest):
     task = add_writing_task(script_id, data.chapter_index, "write")
     task_id = task["id"]
 
-    asyncio.create_task(_execute_write_workflow(task_id, script_id, data.chapter_index, data.mode))
+    asyncio.create_task(_execute_write_workflow(
+        task_id, script_id, data.chapter_index, data.mode, data.chapter_words))
 
     return {"success": True, "task_id": task_id, "message": f"第{data.chapter_index}章写作任务已创建"}
 
 
-async def _execute_write_workflow(task_id: int, script_id: int, chapter_index: int, mode: str):
+async def _execute_write_workflow(task_id: int, script_id: int, chapter_index: int, mode: str,
+                                   chapter_words: int = 0):
     """执行写作工作流。"""
     try:
         update_writing_task(task_id, status="running", progress=10, progress_message=f"开始第{chapter_index}章写作...")
 
         orchestrator = PipelineOrchestrator(script_id, chapter_index, task_id)
-        result = await orchestrator.execute_workflow(mode, {"chapter_index": chapter_index})
+        result = await orchestrator.execute_workflow(mode, {
+            "chapter_index": chapter_index,
+            "chapter_words": chapter_words,
+        })
 
         if result["success"]:
             ctx = result.get("context", {})

@@ -511,6 +511,25 @@ def _init_schema(conn: sqlite3.Connection):
 
         CREATE INDEX IF NOT EXISTS idx_webnovel_char_power ON webnovel_character_power(character_id);
 
+        CREATE TABLE IF NOT EXISTS webnovel_character_state (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            character_id INTEGER NOT NULL,
+            character_name TEXT DEFAULT '',
+            chapter_number INTEGER DEFAULT 0,
+            location TEXT DEFAULT '',
+            state_summary TEXT DEFAULT '',
+            emotion TEXT DEFAULT '',
+            knowledge TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at REAL,
+            updated_at REAL,
+            UNIQUE (character_id, chapter_number)
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_webnovel_char_state ON webnovel_character_state(character_id, chapter_number);
+        CREATE INDEX IF NOT EXISTS idx_webnovel_char_state_chapter ON webnovel_character_state(project_id, chapter_number);
+
         CREATE TABLE IF NOT EXISTS webnovel_character_item (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             character_id INTEGER NOT NULL,

@@ -7,7 +7,7 @@ user_prompt: |
   【写作要求】
   {user_prompt_section}
   用朴素直白的语言叙述事件经过、角色行为和关键对话;
-  字数1200-1800字;
+  字数{draft_word_min}-{draft_word_max}字;
   每个剧情点独占一段，每段只写1-3句（40-80字），严禁将多个剧情点塞入同一段;
   对话单独成段，每句对话独占一行;
   禁止出现超过100字的密集段落;
@@ -34,8 +34,16 @@ user_prompt: |
   【本章剧情列表】
   {plot_list}
   {character_info}{previous_chapters}
+  【上章末角色状态（确保本章状态延续）】
+  {character_states_text}
+
+  【不可提前揭示的伏笔】
+  {undisclosed_text}
   【历史参考（来自 RAG 语义检索，包含相关历史章节摘要、角色状态等，确保与已有内容一致）】
   {rag_context}
+
+  【一致性约束】
+  {consistency_notes}
 
   请输出章节草稿：
 ---

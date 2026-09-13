@@ -793,110 +793,6 @@ class WebnovelService:
         except Exception as e:
             return {"success": False, "error_message": str(e)}
 
-    async def _generate_writing_brief(self, context: Dict[str, Any], user_prompt: str = "") -> str:
-        """生成写作任务书。"""
-        prompt_parts = [
-            "你是一位拥有10年经验的顶级网文编辑，请根据以下上下文生成一份专业的写作任务书：\n",
-            "\n【世界观设定】",
-        ]
-        for setting in context.get("world_settings", []):
-            prompt_parts.append(f"- {setting['name']}: {setting['content'][:300]}")
-
-        prompt_parts.append("\n【角色设定】")
-        for char in context.get("characters", []):
-            personality = char.get("personality", "")
-            background = char.get("background", "")
-            voice_style = char.get("voice_style", "")
-            prompt_parts.append(f"- {char['role']}:")
-            if personality:
-                prompt_parts.append(f"  * 性格: {personality[:100]}")
-            if background:
-                prompt_parts.append(f"  * 背景: {background[:100]}")
-            if voice_style:
-                prompt_parts.append(f"  * 说话风格: {voice_style[:50]}")
-            prompt_parts.append(f"  * 标签: {char.get('tags', '')[:50]}")
-
-        prompt_parts.append("\n【前文内容】")
-        for prev in context.get("previous_chapters", []):
-            prompt_parts.append(f"第{prev['chapter_index']}章:\n{prev['content']}")
-
-        if context.get("chapter_plans"):
-            prompt_parts.append("\n【章节规划】")
-            for plan in context["chapter_plans"]:
-                prompt_parts.append(f"- 标题: {plan['chapter_title']}")
-                prompt_parts.append(f"- 概要: {plan['summary']}")
-                prompt_parts.append(f"- 关键事件: {plan['key_events']}")
-                prompt_parts.append(f"- 预期爽点: {plan.get('expected_cool_points', '')}")
-
-        prompt_parts.append(f"\n【当前内容】\n{context.get('current_content', '')}")
-
-        if user_prompt:
-            prompt_parts.append(f"\n【用户要求】\n{user_prompt}")
-
-        prompt_parts.append("\n\n请生成一份详细的写作任务书，包括：")
-        prompt_parts.append("1. 本章目标：明确本章要达成的叙事目标")
-        prompt_parts.append("2. 情节推进：详细列出需要发生的事件及顺序")
-        prompt_parts.append("3. 人物关系：需要展现或发展的人物关系")
-        prompt_parts.append("4. 风格要求：语言风格、情感基调、节奏控制")
-        prompt_parts.append("5. 爽点设计：本章需要设计的爽点（打脸、逆袭、升级等）")
-        prompt_parts.append("6. 字数要求：建议字数（3000-5000字）")
-        prompt_parts.append("7. 禁忌事项：需要避免的情节或描写")
-
-        full_prompt = "\n".join(prompt_parts)
-
-        # 🔴 提取 script_id / project_id 传递给统一日志入口
-        _sid = int(context.get("script_id", 0) or 0)
-        _pid = int(context.get("project_id", 0) or 0)
-
-        result = await self._model_executor.execute_text_chat(
-            prompt=full_prompt,
-            system_prompt="你是一位拥有10年经验的顶级网文编辑，精通各种题材的小说创作，擅长设计爽点和控制节奏",
-            max_tokens=1500,
-            script_id=_sid,
-            project_id=_pid,
-            executor_name="webnovel_service",
-            prompt_name="generate_writing_brief",
-        )
-        content = result.get("content", "") if result else ""
-        return content if content.strip() else ""
-
-    async def _generate_draft(self, writing_brief: str, script_id: int = 0, project_id: int = 0) -> str:
-        """根据写作任务书起草正文。"""
-        prompt = f"""你是一位畅销网文作家，拥有多部百万字完本作品，请根据以下写作任务书创作章节内容：
-
-【写作任务书】
-{writing_brief}
-
-【写作要求】
-1. 开篇要有吸引力，迅速抓住读者注意力（黄金三章法则）
-2. 每500字左右设置一个小高潮或悬念，保持阅读节奏
-3. 对话要符合人物性格，有潜台词，避免直白叙述
-4. 场景描写要有画面感，调动读者的五感
-5. 适当使用短句和感叹号增强节奏感
-6. 结尾要有钩子，引导读者追读下一章
-7. 字数控制在3000-5000字
-
-【网文技巧】
-- 打脸情节：铺垫要充分，反击要爽快
-- 升级体系：明确等级差距，展示实力提升
-- 情感描写：细腻真实，引发共鸣
-- 节奏控制：张弛有度，快慢结合
-
-请直接输出正文内容，不要包含标题和额外说明。
-"""
-
-        result = await self._model_executor.execute_text_chat(
-            prompt=prompt,
-            system_prompt="你是一位畅销网文作家，擅长设计爽点、控制节奏，语言风格生动有力，情节紧凑吸引人",
-            max_tokens=5000,
-            script_id=int(script_id or 0),
-            project_id=int(project_id or 0),
-            executor_name="webnovel_service",
-            prompt_name="generate_draft",
-        )
-        content = result.get("content", "") if result else ""
-        return content if content.strip() else ""
-
     async def _polish_chapter(self, draft: str, review_result: List[Dict[str, Any]], script_id: int = 0, project_id: int = 0) -> str:
         """根据审查结果润色章节。"""
         issues = []
@@ -1298,13 +1194,18 @@ class WebnovelService:
             project = get_webnovel_project_by_script(script_id)
             project_id = project["id"] if project else 0
 
-            # 构建 writing_context 供事实记录使用
-            writing_context = self._build_writing_context_for_apply(script_id)
+            # 构建 context_inventory 供事实记录使用
+            context_inventory = self._build_context_inventory_for_apply(script_id)
 
             # 后处理步骤（事实记录 → 伏笔爽点提取 → 结尾钩子 → RAG 索引）
             await self._run_apply_post_process(
                 apply_task_id, script_id, chapter_index, project_id,
-                filtered_content, writing_context, start_time,
+                filtered_content, context_inventory, start_time,
+            )
+
+            # 任务归档（写流程 execution_log → pipeline_log；角色状态已并入 fact_recorder）
+            await self._run_apply_archive(
+                apply_task_id, script_id, chapter_index, source_task,
             )
 
             # 完成
@@ -1342,10 +1243,45 @@ class WebnovelService:
                 }
             )
 
+    async def _run_apply_archive(
+        self, apply_task_id: int, script_id: int, chapter_index: int,
+        source_task: Dict[str, Any],
+    ):
+        """应用后置处理：任务归档（写流程 execution_log → pipeline_log）。
+
+        角色状态记录已并入 fact_recorder 主提取（基于应用后最终内容）。
+        归档失败仅记日志，不阻断应用任务完成。
+        """
+        try:
+            from webnovel.pipeline.executors.task_archiver_executor import TaskArchiverExecutor
+            execution_log = []
+            ctx_raw = source_task.get("context") or ""
+            if ctx_raw:
+                try:
+                    ctx_data = json.loads(ctx_raw)
+                    execution_log = ctx_data.get("execution_log") or []
+                except Exception:
+                    execution_log = []
+            archiver = TaskArchiverExecutor(
+                script_id, chapter_index, source_task.get("id") or apply_task_id)
+            arch_result = await archiver.execute({"execution_log": execution_log})
+            self._logger.info(f"[WebnovelService] 应用后任务归档完成: {arch_result.step_summary}")
+        except Exception as e:
+            self._logger.warning(f"[WebnovelService] 应用后任务归档失败（不阻断）: {e}")
+        await ws_broadcast_manager.broadcast_apply_task_update(
+            script_id, {
+                "task_id": apply_task_id,
+                "chapter_index": chapter_index,
+                "phase": "processing",
+                "message": "任务归档完成",
+            }
+        )
+
+
     async def _run_apply_post_process(self, apply_task_id: int, script_id: int,
                                        chapter_index: int, project_id: int,
                                        filtered_content: str,
-                                       writing_context: Dict[str, Any],
+                                       context_inventory: Dict[str, Any],
                                        start_time: float):
         """执行应用任务的后处理步骤（并行优化版）。
 
@@ -1357,58 +1293,33 @@ class WebnovelService:
         供 _execute_apply_workflow 和 retry_post_process 复用。
         """
         from webnovel.pipeline.executors.fact_recorder_executor import FactRecorderExecutor
-        from webnovel.pipeline.executors.foreshadow_cool_point_extractor_executor import (
-            ForeshadowCoolPointExtractorExecutor,
-        )
 
-        # ── Phase 1: 事实记录 + 伏笔爽点提取 + 结尾钩子 并行 ──
+        # ── Phase 1: 事实提取（事实/伏笔爽点/结尾钩子/角色状态 全部归口 fact_recorder）──
         update_writing_task(apply_task_id, progress=40,
-                            progress_message="正在执行后处理（事实记录/伏笔提取/钩子提取）...",
+                            progress_message="正在执行事实提取（事实/伏笔/爽点/钩子/角色状态）...",
                             current_step="后处理")
         await ws_broadcast_manager.broadcast_apply_task_update(
             script_id, {
                 "task_id": apply_task_id,
                 "chapter_index": chapter_index,
                 "phase": "processing",
-                "message": "正在执行后处理...",
+                "message": "正在执行事实提取...",
             }
         )
 
-        # 创建并行任务
+        # 事实提取（fact_recorder 内部：主提取1次 + 伏笔回收检查1次 + 新角色建卡1次）
         fact_executor = FactRecorderExecutor(script_id, chapter_index, apply_task_id)
-        fact_task = asyncio.create_task(fact_executor.execute({
+        fact_result = await fact_executor.execute({
             "polished_content": filtered_content,
-            "writing_context": writing_context,
-        }))
-
-        foreshadow_executor = ForeshadowCoolPointExtractorExecutor(script_id, chapter_index, apply_task_id)
-        foreshadow_task = asyncio.create_task(foreshadow_executor.execute({
-            "polished_content": filtered_content,
-        }))
-
-        hook_task = None
-        if project_id:
-            hook_task = asyncio.create_task(
-                self._extract_and_save_hook(project_id, chapter_index, filtered_content)
-            )
-
-        # 等待事实记录完成
-        fact_result = await fact_task
+            "context_inventory": context_inventory,
+        })
         if fact_result.success:
-            self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id}: 事实记录完成 - {fact_result.step_summary}")
+            self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id}: 事实提取完成 - {fact_result.step_summary}")
         else:
-            self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 事实记录失败 - {fact_result.error_message}")
+            self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 事实提取失败 - {fact_result.error_message}")
 
-        # 等待伏笔爽点提取完成（内部已包含伏笔回收检查）
-        foreshadow_result = await foreshadow_task
-        if foreshadow_result.success:
-            self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id}: 伏笔爽点提取完成 - {foreshadow_result.step_summary}")
-        else:
-            self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 伏笔爽点提取失败 - {foreshadow_result.error_message}")
-
-        # 等待结尾钩子提取完成
-        if hook_task:
-            await hook_task
+        # 章节元数据标记（hook_type 字段由 apply 流程标记状态）
+        if project_id:
             _meta = get_chapter_meta(project_id, chapter_index)
             if _meta:
                 update_chapter_meta(_meta["id"], hook_type="已完成")
@@ -1493,8 +1404,8 @@ class WebnovelService:
             project = get_webnovel_project_by_script(script_id)
             project_id = project["id"] if project else 0
 
-            # 构建 writing_context
-            writing_context = self._build_writing_context_for_apply(script_id)
+            # 构建 context_inventory
+            context_inventory = self._build_context_inventory_for_apply(script_id)
 
             # 广播 content_saved（章节已存在，直接跳到后处理）
             await ws_broadcast_manager.broadcast_apply_task_update(
@@ -1509,7 +1420,7 @@ class WebnovelService:
             # 执行后处理
             await self._run_apply_post_process(
                 apply_task_id, script_id, chapter_index, project_id,
-                filtered_content, writing_context, start_time,
+                filtered_content, context_inventory, start_time,
             )
 
             # 完成
@@ -1543,8 +1454,8 @@ class WebnovelService:
                 }
             )
 
-    def _build_writing_context_for_apply(self, script_id: int) -> Dict[str, Any]:
-        """为 apply 任务构建最小化的 writing_context（供事实记录器使用）。"""
+    def _build_context_inventory_for_apply(self, script_id: int) -> Dict[str, Any]:
+        """为 apply 任务构建最小化的 context_inventory（供事实记录器使用）。"""
         project = get_webnovel_project_by_script(script_id)
         if not project:
             return {"world_settings": [], "characters": []}
@@ -1557,16 +1468,16 @@ class WebnovelService:
         if worldview:
             world_settings.append({
                 "name": worldview.get("name", ""),
-                "world_summary": worldview.get("world_summary", ""),
+                "summary": (worldview.get("world_summary", "") or "")[:150],
             })
 
-        # 角色
+        # 角色（使用与 context_inventory 一致的字段名）
         characters = []
         cards = get_character_cards_by_project(project_id)
         for card in cards:
             characters.append({
-                "character_name": card.get("character_name", ""),
-                "role": card.get("role", ""),
+                "name": card.get("name", "") or card.get("character_name", ""),
+                "type": card.get("character_type", ""),
             })
 
         return {
