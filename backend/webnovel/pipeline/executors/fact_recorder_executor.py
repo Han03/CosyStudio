@@ -18,6 +18,8 @@ from webnovel.repositories import (
     update_open_loop_resolved, update_open_loop_urgency, get_open_loops_by_project,
     get_chapter_meta, update_chapter_meta, upsert_character_state,
     get_worldview_by_project, add_worldview, update_worldview,
+    get_volume_outlines_by_project, get_timelines_by_project,
+    get_timeline_chapters, upsert_timeline_chapter,
 )
 
 
@@ -84,18 +86,23 @@ class FactRecorderExecutor(BaseExecutor):
             # 事实提取需要覆盖全章内容，截断过短会遗漏核心事件（如升级突破、物品消耗）。
             # 成品章节 3000-5000 字，取前 4000 字可覆盖大部分关键事件。
             chapter_content = polished_content[:4000] if len(polished_content) > 4000 else polished_content
-            prompt = prompt_data["user_prompt"].format(
-                chapter_content=chapter_content,
-                world_settings=json.dumps(world_settings_text, ensure_ascii=False),
-                characters=json.dumps(characters_text, ensure_ascii=False),
-            )
-            system_prompt = prompt_data["system_prompt"] or "你是一位专业的内容分析助手，擅长提取文本中的关键信息，输出严格的JSON格式"
 
             from core.model_executor import get_model_executor
             executor = get_model_executor()
 
             project = get_webnovel_project_by_script(script_id)
             project_id = project["id"] if project else 0
+
+            # 前一章时间轴（基于原文的章节时间轴证据，供 chapter_timeline 块衔接）
+            prev_timeline = self._build_prev_timeline_text(project_id, self.chapter_index)
+
+            prompt = prompt_data["user_prompt"].format(
+                chapter_content=chapter_content,
+                world_settings=json.dumps(world_settings_text, ensure_ascii=False),
+                characters=json.dumps(characters_text, ensure_ascii=False),
+                prev_timeline=prev_timeline,
+            )
+            system_prompt = prompt_data["system_prompt"] or "你是一位专业的内容分析助手，擅长提取文本中的关键信息，输出严格的JSON格式"
 
             result = await executor.execute_text_chat(
                 prompt=prompt,
@@ -109,7 +116,7 @@ class FactRecorderExecutor(BaseExecutor):
 
             content = result.get("content", "") if result else ""
             (item_changes, character_updates, cool_points, hook,
-             character_states, world_settings) = self._parse_all(
+             character_states, world_settings, chapter_timeline) = self._parse_all(
                 content, script_id, project_id)
 
             # 1. 结构化物品变化落库（item_changes）
@@ -137,6 +144,8 @@ class FactRecorderExecutor(BaseExecutor):
                 await self._save_hook(project_id, self.chapter_index, hook)
                 await self._save_character_states(project_id, self.chapter_index, character_states)
                 await self._save_world_settings(project_id, self.chapter_index, world_settings)
+                # 5.5 章节时间轴（基于原文补写 webnovel_timeline_chapter）
+                await self._save_chapter_timeline(project_id, self.chapter_index, chapter_timeline)
                 planted_loop_count = await self._process_foreshadows(
                     project_id, self.chapter_index, polished_content)
 
@@ -147,10 +156,14 @@ class FactRecorderExecutor(BaseExecutor):
             char_update_count = len(character_updates)
             item_tail = f"，{item_change_count}条物品变化" if item_change_count else ""
             char_tail = f"，{char_update_count}条角色更新" if char_update_count else ""
+            timeline_tail = ""
+            if chapter_timeline and chapter_timeline.get("time_anchor"):
+                timeline_tail = f"，时间轴:{chapter_timeline.get('time_anchor', '')[:20]}"
             summary = (f"事实记录完成：{planted_loop_count}个伏笔，"
                        f"{len(cool_points)}个爽点，{len(character_states)}条角色状态"
                        f"{item_tail}{char_tail}"
-                       + (f"，{len(world_settings)}条设定" if world_settings else ""))
+                       + (f"，{len(world_settings)}条设定" if world_settings else "")
+                       + timeline_tail)
 
             return ExecutorResult(
                 success=True,
@@ -164,6 +177,7 @@ class FactRecorderExecutor(BaseExecutor):
                     "cool_points_count": len(cool_points),
                     "character_states_count": len(character_states),
                     "world_settings_count": len(world_settings),
+                    "chapter_timeline": chapter_timeline,
                 }
             )
 
@@ -175,10 +189,12 @@ class FactRecorderExecutor(BaseExecutor):
             )
 
     def _parse_all(self, content: str, script_id: int, project_id: int):
-        """解析六块提取结果：item_changes / character_updates / cool_points / hook / character_states / world_settings（容错）。"""
+        """解析七块提取结果：item_changes / character_updates / cool_points / hook / character_states / world_settings / chapter_timeline（容错）。"""
         item_changes, character_updates, cool_points, hook, character_states, world_settings = [], [], [], {}, [], []
+        chapter_timeline: Dict[str, Any] = {}
         if not content:
-            return item_changes, character_updates, cool_points, hook, character_states, world_settings
+            return (item_changes, character_updates, cool_points, hook,
+                    character_states, world_settings, chapter_timeline)
 
         fact_data = parse_llm_json(
             content,
@@ -201,8 +217,105 @@ class FactRecorderExecutor(BaseExecutor):
                                 if isinstance(s, dict) and s.get("character_id")]
             world_settings = [w for w in (fact_data.get("world_settings") or [])
                               if isinstance(w, dict) and w.get("name") and w.get("content")]
+            ct = fact_data.get("chapter_timeline") or {}
+            if isinstance(ct, dict):
+                chapter_timeline = {
+                    k: str(v).strip() if isinstance(v, str) else v
+                    for k, v in ct.items()
+                    if k in ("time_anchor", "chapter_duration", "interval_from_prev",
+                             "countdown_status", "notes")
+                }
         # JSON 解析失败或缺失：全部结构化块为空（无文本兜底）
-        return item_changes, character_updates, cool_points, hook, character_states, world_settings
+        return (item_changes, character_updates, cool_points, hook,
+                character_states, world_settings, chapter_timeline)
+
+    def _build_prev_timeline_text(self, project_id: int, chapter_index: int) -> str:
+        """构建前一章时间轴文本（当前章所属卷时间轴中，本章之前的最近 3 章锚点）。"""
+        if not project_id:
+            return "（暂无前一章时间轴）"
+        try:
+            volume_outlines = get_volume_outlines_by_project(project_id)
+            cur_vol = None
+            for vo in volume_outlines:
+                if vo.get("chapter_start", 1) <= chapter_index <= vo.get("chapter_end", 9999):
+                    cur_vol = vo
+                    break
+            if not cur_vol:
+                return "（暂无前一章时间轴）"
+            timelines = get_timelines_by_project(project_id)
+            tl = next(
+                (t for t in timelines if t.get("volume_number") == cur_vol.get("volume_number")),
+                None
+            )
+            if not tl:
+                return "（本卷暂无时间轴数据）"
+            chapters = get_timeline_chapters(tl["id"]) or []
+            prev = [c for c in chapters if (c.get("chapter_number") or 0) < chapter_index][-3:]
+            if not prev:
+                return "（本章为该卷起始章，无前一章时间轴）"
+            lines = []
+            for c in prev:
+                bits = []
+                if c.get("time_anchor"):
+                    bits.append(f"锚点:{c['time_anchor']}")
+                if c.get("chapter_duration"):
+                    bits.append(f"章内跨度:{c['chapter_duration']}")
+                if c.get("interval_from_prev"):
+                    bits.append(f"距上章:{c['interval_from_prev']}")
+                if c.get("countdown_status") and c.get("countdown_status") != "无":
+                    bits.append(f"倒计时:{c['countdown_status']}")
+                line = f"- 第{c.get('chapter_number', '?')}章"
+                if bits:
+                    line += " | " + " | ".join(bits)
+                lines.append(line)
+            return "\n".join(lines)
+        except Exception:
+            return "（暂无前一章时间轴）"
+
+    async def _save_chapter_timeline(
+        self, project_id: int, chapter_index: int, chapter_timeline: Dict[str, Any]
+    ) -> None:
+        """落库章节时间轴到 webnovel_timeline_chapter（upsert，按卷匹配主记录）。
+
+        卷主记录由卷首时间轴生成器在每卷第一章创作前创建；此处缺失时记警告跳过，
+        不阻断事实记录主流程（时间轴为辅助数据）。
+        """
+        from utils.logger import log_manager
+        logger = log_manager.get_logger("fact_recorder")
+        try:
+            if not chapter_timeline or not isinstance(chapter_timeline, dict):
+                return
+            if not chapter_timeline.get("time_anchor"):
+                return
+            volume_outlines = get_volume_outlines_by_project(project_id)
+            cur_vol = None
+            for vo in volume_outlines:
+                if vo.get("chapter_start", 1) <= chapter_index <= vo.get("chapter_end", 9999):
+                    cur_vol = vo
+                    break
+            if not cur_vol:
+                return
+            timelines = get_timelines_by_project(project_id)
+            tl = next(
+                (t for t in timelines if t.get("volume_number") == cur_vol.get("volume_number")),
+                None
+            )
+            if not tl:
+                logger.warning(
+                    f"[FactRecorder] 第{chapter_index}章时间轴落库跳过：第{cur_vol.get('volume_number')}卷无主记录"
+                )
+                return
+            upsert_timeline_chapter(
+                timeline_id=tl["id"],
+                chapter_number=chapter_index,
+                time_anchor=chapter_timeline.get("time_anchor", ""),
+                chapter_duration=chapter_timeline.get("chapter_duration", ""),
+                interval_from_prev=chapter_timeline.get("interval_from_prev", ""),
+                countdown_status=chapter_timeline.get("countdown_status", ""),
+                notes=chapter_timeline.get("notes", ""),
+            )
+        except Exception as e:
+            logger.warning(f"[FactRecorder] 章节时间轴落库失败（不阻断）: {e}")
 
 
     async def _save_cool_points(

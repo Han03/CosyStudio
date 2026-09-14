@@ -12,6 +12,9 @@ user_prompt: |
   世界观: {world_settings}
   角色: {characters}
 
+  【前一章时间轴】
+  {prev_timeline}
+
   【角色更新 character_updates】当章节中出现影响角色卡的关键变化时提取，每类一条，character/target 必须与【角色】清单一致，无法匹配清单角色的不要提取：
   - type 枚举：关系 | 身份揭露 | 成长 | 能力
   - 关系：角色间关系变化（character=角色A, target=角色B, description=变化说明），如 {{"type": "关系", "character": "李威", "target": "苏婉清", "description": "因路线选择产生激烈冲突，最终因林若兮的调解妥协"}}
@@ -61,8 +64,16 @@ user_prompt: |
   - category: 历史事件/历史人物/地理位置/科学概念/文化习俗/传统节日/古代官职/兵器名称/诗词典故/成语出处/金手指规则/其他
   注意：与【已知设定】中已存在的内容重复的不提取；正文中没有明确交代的不要臆造。
 
+  【章节时间轴 chapter_timeline】基于本章原文与【前一章时间轴】，推断本章的时间信息，只输出一条：
+  - time_anchor: 本章故事发生的具体时间，优先从原文明确时间描述推断（具体时辰/日期/"翌日""三日后"等），与前一章时间锚点保持同一纪年体系
+  - chapter_duration: 章内时间跨度（如"一夜""半日"，无法判断填"（未知）"）
+  - interval_from_prev: 与上一章的时间间隔（"三日后"→三日；跨夜/连续等按原文描述），本章为首章且无前一章时填"（起始章）"
+  - countdown_status: 原文出现倒计时（"还剩X天"等）时记录，否则填"无"
+  - notes: 时间推理说明；原文无明确时间时注明"原文无明确时间，按前一章顺延"
+  注意：time_anchor 必须从本章原文推断，不得臆造；原文完全无时间线索且无前一章时，time_anchor 填"（未知）"。
+
   【输出格式】
   请严格按照JSON格式输出，只输出JSON，不要包含任何其他内容：
-  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 1, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}], "world_settings": [{{"name": "名词", "content": "解释", "category": "分类"}}]}}
-  cool_points/character_states/item_changes/character_updates/world_settings 无内容时输出空数组，hook 无内容时输出空对象。
+  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 1, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}], "world_settings": [{{"name": "名词", "content": "解释", "category": "分类"}}], "chapter_timeline": {{"time_anchor": "本章时间", "chapter_duration": "章内跨度", "interval_from_prev": "距上章间隔", "countdown_status": "无", "notes": "推理说明"}}}}
+  cool_points/character_states/item_changes/character_updates/world_settings 无内容时输出空数组，hook 无内容时输出空对象，chapter_timeline 无法推断时输出空对象。
 ---
