@@ -146,7 +146,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         plot_text = json.dumps(plot_list, ensure_ascii=False, indent=2)
 
         prompt_data = self._load_prompt("chapter_plot_review")
-        prompt = prompt_data["user_prompt"].format(
+        prompt = self._format_prompt(prompt_data["user_prompt"], 
             chapter_index=chapter_index,
             assembled_context=step_ctx.get("assembled_context", "") if step_ctx else "",
             plot_text=plot_text,
@@ -270,7 +270,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         issues_text = "\n".join(issues)
 
         prompt_data = self._load_prompt("chapter_plot_revise")
-        prompt = prompt_data["user_prompt"].format(
+        prompt = self._format_prompt(prompt_data["user_prompt"],
             original_plot_text=original_plot_text,
             issues_text=issues_text,
         )

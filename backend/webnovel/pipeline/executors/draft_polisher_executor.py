@@ -57,7 +57,7 @@ class DraftPolisherExecutor(BaseExecutor):
             # 从 .md 文件加载 prompt 模板
             prompt_data = self._load_prompt("draft_polish")
             word_cfg = context.get("word_config") or {}
-            full_prompt = prompt_data["user_prompt"].format(
+            full_prompt = self._format_prompt(prompt_data["user_prompt"], 
                 assembled_context=step_ctx["assembled_context"],
                 draft_content=draft_content,
                 polish_word_min=int(word_cfg.get("polish_word_min", 3000)),

@@ -67,7 +67,7 @@ class DraftGeneratorExecutor(BaseExecutor):
 
             prompt_data = self._load_prompt("draft_generate")
             word_cfg = context.get("word_config") or {}
-            full_prompt = prompt_data["user_prompt"].format(
+            full_prompt = self._format_prompt(prompt_data["user_prompt"], 
                 continue_prev=continue_prev,
                 user_prompt_section=user_prompt_section,
                 assembled_context=step_ctx["assembled_context"],

@@ -16,13 +16,12 @@ user_prompt: |
 
   {prev_step_selections_text}
 
-  【选择约束】
-  - 只选择与本章剧情直接相关的条目，宁少勿滥；每个资源至少给出 1 个条目（若清单中有）
-  - 深度选择：需要精确承接/核对细节用 full；只需要概要用 summary；前文结尾衔接用 tail
-  - 上一章结尾衔接、章节规划、卷纲、角色状态等核心信息通常必须选择，除非本章确实不涉及
-  - 如果前序步骤已选择了某些条目，你应当至少保留它们（除非确实不相关）
-  - structured_refs 中的 resource 只能取【资源目录】中列出的资源名
-  - 引用参数必填：previous_chapter 必须填 chapter_index（前文清单中的章节号，如 2 表示第2章）；character_card/foreshadow 必须填 ids（清单中条目编号）
+  【选择约束】（按优先级）
+  1. 必选：上一章结尾衔接、章节规划、卷纲、角色状态——本章不涉及才可省略
+  2. 建议：前序步骤已选择的条目——至少保留，除非确实不相关
+  3. 可选：其他与本章剧情直接相关的条目——宁少勿滥
+  4. 深度：前文承接用 tail，文风参照用 style；角色核对细节用 full，概要用 summary；设定类用 summary
+  5. 参数：structured_refs 的 resource 只能取【资源目录】中列出的资源名；previous_chapter 必填 chapter_index；character_card/foreshadow 必填 ids（清单中条目编号）
 
   {dimension_checklist_text}
 
