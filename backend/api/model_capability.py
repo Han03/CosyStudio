@@ -517,7 +517,6 @@ CALL_POINT_CATEGORIES = [
             "draft_reviewer_revise": {"name": "草稿审查修正", "description": "根据评分反馈修正草稿"},
             "draft_polisher": {"name": "草稿润色", "description": "草稿质量优化润色"},
             "fact_recorder": {"name": "事实记录", "description": "剧情事实提取与记录"},
-            "foreshadow_cool_point_extractor": {"name": "伏笔爽点提取", "description": "伏笔和爽点提取"},
         },
     },
     {

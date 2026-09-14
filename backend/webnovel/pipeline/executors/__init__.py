@@ -11,7 +11,6 @@ from .character_builder_executor import CharacterBuilderExecutor
 from .plan_executor import PlanExecutor
 from .query_executor import QueryExecutor
 from .story_system_executor import StorySystemExecutor
-from .foreshadow_cool_point_extractor_executor import ForeshadowCoolPointExtractorExecutor
 from .chapter_plot_generator_executor import ChapterPlotGeneratorExecutor
 from .chapter_plot_reviewer_executor import ChapterPlotReviewerExecutor
 
@@ -31,5 +30,4 @@ EXECUTORS = [
     PlanExecutor,
     QueryExecutor,
     StorySystemExecutor,
-    ForeshadowCoolPointExtractorExecutor,
 ]
