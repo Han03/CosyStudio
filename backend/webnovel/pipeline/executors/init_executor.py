@@ -498,98 +498,6 @@ class InitExecutor(BaseExecutor):
                 "cultivation_chain": project_data.get("cultivation_chain", ""),
             })
 
-            # ============== 金手指详细设定：基于用户选择的方向调用专用 prompt 生成完整设定（含升级路线/爽点/反馈节奏子表），用户基本字段覆盖 ==============
-            gf_user_flat = {
-                "type": project_data.get("golden_finger_type", ""),
-                "name": project_data.get("golden_finger_name", ""),
-                "style": project_data.get("golden_finger_style", ""),
-                "visibility": project_data.get("gf_visibility", ""),
-                "irreversible_cost": project_data.get("gf_irreversible_cost", ""),
-                "growth_rhythm": project_data.get("gf_growth_rhythm", "")
-            }
-            user_has_basic_gf = bool(gf_user_flat["type"] or gf_user_flat["name"])
-
-            _logger.info(f"[init_executor] 调用 LLM 生成金手指详细设定（用户基本字段: {'有' if user_has_basic_gf else '无'}）")
-            golden_finger_data = await self._call_llm("init_golden_finger_detail", llm_context)
-
-            if not golden_finger_data or "error" in golden_finger_data:
-                error_msg = golden_finger_data.get("error", "LLM返回空内容") if golden_finger_data else "LLM返回空内容"
-                _logger.error(f"[init_executor] 金手指 LLM 调用失败: {error_msg}")
-                return ExecutorResult(success=False, error_message=f"金手指设定生成失败: {error_msg}")
-
-            gf_data = golden_finger_data.copy()
-            upgrade_path = gf_data.pop("upgrade_path", [])
-            payoff_points = gf_data.pop("payoff_points", gf_data.pop("payoff", []))
-            feedback_nodes = gf_data.pop("feedback_nodes", gf_data.pop("_nodes", []))
-
-            # 用户已填写的基本字段覆盖 LLM 生成的值
-            if user_has_basic_gf:
-                for key, val in gf_user_flat.items():
-                    if val:
-                        gf_data[key] = val
-
-            gf_data["irreversible_cost"] = gf_data.pop("irre_cost", gf_data.get("irreversible_cost", ""))
-
-            # 字段映射：name→main_role（金手指名称存主要作用列）；
-            # style 仅在 LLM 未生成 visual_expression 时兜底；growth_rhythm→cost_limitation
-            if "name" in gf_data:
-                gf_data["main_role"] = gf_data.pop("name")
-                gf_data["name"] = gf_data["main_role"]  # 保留副本，供 prompt {golden_finger.name} 引用
-            if "style" in gf_data:
-                style_val = gf_data.pop("style")
-                if not gf_data.get("visual_expression"):
-                    gf_data["visual_expression"] = style_val
-            if "growth_rhythm" in gf_data:
-                gf_data["cost_limitation"] = gf_data.pop("growth_rhythm")
-
-            # 安全转换所有字段类型
-            for key in list(gf_data.keys()):
-                gf_data[key] = self._sanitize_value(gf_data[key], "")
-
-            _logger.info(f"[init_executor] 准备保存金手指，gf_data keys: {list(gf_data.keys())}")
-            _logger.info(f"[init_executor] gf_data sample: {str(gf_data)[:200]}")
-
-            gf = add_golden_finger(project_id, **gf_data)
-            gf_id = gf["id"]
-
-            for upgrade in _safe_items(upgrade_path):
-                add_golden_finger_upgrade(gf_id, upgrade.get("stage", ""), upgrade.get("description", ""))
-
-            for payoff in _safe_items(payoff_points):
-                add_golden_finger_payoff(gf_id, payoff.get("type", ""), payoff.get("description", ""))
-
-            for feedback in _safe_items(feedback_nodes):
-                add_golden_finger_feedback(gf_id, feedback.get("type", ""), feedback.get("chapter_interval", 0), feedback.get("description", ""))
-
-            if not (_safe_items(upgrade_path) or _safe_items(payoff_points) or _safe_items(feedback_nodes)):
-                _logger.warning(
-                    f"[init_executor] 金手指子表数据为空（升级路线/爽点/反馈节奏均未生成），"
-                    f"LLM返回键: {list(golden_finger_data.keys()) if golden_finger_data else 'None'}"
-                )
-
-            llm_context["golden_finger"] = DictObj(gf_data)
-
-            self._check_interrupted()
-            await self._notify_progress("golden_finger", "金手指设定已完成", 25)
-
-            # ============== 角色构建（委托给 CharacterBuilderExecutor）=============
-            char_builder = CharacterBuilderExecutor(self.script_id, 0, 0)
-
-            protagonist_data, protagonist_id = await char_builder.build_protagonist(project_data, llm_context)
-
-            self._check_interrupted()
-            await self._notify_progress("protagonist", "主角设定已完成", 35)
-
-            heroine_data_list, heroine_id_list = await char_builder.build_heroine(project_data, llm_context)
-
-            self._check_interrupted()
-            await self._notify_progress("heroine", "女主设定已完成", 40)
-
-            villain_data, villain_id = await char_builder.build_villain(project_data, llm_context)
-
-            self._check_interrupted()
-            await self._notify_progress("villain", "反派设定已完成", 45)
-
             # ============== 加载 CSV 知识（按题材 × 步骤精准注入）=============
             # 先设置默认空值，确保 prompt 模板占位符不会 KeyError
             llm_context["golden_finger_knowledge"] = ""
@@ -612,49 +520,6 @@ class InitExecutor(BaseExecutor):
                 _naming_knowledge = self._load_csv_knowledge_text("webnovel_csv_naming", _genre)
                 if _naming_knowledge:
                     llm_context["naming_knowledge"] = _naming_knowledge
-
-            power_system_data = project_data.get("power_system")
-            if not power_system_data:
-                self._check_interrupted()
-                power_system_data = await self._call_llm("init_power_system", llm_context)
-            
-            if power_system_data and "error" not in power_system_data:
-                ps_data = power_system_data.copy()
-                power_levels = ps_data.pop("power_levels", [])
-                power_feedbacks = ps_data.pop("power_feedbacks", [])
-                
-                # 统一安全转换：和 villain/golden_finger/character_card 保持一致
-                for key in list(ps_data.keys()):
-                    ps_data[key] = self._sanitize_value(ps_data[key], "")
-                
-                ps = add_power_system(project_id, **ps_data)
-                ps_id = ps["id"]
-
-                for level in _safe_items(power_levels):
-                    level_data = {
-                        "level_order": self._sanitize_value(level.get("level_order", 0), 0),
-                        "level_name": self._sanitize_value(level.get("level_name", "")),
-                        "core_abilities": self._sanitize_value(level.get("core_abilities", "")),
-                        "resource_requirements": self._sanitize_value(level.get("resource_requirements", "")),
-                        "breakthrough_method": self._sanitize_value(level.get("breakthrough_method", "")),
-                        "failure_cost": self._sanitize_value(level.get("failure_cost", "")),
-                        "overlevel_cost": self._sanitize_value(level.get("overlevel_cost", ""))
-                    }
-                    add_power_level(ps_id, **level_data)
-
-                for feedback in _safe_items(power_feedbacks):
-                    feedback_data = {
-                        "realm_change_chapter": self._sanitize_value(
-                            feedback.get("realm_change_chapter", feedback.get("chapter", 0)), 0),
-                        "power_gap_display": self._sanitize_value(
-                            feedback.get("power_gap_display", feedback.get("description", "")))
-                    }
-                    add_power_feedback(ps_id, **feedback_data)
-                
-                llm_context["power_system"] = DictObj(ps_data)
-
-            self._check_interrupted()
-            await self._notify_progress("power_system", "力量体系已完成", 55)
 
             worldview_data = project_data.get("worldview")
             user_has_worldview = bool(worldview_data and isinstance(worldview_data, dict) and any(
@@ -792,7 +657,142 @@ class InitExecutor(BaseExecutor):
                 llm_context["worldview"] = DictObj(wv_data)
 
             self._check_interrupted()
-            await self._notify_progress("worldview", "世界观设定已完成", 65)
+            await self._notify_progress("worldview", "世界观设定已完成", 20)
+
+            # ============== 金手指详细设定：基于用户选择的方向调用专用 prompt 生成完整设定（含升级路线/爽点/反馈节奏子表），用户基本字段覆盖 ==============
+            gf_user_flat = {
+                "type": project_data.get("golden_finger_type", ""),
+                "name": project_data.get("golden_finger_name", ""),
+                "style": project_data.get("golden_finger_style", ""),
+                "visibility": project_data.get("gf_visibility", ""),
+                "irreversible_cost": project_data.get("gf_irreversible_cost", ""),
+                "growth_rhythm": project_data.get("gf_growth_rhythm", "")
+            }
+            user_has_basic_gf = bool(gf_user_flat["type"] or gf_user_flat["name"])
+
+            _logger.info(f"[init_executor] 调用 LLM 生成金手指详细设定（用户基本字段: {'有' if user_has_basic_gf else '无'}）")
+            golden_finger_data = await self._call_llm("init_golden_finger_detail", llm_context)
+
+            if not golden_finger_data or "error" in golden_finger_data:
+                error_msg = golden_finger_data.get("error", "LLM返回空内容") if golden_finger_data else "LLM返回空内容"
+                _logger.error(f"[init_executor] 金手指 LLM 调用失败: {error_msg}")
+                return ExecutorResult(success=False, error_message=f"金手指设定生成失败: {error_msg}")
+
+            gf_data = golden_finger_data.copy()
+            upgrade_path = gf_data.pop("upgrade_path", [])
+            payoff_points = gf_data.pop("payoff_points", gf_data.pop("payoff", []))
+            feedback_nodes = gf_data.pop("feedback_nodes", gf_data.pop("_nodes", []))
+
+            # 用户已填写的基本字段覆盖 LLM 生成的值
+            if user_has_basic_gf:
+                for key, val in gf_user_flat.items():
+                    if val:
+                        gf_data[key] = val
+
+            gf_data["irreversible_cost"] = gf_data.pop("irre_cost", gf_data.get("irreversible_cost", ""))
+
+            # 字段映射：name→main_role（金手指名称存主要作用列）；
+            # style 仅在 LLM 未生成 visual_expression 时兜底；growth_rhythm→cost_limitation
+            if "name" in gf_data:
+                gf_data["main_role"] = gf_data.pop("name")
+                gf_data["name"] = gf_data["main_role"]  # 保留副本，供 prompt {golden_finger.name} 引用
+            if "style" in gf_data:
+                style_val = gf_data.pop("style")
+                if not gf_data.get("visual_expression"):
+                    gf_data["visual_expression"] = style_val
+            if "growth_rhythm" in gf_data:
+                gf_data["cost_limitation"] = gf_data.pop("growth_rhythm")
+
+            # 安全转换所有字段类型
+            for key in list(gf_data.keys()):
+                gf_data[key] = self._sanitize_value(gf_data[key], "")
+
+            _logger.info(f"[init_executor] 准备保存金手指，gf_data keys: {list(gf_data.keys())}")
+            _logger.info(f"[init_executor] gf_data sample: {str(gf_data)[:200]}")
+
+            gf = add_golden_finger(project_id, **gf_data)
+            gf_id = gf["id"]
+
+            for upgrade in _safe_items(upgrade_path):
+                add_golden_finger_upgrade(gf_id, upgrade.get("stage", ""), upgrade.get("description", ""))
+
+            for payoff in _safe_items(payoff_points):
+                add_golden_finger_payoff(gf_id, payoff.get("type", ""), payoff.get("description", ""))
+
+            for feedback in _safe_items(feedback_nodes):
+                add_golden_finger_feedback(gf_id, feedback.get("type", ""), feedback.get("chapter_interval", 0), feedback.get("description", ""))
+
+            if not (_safe_items(upgrade_path) or _safe_items(payoff_points) or _safe_items(feedback_nodes)):
+                _logger.warning(
+                    f"[init_executor] 金手指子表数据为空（升级路线/爽点/反馈节奏均未生成），"
+                    f"LLM返回键: {list(golden_finger_data.keys()) if golden_finger_data else 'None'}"
+                )
+
+            llm_context["golden_finger"] = DictObj(gf_data)
+
+            self._check_interrupted()
+            await self._notify_progress("golden_finger", "金手指设定已完成", 30)
+
+            # ============== 角色构建（委托给 CharacterBuilderExecutor）=============
+            char_builder = CharacterBuilderExecutor(self.script_id, 0, 0)
+
+            protagonist_data, protagonist_id = await char_builder.build_protagonist(project_data, llm_context)
+
+            self._check_interrupted()
+            await self._notify_progress("protagonist", "主角设定已完成", 40)
+
+            heroine_data_list, heroine_id_list = await char_builder.build_heroine(project_data, llm_context)
+
+            self._check_interrupted()
+            await self._notify_progress("heroine", "女主设定已完成", 45)
+
+            villain_data, villain_id = await char_builder.build_villain(project_data, llm_context)
+
+            self._check_interrupted()
+            await self._notify_progress("villain", "反派设定已完成", 50)
+
+            power_system_data = project_data.get("power_system")
+            if not power_system_data:
+                self._check_interrupted()
+                power_system_data = await self._call_llm("init_power_system", llm_context)
+            
+            if power_system_data and "error" not in power_system_data:
+                ps_data = power_system_data.copy()
+                power_levels = ps_data.pop("power_levels", [])
+                power_feedbacks = ps_data.pop("power_feedbacks", [])
+                
+                # 统一安全转换：和 villain/golden_finger/character_card 保持一致
+                for key in list(ps_data.keys()):
+                    ps_data[key] = self._sanitize_value(ps_data[key], "")
+                
+                ps = add_power_system(project_id, **ps_data)
+                ps_id = ps["id"]
+
+                for level in _safe_items(power_levels):
+                    level_data = {
+                        "level_order": self._sanitize_value(level.get("level_order", 0), 0),
+                        "level_name": self._sanitize_value(level.get("level_name", "")),
+                        "core_abilities": self._sanitize_value(level.get("core_abilities", "")),
+                        "resource_requirements": self._sanitize_value(level.get("resource_requirements", "")),
+                        "breakthrough_method": self._sanitize_value(level.get("breakthrough_method", "")),
+                        "failure_cost": self._sanitize_value(level.get("failure_cost", "")),
+                        "overlevel_cost": self._sanitize_value(level.get("overlevel_cost", ""))
+                    }
+                    add_power_level(ps_id, **level_data)
+
+                for feedback in _safe_items(power_feedbacks):
+                    feedback_data = {
+                        "realm_change_chapter": self._sanitize_value(
+                            feedback.get("realm_change_chapter", feedback.get("chapter", 0)), 0),
+                        "power_gap_display": self._sanitize_value(
+                            feedback.get("power_gap_display", feedback.get("description", "")))
+                    }
+                    add_power_feedback(ps_id, **feedback_data)
+                
+                llm_context["power_system"] = DictObj(ps_data)
+
+            self._check_interrupted()
+            await self._notify_progress("power_system", "力量体系已完成", 60)
 
             llm_context["anti_trope_rules"] = self._load_anti_trope_rules(project_data.get("genre", ""))
 

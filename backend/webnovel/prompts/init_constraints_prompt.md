@@ -40,6 +40,14 @@ user_prompt: |
   境界链：{cultivation_chain}
   宗门/组织层级：{sect_hierarchy}
 
+  【世界观核心设定】
+  世界核心设定：{worldview.world_summary}
+  核心区域：{worldview.core_regions}
+  社会结构：{worldview.social_hierarchy}
+  政治规则：{worldview.political_rules}
+  社会常识/禁忌：{worldview.social_common_sense}
+  硬约束：{worldview.hard_constraints}
+
   【用户已填约束信息】
   反套路规则：{anti_trope}
   硬性约束：{hard_constraints}

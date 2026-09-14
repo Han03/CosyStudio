@@ -599,6 +599,15 @@ async def _run_init_async(script_id: int, session_id: int):
         if result.success:
             complete_init_session(session_id)
             update_script(script_id, status="ready", progress_message="深度初始化完成")
+            # 初始化完成后，将项目设定数据索引到 RAG 向量库（与 API 直调入口语义一致）
+            try:
+                from webnovel.services.webnovel_service import WebnovelService
+                service = WebnovelService()
+                project = get_webnovel_project_by_script(script_id)
+                if project:
+                    await service._index_project_settings(project["id"])
+            except Exception as rag_exc:
+                _init_logger.warning(f"[深度初始化] RAG索引失败: {rag_exc}")
             await ws_broadcast_manager.broadcast_init_progress(
                 script_id, "completed", "completed", "深度初始化完成", 100
             )

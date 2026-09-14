@@ -18,9 +18,13 @@ user_prompt: |
   【已有角色名单】
   {existing_characters_section}
   
-  【世界观信息】
-  世界规模：{project.world_scale}
-  势力分布：{project.factions}
+  【世界观核心设定】
+  世界核心设定：{worldview.world_summary}
+  核心区域：{worldview.core_regions}
+  社会结构：{worldview.social_hierarchy}
+  政治规则：{worldview.political_rules}
+  社会常识/禁忌：{worldview.social_common_sense}
+  硬约束：{worldview.hard_constraints}
   
   【要求】
   请生成JSON格式的角色团队设定，包含：
