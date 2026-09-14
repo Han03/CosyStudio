@@ -477,8 +477,9 @@ def _fmt_previous_chapter(data, depth="full"):
     if depth == "tail":
         tail = content[-500:] if len(content) > 500 else content
         return f"第{ch_idx}章结尾: {tail}"
-    if len(content) > 4000:
-        content = content[:2000] + "\n……（中间内容省略）……\n" + content[-2000:]
+    # full 深度硬截断：前文仅作承接/设定参考，超 1500 字取首尾
+    if len(content) > 1500:
+        content = content[:750] + "\n……（中间内容省略）……\n" + content[-750:]
     return f"第{ch_idx}章（请仔细承接）:\n{content}"
 
 

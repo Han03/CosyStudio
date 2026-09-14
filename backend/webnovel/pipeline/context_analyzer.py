@@ -432,17 +432,20 @@ class ContextAnalyzer:
             "foreshadow": '"ids": [伏笔id]',
             "previous_chapter": '"chapter_index": 章节号',
         }
+        # 前文按承接需求引导 depth：剧情承接用 tail，文风参照用 style
+        _PREV_CH_DEPTH_RECOMMEND = {"previous_chapter": "tail"}
         for r in selectable:
             label = res_labels.get(r, r)
             res = RESOURCE_REGISTRY.get(r, {})
             depths = list(res.get("formatters", {}).keys())
             depth_hint = " | ".join(depths) if depths else "full"
+            recommend = _PREV_CH_DEPTH_RECOMMEND.get(r) or (depths[0] if depths else "full")
             arg = arg_hints.get(r, "")
             if arg:
                 ref_lines.append(
-                    f'    {{"resource": "{r}", {arg}, "depth": "{depth_hint.split()[0]}"}}')
+                    f'    {{"resource": "{r}", {arg}, "depth": "{recommend}"}}')
             else:
-                ref_lines.append(f'    {{"resource": "{r}", "depth": "{depth_hint.split()[0]}"}}')
+                ref_lines.append(f'    {{"resource": "{r}", "depth": "{recommend}"}}')
         ref_text = "\n".join(ref_lines) if ref_lines else "    （本节点无可选资源）"
 
         return (
@@ -455,7 +458,8 @@ class ContextAnalyzer:
             "}\n"
             "字段说明：\n"
             "- structured_refs：本节点可选资源清单（见【资源目录】），resource 只能取上述值；"
-            "ids 从清单中选；depth 决定加载深度（full=完整/summary=摘要/tail=结尾片段/style=文风片段）。\n"
+            "ids 从清单中选；depth 决定加载深度（full=完整/summary=摘要/tail=结尾片段/style=文风片段）。"
+            "previous_chapter 建议 depth=tail（承接上一章结尾，约500字）或 style（润色文风参照，约320字），full 将截断至1500字。\n"
             "- 引用参数（必填）：character_card/foreshadow 必须填 ids（从【资源目录】清单选）；"
             "previous_chapter 必须填 chapter_index（从【资源目录】前文清单选章节号，例如 2 表示第2章），不得省略。\n"
             "- rag_queries：RAG 语义检索查询，每条含实体与限定、禁止复制原文；"
