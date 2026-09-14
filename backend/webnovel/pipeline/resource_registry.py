@@ -25,6 +25,7 @@ from webnovel.repositories import (
     get_power_system_by_project,
     get_golden_finger_by_project,
     get_character_group_by_project, get_character_group_members,
+    get_timelines_by_project, get_timeline_chapters,
 )
 
 _logger = log_manager.get_logger("resource_registry")
@@ -190,6 +191,30 @@ def _load_foreshadows(ref, env):
     if not loops:
         raise ContextAnalysisError(f"伏笔资源加载失败：ids={sorted(ids)} 在活跃伏笔中不存在")
     return loops
+
+
+def _load_timeline(ref, env):
+    """章节时间轴：按卷匹配时间线主记录 + 章节锚点列表。
+
+    项目暂无时间轴数据时返回 None（渲染为空区块，自动跳过），不视为失败——
+    时间轴是辅助参考资源，未生成时间线的项目/卷不应阻断创作。
+    """
+    project_id = env["project_id"]
+    timelines = get_timelines_by_project(project_id)
+    if not timelines:
+        return None
+    vol = env["structural_data"].get("current_volume") or {}
+    volume_number = ref.get("volume_number") or vol.get("volume_number")
+    tl = None
+    if volume_number is not None:
+        for t in timelines:
+            if t.get("volume_number") == volume_number:
+                tl = t
+                break
+    if tl is None:
+        tl = timelines[0]
+    chapters = get_timeline_chapters(tl["id"]) or []
+    return {"timeline": tl, "chapters": chapters}
 
 
 def _load_previous_chapter(ref, env):
@@ -476,6 +501,43 @@ def _fmt_foreshadows(loops, depth="full"):
     return "\n".join(lines)
 
 
+def _fmt_timeline(data, depth="full"):
+    """章节时间轴：卷基准时间 + 最近章节的时间锚点/间隔/跨度/倒计时。"""
+    if not data or not isinstance(data, dict):
+        return ""
+    tl = data.get("timeline") or {}
+    chapters = data.get("chapters") or []
+    parts = []
+    meta = []
+    if tl.get("time_base"):
+        meta.append(f"基准时间: {tl['time_base']}")
+    if tl.get("time_span"):
+        meta.append(f"时间跨度: {tl['time_span']}")
+    if meta:
+        parts.append(" | ".join(meta))
+    if not chapters:
+        return "\n".join(parts) if parts else ""
+    # 最近 6 章（含当前章），保持时间推进顺序
+    recent = chapters[-6:]
+    for ch in recent:
+        cnum = ch.get("chapter_number", "?")
+        bits = []
+        if ch.get("time_anchor"):
+            bits.append(f"时间锚点: {ch['time_anchor']}")
+        if ch.get("chapter_duration"):
+            bits.append(f"章内跨度: {ch['chapter_duration']}")
+        if ch.get("interval_from_prev"):
+            bits.append(f"距上章: {ch['interval_from_prev']}")
+        if ch.get("countdown_status") and ch.get("countdown_status") != "无":
+            bits.append(f"倒计时: {ch['countdown_status']}")
+        line = f"- 第{cnum}章"
+        if bits:
+            line += " | " + " | ".join(bits)
+        parts.append(line)
+    parts.append("时间一致性要求：本章时间须与上章时间锚点衔接（间隔/跳跃须有原文依据），禁止时间倒挂")
+    return "\n".join(parts)
+
+
 def _fmt_previous_chapter(data, depth="full"):
     ch_idx = data.get("chapter_index", "?")
     content = data.get("content", "")
@@ -651,6 +713,11 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "loader": _load_foreshadows, "formatters": {"full": _fmt_foreshadows},
         "default_depth": "full", "task_input": False,
     },
+    "timeline": {
+        "label": "章节时间轴", "header": "【章节时间轴】", "category": "structured",
+        "loader": _load_timeline, "formatters": {"full": _fmt_timeline},
+        "default_depth": "full", "task_input": False,
+    },
     "previous_chapter": {
         "label": "前文章节", "header": "【前文回顾】", "category": "structured",
         "loader": _load_previous_chapter,
@@ -717,7 +784,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "chapter_plan", "volume_outline", "project", "character_state",
             "previous_hook", "character_card", "character_group",
             "golden_finger", "power_system", "worldview", "foreshadow",
-            "previous_chapter",
+            "previous_chapter", "timeline",
         ],
     },
     "chapter_plot_reviewer": {
@@ -733,7 +800,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         ],
         "selectable": [
             "chapter_plan", "volume_outline", "character_card",
-            "golden_finger", "worldview", "foreshadow",
+            "golden_finger", "worldview", "foreshadow", "timeline",
         ],
     },
     "draft_generator": {
@@ -749,7 +816,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         "selectable": [
             "character_card", "previous_chapter", "character_state",
             "character_group", "worldview", "power_system", "golden_finger",
-            "foreshadow",
+            "foreshadow", "timeline",
         ],
     },
     "draft_reviewer": {
@@ -764,7 +831,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         ],
         "selectable": [
             "chapter_plan", "character_state", "worldview",
-            "character_card", "previous_chapter",
+            "character_card", "previous_chapter", "timeline",
         ],
     },
     "draft_polisher": {

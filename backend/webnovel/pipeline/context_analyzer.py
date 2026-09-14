@@ -102,6 +102,7 @@ _RESOURCE_CTX_FIELD = {
     "golden_finger": "golden_finger",
     "foreshadow": "foreshadows",
     "previous_chapter": "previous_chapters",
+    "timeline": "timeline",
     "plot_list": "plot_list",
     "review_result": "review_result",
     "rag_results": "rag_results",
@@ -408,6 +409,21 @@ class ContextAnalyzer:
         if res_name == "project":
             proj = structural.get("project") or {}
             return f"    {proj.get('title', '')} | {proj.get('genre', '')}"
+        if res_name == "timeline":
+            from webnovel.repositories import get_timelines_by_project, get_timeline_chapters
+            timelines = get_timelines_by_project(env["project_id"])
+            if not timelines:
+                return "    （项目暂无时间轴数据）"
+            lines = []
+            for tl in timelines[:3]:
+                chapters = get_timeline_chapters(tl["id"]) or []
+                recent = chapters[-1] if chapters else {}
+                anchor = (recent.get("time_anchor", "") or "")[:20]
+                lines.append(
+                    f"    第{tl.get('volume_number', '?')}卷: 基准 {str(tl.get('time_base', ''))[:30]}"
+                    f" | {len(chapters)}章 | 最近锚点 {anchor}"
+                )
+            return "\n".join(lines)
         return ""
 
     def _build_dimension_checklist(self, step_name: str) -> str:
