@@ -302,6 +302,9 @@ def _fmt_character_states(states, depth="full"):
                            ("emotion", "情绪"), ("health", "健康"),
                            ("items", "持有"), ("knowledge", "已知")):
             val = st.get(key)
+            # 🔴 数据库字段为 state_summary（含状态描述），兼容旧字段名 state
+            if not val and key == "state":
+                val = st.get("state_summary")
             if val:
                 line_parts.append(f"{label}:{str(val)[:80]}")
         if line_parts:

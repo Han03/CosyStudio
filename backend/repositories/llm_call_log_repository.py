@@ -244,22 +244,23 @@ def add_llm_call_log(
     return log_id
 
 
-def update_llm_call_log(
-    log_id: int,
-    raw_output: str = "",
-    parsed_output: Any = None,
-    parse_success: bool = False,
-    success_strategy: str = "",
-    strategies_tried: int = 0,
-    error_message: str = "",
-    input_tokens: int = 0,
-    output_tokens: int = 0,
-    latency_ms: int = 0,
-) -> bool:
+
+def _truncate_text(text: Any, limit: int) -> str:
+    if text is None:
+        return ""
+    s = text if isinstance(text, str) else str(text)
+    return s if len(s) <= limit else s[:limit]
+
+
+def update_llm_call_log(log_id: int, **fields) -> bool:
     """更新已有的LLM调用日志（用于 parse_llm_json 补充解析结果，避免重复插入）。
 
     典型场景：model_executor 的 finally 块先 INSERT 一条包含 raw_output 的日志并返回 log_id，
     随后 parse_llm_json 解析完成后通过本函数 UPDATE 同一条记录，补充 parsed_output / 解析策略等字段。
+
+    🔴 仅更新显式传入的字段（kwargs 语义）：缺省的键不写入 SQL。
+       旧实现无条件覆盖全部列（缺省参数=0），会把 execute_text_chat 实测并 INSERT 的
+       input_tokens/output_tokens/latency_ms 覆盖成 0（历史日志 token 全 0 的根因）。
 
     Returns:
         True 表示更新成功，False 表示失败（log_id 不存在或写入异常）。
@@ -267,48 +268,42 @@ def update_llm_call_log(
     if not log_id or log_id <= 0:
         return False
 
-    parsed_text = ""
-    if parsed_output is not None:
-        try:
-            parsed_text = json.dumps(parsed_output, ensure_ascii=False)
-        except Exception:
-            parsed_text = str(parsed_output)
-
-    def _truncate(text: Any, limit: int) -> str:
-        if text is None:
-            return ""
-        s = text if isinstance(text, str) else str(text)
-        return s if len(s) <= limit else s[:limit]
+    _ALLOWED_COLS = (
+        "raw_output", "parsed_output", "parse_success", "success_strategy",
+        "strategies_tried", "error_message", "input_tokens", "output_tokens", "latency_ms",
+    )
+    set_parts = []
+    values = []
+    for key in _ALLOWED_COLS:
+        if key not in fields:
+            continue
+        val = fields[key]
+        if key == "raw_output":
+            val = _truncate_text(val, 131072)
+        elif key == "parsed_output":
+            val = _truncate_text(val, 131072)
+        elif key == "parse_success":
+            val = 1 if val else 0
+        elif key == "success_strategy":
+            val = _truncate_text(val, 64)
+        elif key == "strategies_tried":
+            val = int(val or 0)
+        elif key == "error_message":
+            val = _truncate_text(val, 1024)
+        elif key in ("input_tokens", "output_tokens", "latency_ms"):
+            val = int(val or 0)
+        set_parts.append(f"{key} = ?")
+        values.append(val)
+    if not set_parts:
+        return False
+    values.append(int(log_id))
 
     with _log_conn_lock:
         conn = _get_log_conn()
         try:
             conn.execute(
-                """
-                UPDATE llm_call_logs SET
-                    raw_output = ?,
-                    parsed_output = ?,
-                    parse_success = ?,
-                    success_strategy = ?,
-                    strategies_tried = ?,
-                    error_message = ?,
-                    input_tokens = ?,
-                    output_tokens = ?,
-                    latency_ms = ?
-                WHERE id = ?
-                """,
-                (
-                    _truncate(raw_output, 131072),
-                    _truncate(parsed_text, 131072),
-                    1 if parse_success else 0,
-                    _truncate(success_strategy, 64),
-                    int(strategies_tried or 0),
-                    _truncate(error_message, 1024),
-                    int(input_tokens or 0),
-                    int(output_tokens or 0),
-                    int(latency_ms or 0),
-                    int(log_id),
-                ),
+                "UPDATE llm_call_logs SET " + ", ".join(set_parts) + " WHERE id = ?",
+                tuple(values),
             )
             conn.commit()
             return True
@@ -328,9 +323,7 @@ def update_llm_call_log(
             return False
 
 
-# ==============================================================================
-# 查询（必须用日志连接，因为数据在独立的 db 文件中）
-# ==============================================================================
+
 
 def get_llm_call_log(log_id: int) -> Optional[Dict[str, Any]]:
     """获取单条LLM调用日志。"""

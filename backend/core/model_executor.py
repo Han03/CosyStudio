@@ -19,6 +19,27 @@ from utils.logger import log_manager
 
 _logger = log_manager.get_logger("model_executor")
 
+
+def _probe_json_parse(raw: str) -> bool:
+    """轻量探测输出是否为合法 JSON 对象（去 markdown 围栏后）。
+
+    用于 execute_text_chat 写日志时 parse_success 的兜底语义：
+    对未走 parse_llm_json 的调用（草稿/润色/审查自定义解析等），
+    日志解析状态也要反映"输出是否为合法 JSON"，而不是恒为 False；
+    走 parse_llm_json 的调用随后会经桥接 UPDATE 覆盖为更精确的结果。
+    """
+    if not raw or not raw.strip():
+        return False
+    t = raw.strip()
+    if t.startswith("```"):
+        t = t.strip("`").strip()
+        if t.startswith("json"):
+            t = t[4:].strip()
+    try:
+        return isinstance(json.loads(t), dict)
+    except Exception:
+        return False
+
 # 🔴 本地模型推理全局串行锁（模块级，跨 ModelExecutor 实例共享）。
 # 本地 Qwen/Embedding/Reranker/CosyVoice/DreamLite 均为单实例模型，不支持多线程并发推理：
 # 多个创作任务（如同时打开两个剧本编辑器做智能创作）若并发调用会导致
@@ -169,6 +190,11 @@ class ModelExecutor:
                 final_err = log_error_msg
 
                 from repositories.llm_call_log_repository import add_llm_call_log
+                # 🔴 parse_success 语义修复：不再硬编码 False。
+                # 未走 parse_llm_json 的调用（草稿/润色/审查等）也做一次轻量 JSON 探测，
+                # 让日志解析状态真实可分析；走 parse_llm_json 的调用随后经桥接 UPDATE 覆盖更精确结果。
+                if not log_parse_success and log_raw_output:
+                    log_parse_success = _probe_json_parse(log_raw_output)
                 log_id = add_llm_call_log(
                     request_id=final_request_id,
                     script_id=final_script_id,
@@ -798,6 +824,11 @@ class ModelExecutor:
                             yield {"type": "text", "content": content, "done": False}
                     except json.JSONDecodeError:
                         continue
+                # 🔴 API 偶发未返回 usage chunk 时（aliyun/glm 兼容接口不保证每次都带），
+                #    用字符量估算兜底，保证日志 token 字段可用于成本/体积分析。
+                if not total_prompt_tokens or not total_completion_tokens:
+                    total_prompt_tokens = total_prompt_tokens or max(1, len(prompt) // 2)
+                    total_completion_tokens = total_completion_tokens or max(1, len(full_content) // 2)
                 yield {
                     "type": "finish",
                     "model_name": finish_model,
