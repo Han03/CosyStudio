@@ -348,7 +348,8 @@ class ContextBuilderExecutor(BaseExecutor):
         except Exception:
             pass
 
-        for i in range(max(0, chapter_index - 5), chapter_index):
+        # 🔴 章节索引从 1 开始，起点必须 max(1, ...)，否则第 0 章（不存在）混入候选清单
+        for i in range(max(1, chapter_index - 5), chapter_index):
             summary = summaries_by_ch.get(i, "")
             if not summary:
                 # 回退：截取 script_lines 的前 200 字

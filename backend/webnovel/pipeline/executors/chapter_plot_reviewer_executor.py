@@ -9,7 +9,6 @@
 """
 
 import json
-import re
 from typing import Dict, Any, List, Optional
 from ..base_executor import BaseExecutor, ExecutorResult
 from ..context_analyzer import ContextAnalyzer
@@ -164,20 +163,32 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         )
 
         content = result.get("content", "") if result else ""
-        return self._parse_review_response(content)
+        return self._parse_review_response(
+            content,
+            project_id=project_id,
+            executor_name="chapter_plot_reviewer_score",
+            prompt_name=f"plot_review_{chapter_index}",
+        )
 
-    def _parse_review_response(self, content: str) -> List[Dict[str, Any]]:
-        """解析审查 LLM 返回的 JSON。"""
+    def _parse_review_response(
+        self, content: str, *, project_id: int = 0,
+        executor_name: str = "", prompt_name: str = ""
+    ) -> List[Dict[str, Any]]:
+        """解析审查 LLM 返回的 JSON。
+
+        统一走 parse_llm_json：既复用其容错策略，也让日志里的 parse_success
+        反映真实解析结果（此前自定义 json.loads 绕过统一解析，导致日志中
+        plot_review_* 恒为 parse_ok=0% 的假象）。
+        """
         results = []
-        try:
-            content = re.sub(r'```json\s*', '', content)
-            content = re.sub(r'\s*```', '', content)
-            json_match = re.search(r'\{[\s\S]*\}', content)
-            if json_match:
-                review_data = json.loads(json_match.group())
-            else:
-                review_data = {"reviews": []}
-        except Exception:
+        review_data = parse_llm_json(
+            content,
+            script_id=self.script_id,
+            project_id=project_id,
+            executor_name=executor_name,
+            prompt_name=prompt_name,
+        )
+        if not review_data or not isinstance(review_data, dict):
             review_data = {"reviews": []}
 
         reviews = review_data.get("reviews", [])

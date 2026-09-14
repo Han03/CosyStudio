@@ -318,9 +318,12 @@ def parse_llm_json(
                 # 🔴 update_llm_call_log 仅接受固定参数集，必须先过滤掉 log_kwargs 中的
                 #    元数据键（request_id/executor_name/system_prompt 等），否则 TypeError 会导致
                 #    解析结果回写失败、日志里 parse_success 永远为假 0。
+                # token/latency 由 execute_text_chat 统一测量并 INSERT，parse 阶段绝不回写：
+                # update_llm_call_log 无条件覆盖全部列（缺省参数=0），若把这三个键放进来，
+                # 会把 INSERT 时的真实 token/latency 覆盖成 0（历史 ctx_analysis 等全 0 的根因）。
                 _allowed_update_keys = (
                     "raw_output", "parsed_output", "parse_success", "success_strategy",
-                    "strategies_tried", "error_message", "input_tokens", "output_tokens", "latency_ms",
+                    "strategies_tried", "error_message",
                 )
                 update_kwargs = {k: v for k, v in log_kwargs.items() if k in _allowed_update_keys}
                 update_llm_call_log(log_id=existing_log_id, **update_kwargs)
