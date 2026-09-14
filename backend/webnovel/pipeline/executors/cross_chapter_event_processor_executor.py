@@ -208,6 +208,8 @@ class CrossChapterEventProcessorExecutor(BaseExecutor):
                     current_status="未触发",
                     trigger_chapter=0,
                     result="",
+                    project_id=project_id,
+                    planted_chapter=chapter_index,
                 )
                 existing.add(name)
                 count += 1

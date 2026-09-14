@@ -106,17 +106,55 @@ def get_timeline_chapters(timeline_id: int) -> List[dict]:
         return [dict(row) for row in cursor.fetchall()]
 
 
-def add_timeline_countdown(timeline_id: int, event_name: str = "", start_countdown: str = "", current_status: str = "", trigger_chapter: int = 0, result: str = "") -> dict:
-    """添加倒计时事件。"""
+def add_timeline_countdown(timeline_id: int, event_name: str = "", start_countdown: str = "", current_status: str = "", trigger_chapter: int = 0, result: str = "", project_id: int = 0, planted_chapter: int = 0) -> dict:
+    """添加倒计时事件。project_id/planted_chapter 用于按章回退。"""
     with _lock:
         conn = _get_conn()
         cursor = conn.execute(
-            "INSERT INTO webnovel_timeline_countdown (timeline_id, event_name, start_countdown, current_status, trigger_chapter, result) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO webnovel_timeline_countdown (timeline_id, event_name, start_countdown, current_status, trigger_chapter, result, project_id, planted_chapter) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (safe_int(timeline_id), safe_str(event_name), safe_str(start_countdown),
-             safe_str(current_status), safe_int(trigger_chapter), safe_str(result))
+             safe_str(current_status), safe_int(trigger_chapter), safe_str(result),
+             safe_int(project_id), safe_int(planted_chapter))
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "timeline_id": timeline_id, "event_name": event_name, "start_countdown": start_countdown, "current_status": current_status, "trigger_chapter": trigger_chapter, "result": result}
+        return {"id": cursor.lastrowid, "timeline_id": timeline_id, "event_name": event_name, "start_countdown": start_countdown, "current_status": current_status, "trigger_chapter": trigger_chapter, "result": result, "project_id": project_id, "planted_chapter": planted_chapter}
+
+
+def get_timeline_countdowns_by_project(project_id: int) -> List[dict]:
+    """按项目获取倒计时事件。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "SELECT * FROM webnovel_timeline_countdown WHERE project_id = ?",
+            (safe_int(project_id),)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def delete_timeline_countdowns_by_planted_chapter(project_id: int, chapter_number: int) -> int:
+    """删除指定埋设章的倒计时事件（含已触发与未触发）。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM webnovel_timeline_countdown WHERE project_id = ? AND planted_chapter = ?",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def restore_timeline_countdowns_by_trigger_chapter(project_id: int, chapter_number: int) -> int:
+    """恢复指定触发章的倒计时为未触发（取消应用回收章时）。返回恢复数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """UPDATE webnovel_timeline_countdown
+               SET current_status = '未触发', trigger_chapter = 0, result = ''
+               WHERE project_id = ? AND trigger_chapter = ?""",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
 
 
 def get_timeline_countdowns(timeline_id: int) -> List[dict]:
@@ -152,3 +190,15 @@ def update_timeline_countdown(countdown_id: int, current_status: str = "",
         conn.commit()
         return {"id": existing["id"], "current_status": current_status,
                 "trigger_chapter": trigger_chapter, "result": result}
+
+
+def delete_timeline_chapters_by_chapter(timeline_id: int, chapter_number: int) -> int:
+    """删除指定章节的时间锚点记录。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM webnovel_timeline_chapter WHERE timeline_id = ? AND chapter_number = ?",
+            (safe_int(timeline_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount

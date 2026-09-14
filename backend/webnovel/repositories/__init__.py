@@ -17,12 +17,15 @@ from .character_card_repository import (
     add_character_growth, get_character_growths, add_character_power, get_character_power,
     upsert_character_item, mark_character_item_lost,
     get_character_items, get_character_items_by_project,
-    get_active_character_ids
+    get_active_character_ids, delete_relationships_by_chapter, delete_growths_by_chapter,
+    get_items_acquired_in_chapter, delete_items_acquired_in_chapter,
+    restore_items_lost_in_chapter,
 )
 from .character_state_repository import (
     upsert_character_state,
     get_character_states_by_chapter,
-    get_character_states_before_chapter
+    get_character_states_before_chapter,
+    delete_character_states_by_chapter,
 )
 from .character_group_repository import (
     add_character_group, get_character_group, get_character_group_by_project,
@@ -50,7 +53,9 @@ from .volume_outline_repository import (
 from .timeline_repository import (
     add_timeline, get_timeline, get_timelines_by_project, get_timeline_by_project,
     add_timeline_chapter, upsert_timeline_chapter, get_timeline_chapters,
-    add_timeline_countdown, get_timeline_countdowns, update_timeline_countdown
+    add_timeline_countdown, get_timeline_countdowns, update_timeline_countdown,
+    get_timeline_countdowns_by_project, delete_timeline_countdowns_by_planted_chapter,
+    restore_timeline_countdowns_by_trigger_chapter, delete_timeline_chapters_by_chapter
 )
 from .genre_fusion_repository import (
     add_genre_fusion, get_genre_fusion, get_genre_fusion_by_project
@@ -86,6 +91,8 @@ from .foreshadowing_repository import (
     add_open_loop, update_open_loop_resolved, get_open_loops_by_project,
     get_active_open_loops, update_open_loop_urgency, add_cool_point,
     get_cool_points_by_project, get_cool_points_by_chapter, get_cool_points_count_by_type,
+    delete_open_loops_by_planted_chapter, restore_open_loops_by_resolved_chapter,
+    delete_cool_points_by_chapter,
 )
 from .csv_pack_repository import (
     add_csv_pack, batch_add_csv_packs, get_csv_pack, get_csv_pack_by_code,
@@ -104,4 +111,12 @@ from .story_system_repository import (
 from .chapter_plot_repository import (
     add_chapter_plot, get_chapter_plot, get_chapter_plots_by_project,
     delete_chapter_plot, delete_chapter_plots_by_project
+)
+
+from .worldview_setting_repository import (
+    add_worldview_setting, get_worldview_settings_by_project,
+    get_worldview_settings_by_chapter, delete_worldview_settings_by_chapter
+)
+from .setting_change_repository import (
+    add_setting_change, get_setting_changes_by_chapter, delete_setting_changes_by_chapter
 )

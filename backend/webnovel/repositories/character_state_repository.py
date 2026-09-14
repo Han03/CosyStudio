@@ -81,3 +81,15 @@ def get_character_states_before_chapter(project_id: int, chapter_number: int) ->
             return []
         latest_ch = rows[0]["chapter_number"]
         return [r for r in rows if r["chapter_number"] == latest_ch]
+
+
+def delete_character_states_by_chapter(project_id: int, chapter_number: int) -> int:
+    """删除指定章节的角色状态快照。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM webnovel_character_state WHERE project_id = ? AND chapter_number = ?",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount

@@ -149,18 +149,18 @@ def reassign_character_data(old_char_id: int, new_char_id: int) -> None:
         conn.commit()
 
 
-def add_character_relationship(character_id: int, relation_type: str, target_character_id: int = None, target_name: str = "", description: str = "") -> dict:
-    """添加角色关系。"""
+def add_character_relationship(character_id: int, relation_type: str, target_character_id: int = None, target_name: str = "", description: str = "", source_chapter: int = 0) -> dict:
+    """添加角色关系。source_chapter 记录来源章（0=初始化），用于按章回退。"""
     with _lock:
         conn = _get_conn()
         cursor = conn.execute(
-            "INSERT INTO webnovel_character_relationship (character_id, relation_type, target_character_id, target_name, description) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO webnovel_character_relationship (character_id, relation_type, target_character_id, target_name, description, source_chapter) VALUES (?, ?, ?, ?, ?, ?)",
             (safe_int(character_id), safe_str(relation_type),
              safe_int(target_character_id) if target_character_id is not None else None,
-             safe_str(target_name), safe_str(description))
+             safe_str(target_name), safe_str(description), safe_int(source_chapter))
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "character_id": character_id, "relation_type": relation_type, "target_character_id": target_character_id, "target_name": target_name, "description": description}
+        return {"id": cursor.lastrowid, "character_id": character_id, "relation_type": relation_type, "target_character_id": target_character_id, "target_name": target_name, "description": description, "source_chapter": source_chapter}
 
 
 def get_character_relationships(character_id: int) -> List[dict]:
@@ -174,16 +174,16 @@ def get_character_relationships(character_id: int) -> List[dict]:
         return [dict(row) for row in cursor.fetchall()]
 
 
-def add_character_growth(character_id: int, stage: str, description: str = "") -> dict:
-    """添加角色成长弧线。"""
+def add_character_growth(character_id: int, stage: str, description: str = "", source_chapter: int = 0) -> dict:
+    """添加角色成长弧线。source_chapter 记录来源章（0=初始化），用于按章回退。"""
     with _lock:
         conn = _get_conn()
         cursor = conn.execute(
-            "INSERT INTO webnovel_character_growth (character_id, stage, description) VALUES (?, ?, ?)",
-            (safe_int(character_id), safe_str(stage), safe_str(description))
+            "INSERT INTO webnovel_character_growth (character_id, stage, description, source_chapter) VALUES (?, ?, ?, ?)",
+            (safe_int(character_id), safe_str(stage), safe_str(description), safe_int(source_chapter))
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "character_id": character_id, "stage": stage, "description": description}
+        return {"id": cursor.lastrowid, "character_id": character_id, "stage": stage, "description": description, "source_chapter": source_chapter}
 
 
 def get_character_growths(character_id: int) -> List[dict]:
@@ -375,6 +375,76 @@ def get_character_items_by_project(project_id: int, only_held: bool = True) -> D
         for row in cursor.fetchall():
             grouped.setdefault(row["character_id"], []).append(dict(row))
         return grouped
+
+
+def delete_relationships_by_chapter(project_id: int, chapter_number: int) -> int:
+    """删除指定来源章新增的角色关系。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """DELETE FROM webnovel_character_relationship
+               WHERE character_id IN (SELECT id FROM webnovel_character_card WHERE project_id = ?)
+               AND source_chapter = ?""",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def delete_growths_by_chapter(project_id: int, chapter_number: int) -> int:
+    """删除指定来源章记录的成长弧线。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """DELETE FROM webnovel_character_growth
+               WHERE character_id IN (SELECT id FROM webnovel_character_card WHERE project_id = ?)
+               AND source_chapter = ?""",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def get_items_acquired_in_chapter(project_id: int, chapter_number: int) -> List[dict]:
+    """获取指定章节获得的所有物品行（取消应用时删除）。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """SELECT it.* FROM webnovel_character_item it
+               JOIN webnovel_character_card c ON c.id = it.character_id
+               WHERE c.project_id = ? AND it.acquired_chapter = ?""",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def delete_items_acquired_in_chapter(project_id: int, chapter_number: int) -> int:
+    """删除指定章节获得的物品行。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """DELETE FROM webnovel_character_item
+               WHERE character_id IN (SELECT id FROM webnovel_character_card WHERE project_id = ?)
+               AND acquired_chapter = ?""",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def restore_items_lost_in_chapter(project_id: int, chapter_number: int) -> int:
+    """恢复指定章节失去的物品为持有（lost_chapter=0）。返回恢复数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """UPDATE webnovel_character_item
+               SET lost_chapter = 0, quantity = 1
+               WHERE character_id IN (SELECT id FROM webnovel_character_card WHERE project_id = ?)
+               AND lost_chapter = ?""",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
 
 
 def get_active_character_ids(project_id: int, chapter_index: int, recent_window: int = 3) -> Set[int]:

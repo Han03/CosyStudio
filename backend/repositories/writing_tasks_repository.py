@@ -159,3 +159,15 @@ def add_pipeline_log(script_id: int, chapter_index: int, task_id: int,
             "duration_ms": duration_ms,
             "created_at": now,
         }
+
+
+def delete_pipeline_logs_by_chapter(script_id: int, chapter_index: int) -> int:
+    """删除指定章节的流程执行日志。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM script_writing_pipeline_logs WHERE script_id = ? AND chapter_index = ?",
+            (script_id, chapter_index)
+        )
+        conn.commit()
+        return cursor.rowcount

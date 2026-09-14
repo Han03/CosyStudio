@@ -24,7 +24,8 @@ from repositories import (
     get_script, get_script_chapters_all, get_script_chapter,
     get_writing_tasks, add_writing_task, update_writing_task, get_writing_task,
     delete_writing_task, get_active_writing_tasks,
-    get_ebook, get_chapters
+    get_ebook, get_chapters,
+    delete_pipeline_logs_by_chapter,
 )
 from webnovel.repositories import (
     get_webnovel_project, get_webnovel_project_by_script, get_volume_outlines_by_project,
@@ -36,6 +37,14 @@ from webnovel.repositories import (
     get_character_cards_by_project, get_golden_finger_by_project,
     get_power_system_by_project, get_villains_by_project,
     get_character_card, get_character_items_by_project,
+    get_timelines_by_project, delete_timeline_chapters_by_chapter,
+    delete_timeline_countdowns_by_planted_chapter, restore_timeline_countdowns_by_trigger_chapter,
+    delete_cool_points_by_chapter, delete_character_states_by_chapter,
+    delete_worldview_settings_by_chapter, delete_relationships_by_chapter,
+    delete_growths_by_chapter, delete_open_loops_by_planted_chapter,
+    restore_open_loops_by_resolved_chapter, get_setting_changes_by_chapter,
+    delete_setting_changes_by_chapter, delete_character_card,
+    update_character_card, get_character_items, mark_character_item_lost,
 )
 from core.model_executor import get_model_executor
 from infrastructure.websocket_broadcast import ws_broadcast_manager
@@ -1939,6 +1948,163 @@ class WebnovelService:
                 "suggestions": record.get("suggestions", ""),
             })
         return review_list
+
+    async def rollback_apply_by_chapter(self, script_id: int, chapter_index: int,
+                                        project_id: int = 0) -> dict:
+        """取消应用结果：按章节回退该章"应用结果"产生的全部数据。
+
+        顺序（任一步失败不阻断后续，汇总返回）：
+        1. 章节正文直接删除（script_service.delete_chapter：文件+DB行+台词）
+        2. RAG 三类型 chunk 按章删除
+        3. 直接删除：爽点 / 角色状态快照 / 章节时间锚点 / 世界观设定 / 执行日志 / 关系 / 成长
+        4. 物品：该章获得删行、该章失去恢复持有
+        5. 开放悬念：埋设章删除；回收章恢复 active
+        6. 倒计时：埋设章删除；触发章恢复未触发
+        7. 基础设定变更回退（角色卡）：create 删卡 / update_ability 还原 / reveal 重建旧卡
+        8. 清理该章设定变更日志
+        """
+        summary = {"deleted": {}, "restored": {}, "rolled_back": {}, "errors": []}
+
+        def _safe(name: str, fn, *args) -> int:
+            try:
+                n = fn(*args) or 0
+                summary["deleted"][name] = n
+                return n
+            except Exception as e:
+                summary["errors"].append(f"{name}: {e}")
+                return 0
+
+        def _safe_restore(name: str, fn, *args) -> int:
+            try:
+                n = fn(*args) or 0
+                summary["restored"][name] = n
+                return n
+            except Exception as e:
+                summary["errors"].append(f"{name}: {e}")
+                return 0
+
+        try:
+            # 0. 定位项目
+            project = None
+            if not project_id:
+                project = get_webnovel_project_by_script(script_id)
+                project_id = project["id"] if project else 0
+            if not project_id:
+                summary["errors"].append("project 未找到")
+                return summary
+
+            # 1. 章节正文直接删除
+            try:
+                from services.script_service import get_script_service
+                ok, msg = await get_script_service().delete_chapter(script_id, chapter_index)
+                summary["deleted"]["script_chapter"] = 1 if ok else 0
+                if not ok:
+                    summary["errors"].append(f"script_chapter: {msg}")
+            except Exception as e:
+                summary["errors"].append(f"script_chapter: {e}")
+
+            # 2. RAG 三类型 chunk 删除
+            try:
+                from services.vector_store import get_rag_service
+                rag = get_rag_service()
+                for rtype in ("character", "worldview", "chapter"):
+                    try:
+                        n = rag.delete_by_chapter_number(rtype, chapter_index)
+                        summary["deleted"][f"rag_{rtype}"] = n or 0
+                    except Exception as e:
+                        summary["errors"].append(f"rag_{rtype}: {e}")
+            except Exception as e:
+                summary["errors"].append(f"rag: {e}")
+
+            # 3. 直接删除
+            _safe("cool_points", delete_cool_points_by_chapter, project_id, chapter_index)
+            _safe("character_state", delete_character_states_by_chapter, project_id, chapter_index)
+            _safe("worldview_setting", delete_worldview_settings_by_chapter, project_id, chapter_index)
+            _safe("pipeline_logs", delete_pipeline_logs_by_chapter, script_id, chapter_index)
+            _safe("relationships", delete_relationships_by_chapter, project_id, chapter_index)
+            _safe("growths", delete_growths_by_chapter, project_id, chapter_index)
+            # 章节时间锚点：按卷时间轴定位
+            try:
+                timelines = get_timelines_by_project(project_id)
+                del_tl = 0
+                for tl in timelines:
+                    del_tl += delete_timeline_chapters_by_chapter(tl["id"], chapter_index) or 0
+                summary["deleted"]["timeline_chapter"] = del_tl
+            except Exception as e:
+                summary["errors"].append(f"timeline_chapter: {e}")
+
+            # 4. 物品：该章获得删行、该章失去恢复持有
+            _safe("items_acquired", delete_items_acquired_in_chapter, project_id, chapter_index)
+            _safe_restore("items_lost", restore_items_lost_in_chapter, project_id, chapter_index)
+
+            # 5. 开放悬念：埋设章删除；回收章恢复 active
+            _safe("open_loops_planted", delete_open_loops_by_planted_chapter, project_id, chapter_index)
+            _safe_restore("open_loops_resolved", restore_open_loops_by_resolved_chapter,
+                          project_id, chapter_index)
+
+            # 6. 倒计时：埋设章删除；触发章恢复未触发
+            _safe("countdown_planted", delete_timeline_countdowns_by_planted_chapter,
+                  project_id, chapter_index)
+            _safe_restore("countdown_triggered", restore_timeline_countdowns_by_trigger_chapter,
+                          project_id, chapter_index)
+
+            # 7. 基础设定变更回退（角色卡）
+            changes = get_setting_changes_by_chapter(project_id, chapter_index) or []
+            for ch in changes:
+                try:
+                    etype = str(ch.get("entity_type", "") or "")
+                    ctype = str(ch.get("change_type", "") or "")
+                    entity_id = ch.get("entity_id")
+                    before = ch.get("before_data") or ""
+                    after = ch.get("after_data") or ""
+                    if etype != "character_card" or not entity_id:
+                        continue
+                    if ctype == "create":
+                        card = get_character_card(project_id, int(entity_id))
+                        if card:
+                            delete_character_card(int(entity_id))
+                            summary["rolled_back"][f"create:{entity_id}"] = 1
+                    elif ctype == "update_ability":
+                        card = get_character_card(project_id, int(entity_id))
+                        if card:
+                            try:
+                                bd = json.loads(before)
+                                prev = str(bd.get("ability_limit", "") or "")
+                            except Exception:
+                                prev = ""
+                            update_character_card(int(entity_id), ability_limit=prev)
+                            summary["rolled_back"][f"ability:{entity_id}"] = 1
+                    elif ctype == "reveal":
+                        try:
+                            bd = json.loads(before)
+                        except Exception:
+                            bd = {}
+                        old_card = get_character_card(project_id, int(entity_id))
+                        if not old_card:
+                            # 旧卡已被合并删除：按 before 快照重建
+                            add_character_card(
+                                project_id, str(bd.get("character_type", "supporting")),
+                                name=str(bd.get("name", "")),
+                                alias=str(bd.get("alias", "")),
+                                identity=str(bd.get("identity", "")),
+                            )
+                            summary["rolled_back"][f"reveal_recreate:{entity_id}"] = 1
+                        else:
+                            # 改名路径：直接还原字段
+                            update_character_card(
+                                int(entity_id),
+                                name=str(bd.get("name", "")),
+                                alias=str(bd.get("alias", "")),
+                                identity=str(bd.get("identity", "")),
+                            )
+                            summary["rolled_back"][f"reveal_restore:{entity_id}"] = 1
+                except Exception as e:
+                    summary["errors"].append(f"setting_change({ch.get('id')}): {e}")
+            _safe("setting_changes", delete_setting_changes_by_chapter, project_id, chapter_index)
+
+        except Exception as e:
+            summary["errors"].append(f"rollback_apply_by_chapter 整体异常: {e}")
+        return summary
 
 
 _webnovel_service = None
