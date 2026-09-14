@@ -8,7 +8,9 @@ logging.basicConfig(level=logging.INFO)
 
 from llm.llm import Qwen2Encoder
 
-model_path = 'c:/MyProjects/ai/CosyStudio/pretrained_models/cosyvoice/iic_CosyVoice2-0.5B/CosyVoice-BlankEN'
+# 项目根相对路径（无需因项目迁移改动）；模型目录需按实际部署放置
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+model_path = os.path.join(_PROJECT_ROOT, "pretrained_models", "cosyvoice", "iic_CosyVoice2-0.5B", "CosyVoice-BlankEN")
 
 print(f"Loading Qwen2Encoder from: {model_path}")
 encoder = Qwen2Encoder(model_path)
