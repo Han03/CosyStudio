@@ -174,7 +174,7 @@ class ContextAnalyzer:
             result = await executor.execute_text_chat(
                 prompt=prompt_text,
                 system_prompt=system_prompt,
-                max_tokens=900,
+                max_tokens=500,
                 script_id=self.script_id,
                 project_id=env["project_id"],
                 executor_name="context_analyzer",

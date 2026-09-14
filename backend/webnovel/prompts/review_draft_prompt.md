@@ -44,4 +44,5 @@ user_prompt: |
   - issues 中 severity 为 critical/high 的问题，worth_revising 必须为 true
   - 维度覆盖：必须覆盖所有5个审查维度（爽点呈现/设定一致/节奏控制/叙事连贯/结尾自然度）
   - 未发现问题时 score 给 9-10 分，issues 为空数组
+  - 只输出上述JSON对象本身，禁止输出分析过程、解释文字或代码块标记；description每条不超过40字，fix_hint每条不超过30字，suggestions不超过60字
 ---

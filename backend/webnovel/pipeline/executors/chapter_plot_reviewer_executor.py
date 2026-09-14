@@ -76,7 +76,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             last_review = []
 
             while revision_count < self.MAX_REVISIONS:
-                review_result = await self._review_plot(current_plot, chapter_index, step_ctx)
+                review_result = await self._review_plot(current_plot, chapter_index, step_ctx, context.get("word_config") or {})
                 last_review = review_result
 
                 # 标记驱动：存在值得修正的问题或可落实的建议才触发修正，分数仅作观测指标
@@ -94,7 +94,8 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
                     break
 
                 # 触发修正
-                revised_plot = await self._revise_plot(current_plot, review_result)
+                revised_plot = await self._revise_plot(
+                    current_plot, review_result, context.get("word_config") or {})
                 if revised_plot:
                     # 提前终止：修正后与修正前几乎相同（LLM 未做实质修改），继续循环无意义
                     old_text = json.dumps(current_plot, ensure_ascii=False, sort_keys=True)
@@ -135,6 +136,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
     async def _review_plot(
         self, plot_list: list, chapter_index: int,
         step_ctx: Optional[Dict[str, Any]] = None,
+        word_cfg: Dict[str, Any] = None,
     ) -> List[Dict[str, Any]]:
         """单次 LLM 调用完成所有维度审查。"""
         project = get_webnovel_project_by_script(self.script_id)
@@ -155,7 +157,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         result = await executor.execute_text_chat(
             prompt=prompt,
             system_prompt=system_prompt,
-            max_tokens=2000,
+            max_tokens=int((word_cfg or {}).get("review_max_tokens", 800)),
             script_id=self.script_id,
             project_id=project_id,
             executor_name="chapter_plot_reviewer_score",
@@ -245,7 +247,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         return results
 
     async def _revise_plot(
-        self, plot_list: list, review_result: List[Dict[str, Any]]
+        self, plot_list: list, review_result: List[Dict[str, Any]], word_cfg: Dict[str, Any] = None
     ) -> list:
         """根据审查反馈修正剧情列表。"""
         issues = []
@@ -281,7 +283,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
         result = await executor.execute_text_chat(
             prompt=prompt,
             system_prompt=system_prompt,
-            max_tokens=2500,
+            max_tokens=int((word_cfg or {}).get("plot_revise_max_tokens", 2500)),
             script_id=self.script_id,
             project_id=project_id,
             executor_name="chapter_plot_reviewer_revise",
