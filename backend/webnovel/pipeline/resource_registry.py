@@ -504,7 +504,7 @@ def _fmt_plot_list(plot_list, depth="list"):
         characters = plot.get("characters", [])
         emotion = plot.get("emotion", "")
         conflict = plot.get("conflict", "")
-        line = f"{i}. 【{scene}】"
+        line = f"{i}. 场景「{scene}」"
         if description:
             line += f"\n   {description}"
         if characters:
