@@ -38,7 +38,6 @@ NODE_EXECUTOR_NAMES: Dict[str, Set[str]] = {
     "draft_generator": {"draft_generator"},
     "draft_reviewer": {"draft_reviewer_score", "draft_reviewer_revise"},
     "draft_polisher": {"draft_polisher"},
-    "setting_recorder": {"setting_recorder"},
 }
 
 VALID_NODES = sorted(NODE_EXECUTOR_NAMES.keys())
@@ -74,7 +73,6 @@ class SideEffectGuard:
     PATCH_TARGETS = [
         ("webnovel.pipeline.executors.chapter_plot_generator_executor", "add_chapter_plot", None),
         ("webnovel.pipeline.executors.chapter_plot_reviewer_executor", "add_chapter_plot", None),
-        ("webnovel.pipeline.executors.setting_recorder_executor", "add_worldview", {}),
     ]
 
     def __init__(self, commit: bool = False):

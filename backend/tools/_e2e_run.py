@@ -3,7 +3,7 @@
 
 - 清除第3章剧情缓存（强制走剧情生成）
 - 设置 chapter_words=4000 验证字数参数化接通
-- 跑 context_builder → plot_generator → plot_reviewer → draft_generator → draft_reviewer → draft_polisher → setting_recorder
+- 跑 context_builder → plot_generator → plot_reviewer → draft_generator → draft_reviewer → draft_polisher
 """
 import asyncio
 import os
@@ -58,7 +58,6 @@ async def main():
         "draft_generator",
         "draft_reviewer",
         "draft_polisher",
-        "setting_recorder",
     ]
 
     result = await orch.execute_pipeline(steps, user_prompt="")
