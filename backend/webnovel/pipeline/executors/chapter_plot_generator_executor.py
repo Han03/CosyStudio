@@ -85,7 +85,7 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
             # 加载 prompt 模板并填充
             prompt_data = self._load_prompt("chapter_plot_generate")
             word_cfg = context.get("word_config") or {}
-            full_prompt = prompt_data["user_prompt"].format(
+            full_prompt = self._format_prompt(prompt_data["user_prompt"], 
                 chapter_index=chapter_index,
                 continue_prev=continue_prev,
                 assembled_context=step_ctx["assembled_context"],

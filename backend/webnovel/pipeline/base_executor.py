@@ -27,6 +27,11 @@ class BaseExecutor:
         """执行步骤。"""
         raise NotImplementedError("子类必须实现 execute 方法")
 
+    def _format_prompt(self, template: str, **kwargs) -> str:
+        """格式化 prompt 模板并归一化注入内容（去行尾空白/连续空行/全角空格/零宽字符）。"""
+        from utils.prompt_normalizer import normalize_text_block
+        return normalize_text_block(template.format(**kwargs))
+
     def _load_prompt(self, prompt_name: str) -> Dict[str, str]:
         """加载prompt模板。从 prompts/webnovel/{prompt_name}_prompt.md 读取。
 

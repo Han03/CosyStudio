@@ -279,7 +279,8 @@ class ContextAnalyzer:
         focus = goal["focus"]
 
         try:
-            return user_prompt.format(
+            from utils.prompt_normalizer import normalize_text_block
+            return normalize_text_block(user_prompt.format(
                 chapter_index=chapter_index,
                 step_name=step_name,
                 step_description=step_description,
@@ -289,7 +290,7 @@ class ContextAnalyzer:
                 prev_step_selections_text=prev_step_selections_text,
                 dimension_checklist_text=dimension_checklist_text,
                 output_schema=output_schema,
-            )
+            ))
         except KeyError as e:
             self._logger.error(f"[ContextAnalyzer] prompt 占位符缺失: {e}")
             return ""
@@ -602,13 +603,19 @@ class ContextAnalyzer:
             sections["rag_results"] = (
                 RESOURCE_REGISTRY["rag_results"]["formatters"]["full"](rag_results))
 
-        # 7. 按节点区块顺序组装 assembled_context
+        # 7. 按节点区块顺序组装 assembled_context（每区块归一化，JSON 块保留缩进）
+        from utils.prompt_normalizer import normalize_text_block
+        _JSON_SECTIONS = {"plot_list", "review_result"}
         ordered = []
         for sec_name, _ in assembly["sections"]:
             if sec_name in sections:
                 header = RESOURCE_REGISTRY[sec_name]["header"]
-                ordered.append(f"{header}\n{sections[sec_name]}")
-        ctx["assembled_context"] = "\n\n".join(ordered)
+                body = sections[sec_name]
+                if sec_name not in _JSON_SECTIONS:
+                    body = normalize_text_block(body, mode="preserve_md_list")
+                ordered.append(f"{header}\n{body}")
+        ctx["assembled_context"] = normalize_text_block(
+            "\n\n".join(ordered), mode="preserve_md_list")
         ctx["sections"] = sections
         return ctx
 
@@ -683,11 +690,14 @@ class ContextAnalyzer:
                     chunk_types=chunk_types,
                 )
                 for r in results:
+                    from utils.prompt_normalizer import normalize_text_block
                     content = r.get("content", "")
                     dedup = content[:50] + "|" + content[-50:] if len(content) > 100 else content
                     if dedup not in seen:
                         seen.add(dedup)
-                        all_results.append(r)
+                        _r = dict(r)
+                        _r["content"] = normalize_text_block(content)
+                        all_results.append(_r)
 
             return all_results[:10]
 

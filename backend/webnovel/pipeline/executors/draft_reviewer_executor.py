@@ -172,7 +172,7 @@ class DraftReviewerExecutor(BaseExecutor):
     ) -> List[Dict[str, Any]]:
         """审查草稿（单次LLM调用完成所有维度）。"""
         prompt_data = self._load_prompt("review_draft")
-        prompt = prompt_data["user_prompt"].format(
+        prompt = self._format_prompt(prompt_data["user_prompt"], 
             assembled_context=step_ctx.get("assembled_context", ""),
             draft=draft,
         )
@@ -297,7 +297,7 @@ class DraftReviewerExecutor(BaseExecutor):
 
         prompt_data = self._load_prompt("revise_draft")
         word_cfg = word_cfg or {}
-        prompt = prompt_data["user_prompt"].format(
+        prompt = self._format_prompt(prompt_data["user_prompt"],
             issues_text=chr(10).join(issues),
             suggestions_text=chr(10).join(suggestions),
             draft=draft,
