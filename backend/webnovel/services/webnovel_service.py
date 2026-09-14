@@ -45,6 +45,8 @@ from webnovel.repositories import (
     restore_open_loops_by_resolved_chapter, get_setting_changes_by_chapter,
     delete_setting_changes_by_chapter, delete_character_card,
     update_character_card, get_character_items, mark_character_item_lost,
+    delete_items_acquired_in_chapter, restore_items_lost_in_chapter,
+    delete_chapter_meta, delete_chapter_plot,
 )
 from core.model_executor import get_model_executor
 from infrastructure.websocket_broadcast import ws_broadcast_manager
@@ -1984,24 +1986,25 @@ class WebnovelService:
                 return 0
 
         try:
-            # 0. 定位项目
+            # 0. 定位项目（普通剧本无 webnovel_project 记录时仅执行正文删除）
             project = None
             if not project_id:
                 project = get_webnovel_project_by_script(script_id)
                 project_id = project["id"] if project else 0
-            if not project_id:
-                summary["errors"].append("project 未找到")
-                return summary
 
-            # 1. 章节正文直接删除
+            # 1. 章节正文直接删除（无论是否 webnovel 项目都执行）
             try:
                 from services.script_service import get_script_service
-                ok, msg = await get_script_service().delete_chapter(script_id, chapter_index)
+                ok, msg = get_script_service().delete_chapter(script_id, chapter_index)
                 summary["deleted"]["script_chapter"] = 1 if ok else 0
                 if not ok:
                     summary["errors"].append(f"script_chapter: {msg}")
             except Exception as e:
                 summary["errors"].append(f"script_chapter: {e}")
+
+            # 非 webnovel 项目：正文已删除，跳过 webnovel 关联清理
+            if not project_id:
+                return summary
 
             # 2. RAG 三类型 chunk 删除
             try:
@@ -2009,7 +2012,7 @@ class WebnovelService:
                 rag = get_rag_service()
                 for rtype in ("character", "worldview", "chapter"):
                     try:
-                        n = rag.delete_by_chapter_number(rtype, chapter_index)
+                        n = rag.delete_by_chapter_number(project_id, rtype, chapter_index)
                         summary["deleted"][f"rag_{rtype}"] = n or 0
                     except Exception as e:
                         summary["errors"].append(f"rag_{rtype}: {e}")
@@ -2017,6 +2020,9 @@ class WebnovelService:
                 summary["errors"].append(f"rag: {e}")
 
             # 3. 直接删除
+            _safe("chapter_meta", delete_chapter_meta, project_id, chapter_index)
+            _safe("review_record", delete_chapter_review_records, project_id, chapter_index)
+            _safe("chapter_plot", delete_chapter_plot, project_id, chapter_index)
             _safe("cool_points", delete_cool_points_by_chapter, project_id, chapter_index)
             _safe("character_state", delete_character_states_by_chapter, project_id, chapter_index)
             _safe("worldview_setting", delete_worldview_settings_by_chapter, project_id, chapter_index)
