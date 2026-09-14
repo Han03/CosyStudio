@@ -332,7 +332,7 @@ class ContextAnalyzer:
             if not chars:
                 return "    （无角色）"
             return "\n".join(
-                f"    [{c.get('id')}] {c.get('name')}({c.get('type')}): {c.get('summary', '')[:60]}"
+                f"    [{c.get('id')}] {c.get('name')}({c.get('type')}): {c.get('summary', '')[:20]}"
                 for c in chars[:20]
             )
         if res_name == "foreshadow":
@@ -340,7 +340,7 @@ class ContextAnalyzer:
             if not loops:
                 return "    （无活跃伏笔）"
             return "\n".join(
-                f"    [{f.get('id')}] [{f.get('tier', '')}] {f.get('content', '')[:60]} "
+                f"    [{f.get('id')}] [{f.get('tier', '')}] {f.get('content', '')[:30]} "
                 f"(第{f.get('planted_chapter') or 0}章)"
                 for f in loops[:15]
             )
@@ -349,54 +349,54 @@ class ContextAnalyzer:
             if not worlds:
                 return "    （无世界观设定）"
             return "\n".join(
-                f"    [{w.get('id')}] {w.get('name', '')}: {w.get('summary', '')[:80]}"
+                f"    [{w.get('id')}] {w.get('name', '')}: {w.get('summary', '')[:40]}"
                 for w in worlds[:5]
             )
         if res_name == "power_system":
             ps = inventory.get("power_system")
             if not ps:
                 return "    （未设定力量体系）"
-            return f"    {ps.get('name', '')}: {ps.get('summary', '')[:100]}"
+            return f"    {ps.get('name', '')}: {ps.get('summary', '')[:50]}"
         if res_name == "golden_finger":
             gf = inventory.get("golden_finger")
             if not gf:
                 return "    （未设定金手指）"
-            return f"    {gf.get('name', '')}: {gf.get('summary', '')[:100]}"
+            return f"    {gf.get('name', '')}: {gf.get('summary', '')[:50]}"
         if res_name == "character_group":
             cg = inventory.get("character_group")
             if not cg:
                 return "    （未设定主角团）"
-            return f"    {cg.get('name', '')}: 共同目标 {cg.get('goal', '')[:60]} | 成员: {cg.get('members_summary', '')[:60]}"
+            return f"    {cg.get('name', '')}: 共同目标 {cg.get('goal', '')[:30]} | 成员: {cg.get('members_summary', '')[:30]}"
         if res_name == "previous_chapter":
             chapters = inventory.get("previous_chapters", [])
             if not chapters:
                 return "    （无前文）"
             return "\n".join(
-                f"    第{ch.get('index')}章: {ch.get('summary', '')[:80]}"
+                f"    第{ch.get('index')}章: {ch.get('summary', '')[:40]}"
                 for ch in chapters
             )
         if res_name == "chapter_plan":
             plan = structural.get("current_chapter_plan") or {}
-            summary = plan.get("summary", "")[:100] if plan else ""
+            summary = plan.get("summary", "")[:50] if plan else ""
             return f"    本章规划概要: {summary or '（无）'}"
         if res_name == "volume_outline":
             vol = structural.get("current_volume")
             if not vol:
                 return "    （无当前卷）"
-            return f"    卷: {vol.get('volume_name', '')} | 核心冲突: {str(vol.get('core_conflict', ''))[:60]}"
+            return f"    卷: {vol.get('volume_name', '')} | 核心冲突: {str(vol.get('core_conflict', ''))[:30]}"
         if res_name == "character_state":
             states = structural.get("last_character_states") or []
             if not states:
                 return "    （无状态记录）"
             return "\n".join(
-                f"    {st.get('character_name') or st.get('name', '?')}: 位置 {st.get('location', '')} | 状态 {st.get('state', '')}"
+                f"    {st.get('character_name') or st.get('name', '?')}: 位置 {str(st.get('location', ''))[:20]} | 状态 {str(st.get('state', ''))[:40]}"
                 for st in states[:10]
             )
         if res_name == "previous_hook":
             hook = structural.get("previous_hook") or {}
             if not hook.get("hook_content"):
                 return "    （无钩子）"
-            return f"    {hook.get('hook_content', '')[:80]}"
+            return f"    {hook.get('hook_content', '')[:40]}"
         if res_name == "project":
             proj = structural.get("project") or {}
             return f"    {proj.get('title', '')} | {proj.get('genre', '')}"
@@ -457,15 +457,10 @@ class ContextAnalyzer:
             '  "custom_notes": ["[维度] 主体: 规则"]\n'
             "}\n"
             "字段说明：\n"
-            "- structured_refs：本节点可选资源清单（见【资源目录】），resource 只能取上述值；"
-            "ids 从清单中选；depth 决定加载深度（full=完整/summary=摘要/tail=结尾片段/style=文风片段）。"
-            "previous_chapter 建议 depth=tail（承接上一章结尾，约500字）或 style（润色文风参照，约320字），full 将截断至1500字。\n"
-            "- 引用参数（必填）：character_card/foreshadow 必须填 ids（从【资源目录】清单选）；"
-            "previous_chapter 必须填 chapter_index（从【资源目录】前文清单选章节号，例如 2 表示第2章），不得省略。\n"
-            "- rag_queries：RAG 语义检索查询，每条含实体与限定、禁止复制原文；"
-            "types 可选值：chapter/chapter_summary/chapter_paragraph/foreshadow/character/worldview/power_system/golden_finger/villain/volume_outline。\n"
-            "- custom_notes：一致性要点，按【本节点一致性维度】检查，"
-            "每条格式「[维度名] 主体: 规则」，如「[角色状态] 苏瑶: 保持受伤未愈状态」，不超过50字。\n"
+            "- structured_refs 从【资源目录】选；character_card/foreshadow 必填 ids，previous_chapter 必填 chapter_index；"
+            "previous_chapter 建议 depth=tail(500字)或style(320字)。\n"
+            "- rag_queries：RAG 语义检索查询（含实体限定，禁止复制原文）；types：chapter/chapter_summary/foreshadow/character/worldview/power_system/golden_finger/villain/volume_outline。\n"
+            "- custom_notes：一致性要点，格式「[维度名] 主体: 规则」，如「[角色状态] 苏瑶: 保持受伤未愈状态」，≤50字。\n"
         )
 
     def _format_rag_candidates(self, candidates: list) -> str:
@@ -473,11 +468,11 @@ class ContextAnalyzer:
         if not candidates:
             return "（无RAG候选）"
         lines = []
-        for i, c in enumerate(candidates[:15]):
+        for i, c in enumerate(candidates[:10]):
             doc_id = c.get("doc_id", f"rag_{i}")
             ctype = c.get("type", "")
             chapter = c.get("chapter", 0)
-            preview = c.get("preview", "")[:60]
+            preview = c.get("preview", "")[:30]
             lines.append(f"  [{doc_id}] {ctype}/第{chapter}章: {preview}")
         return "\n".join(lines)
 
