@@ -111,11 +111,11 @@ class PipelineOrchestrator:
             "plot_count": plot_count,
             "plot_desc_max": plot_desc_max,
             "draft_point_max": draft_point_max,
-            "polish_max_tokens": max(1500, polish_max * 2),
-            "draft_max_tokens": max(800, draft_max * 2),
-            "revise_draft_max_tokens": max(800, draft_max * 2),
-            "plot_max_tokens": max(1200, plot_count * 400),
-            "plot_revise_max_tokens": max(1200, plot_count * 400),
+            "polish_max_tokens": max(1500, round(polish_max * 2.4)),
+            "draft_max_tokens": max(800, round(draft_max * 2.4)),
+            "revise_draft_max_tokens": max(800, round(draft_max * 2.4)),
+            "plot_max_tokens": max(1500, plot_count * 600),
+            "plot_revise_max_tokens": max(1500, plot_count * 600),
             "review_max_tokens": 800,
         }
 
