@@ -87,6 +87,11 @@ def _load_project(ref, env):
 def _load_character_states(ref, env):
     states = env["structural_data"].get("last_character_states") or []
     if not states:
+        # 首章（chapter_index<=1）无上章末状态属正常空态，返回空列表由装配层跳过空区块；
+        # 非首章缺上章状态视为数据链断裂（上章应用结果缺失），保持失败即报错
+        chapter_index = env.get("chapter_index") or 0
+        if chapter_index <= 1:
+            return []
         raise ContextAnalysisError("上章末角色状态资源加载失败：last_character_states 为空")
     return states
 
@@ -94,6 +99,11 @@ def _load_character_states(ref, env):
 def _load_previous_hook(ref, env):
     hook = env["structural_data"].get("previous_hook") or {}
     if not hook.get("hook_content"):
+        # 首章无上一章结尾属正常空态，返回空 dict 由装配层跳过空区块；
+        # 非首章为空视为数据链断裂（上章 chapter_meta 缺失），保持失败即报错
+        chapter_index = env.get("chapter_index") or 0
+        if chapter_index <= 1:
+            return {}
         raise ContextAnalysisError("上一章结尾状态资源加载失败：previous_hook 为空")
     return hook
 
@@ -186,7 +196,9 @@ def _load_golden_finger(ref, env):
 def _load_foreshadows(ref, env):
     ids = {str(i) for i in (ref.get("ids") or [])}
     if not ids:
-        raise ContextAnalysisError("伏笔资源加载失败：未选择伏笔 id")
+        # 当前无活跃伏笔属正常空态（LLM 传空 ids 表示无需注入），
+        # 返回空列表由装配层跳过空区块
+        return []
     loops = [f for f in env["inventory"].get("foreshadows", []) if str(f.get("id")) in ids]
     if not loops:
         raise ContextAnalysisError(f"伏笔资源加载失败：ids={sorted(ids)} 在活跃伏笔中不存在")
@@ -221,6 +233,10 @@ def _load_previous_chapter(ref, env):
     chapter_index = ref.get("chapter_index")
     if chapter_index is None:
         raise ContextAnalysisError("前文资源加载失败：未指定 chapter_index")
+    if chapter_index <= 0:
+        # 首章无前文属正常空态（LLM 可能以 chapter_index=0 表达"无前文"），
+        # 返回空 dict 由装配层跳过空区块
+        return {}
     depth = ref.get("depth", "full")
     if depth == "summary":
         for ch in env["inventory"].get("previous_chapters", []):
@@ -539,6 +555,9 @@ def _fmt_timeline(data, depth="full"):
 
 
 def _fmt_previous_chapter(data, depth="full"):
+    if not data or not data.get("content"):
+        # 空态（首章无前文）不渲染，由装配层跳过空区块
+        return ""
     ch_idx = data.get("chapter_index", "?")
     content = data.get("content", "")
     if data.get("is_summary"):
