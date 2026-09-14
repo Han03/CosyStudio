@@ -8,6 +8,14 @@ user_prompt: |
   题材：{project.genre}
   金手指：{golden_finger.type}
   
+  【世界观核心设定】
+  世界核心设定：{worldview.world_summary}
+  核心区域：{worldview.core_regions}
+  社会结构：{worldview.social_hierarchy}
+  政治规则：{worldview.political_rules}
+  社会常识/禁忌：{worldview.social_common_sense}
+  硬约束：{worldview.hard_constraints}
+  
   {character_basic_section}
   
   【题材角色指南】

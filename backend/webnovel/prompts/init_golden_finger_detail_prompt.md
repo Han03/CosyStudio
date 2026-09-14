@@ -13,6 +13,14 @@ user_prompt: |
   反套路规则：{project.anti_trope_rules}
   硬性约束：{project.hard_constraints}
 
+  【世界观核心设定】
+  世界核心设定：{worldview.world_summary}
+  核心区域：{worldview.core_regions}
+  社会结构：{worldview.social_hierarchy}
+  政治规则：{worldview.political_rules}
+  社会常识/禁忌：{worldview.social_common_sense}
+  硬约束：{worldview.hard_constraints}
+
   【主角信息】
   姓名：{protagonist.name}
   欲望：{protagonist.desire}

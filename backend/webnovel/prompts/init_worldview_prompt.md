@@ -6,7 +6,7 @@ user_prompt: |
   【项目信息】
   书名：{project.title}
   题材：{project.genre}
-  力量体系：{power_system.system_type}
+  力量体系：{world.power_system_type}
   
   【用户已有世界观数据】
   世界规模：{project.world_scale}

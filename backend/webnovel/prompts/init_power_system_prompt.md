@@ -13,6 +13,14 @@ user_prompt: |
   境界链：{project.cultivation_chain}
   （注：以上为用户已确定的力量体系基础设定，请在此基础上展开设计，体系类型和境界链必须保持一致）
   
+  【世界观核心设定】
+  世界核心设定：{worldview.world_summary}
+  核心区域：{worldview.core_regions}
+  社会结构：{worldview.social_hierarchy}
+  政治规则：{worldview.political_rules}
+  社会常识/禁忌：{worldview.social_common_sense}
+  硬约束：{worldview.hard_constraints}
+
   【题材力量体系】
   {genre_power_system}
   

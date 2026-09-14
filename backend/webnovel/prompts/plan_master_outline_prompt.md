@@ -24,10 +24,13 @@ user_prompt: |
   名称：{golden_finger.name}
   不可逆代价：{golden_finger.irreversible_cost}
   
-  【世界观信息】
-  世界规模：{world.scale}
-  力量体系类型：{world.power_system_type}
-  势力格局：{world.factions}
+  【世界观核心设定】
+  世界核心设定：{worldview.world_summary}
+  核心区域：{worldview.core_regions}
+  社会结构：{worldview.social_hierarchy}
+  政治规则：{worldview.political_rules}
+  社会常识/禁忌：{worldview.social_common_sense}
+  硬约束：{worldview.hard_constraints}
   
   【题材参考】
   核心卖点：{genre_core_selling_points}
