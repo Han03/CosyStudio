@@ -86,7 +86,6 @@ from .foreshadowing_repository import (
     add_open_loop, update_open_loop_resolved, get_open_loops_by_project,
     get_active_open_loops, update_open_loop_urgency, add_cool_point,
     get_cool_points_by_project, get_cool_points_by_chapter, get_cool_points_count_by_type,
-    add_foreshadow, get_foreshadows_by_volume, get_foreshadows_by_project
 )
 from .csv_pack_repository import (
     add_csv_pack, batch_add_csv_packs, get_csv_pack, get_csv_pack_by_code,
