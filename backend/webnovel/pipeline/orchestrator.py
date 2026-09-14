@@ -36,7 +36,6 @@ class PipelineOrchestrator:
             "draft_generator",
             "draft_reviewer",
             "draft_polisher",
-            "character_state_recorder",
             "setting_recorder",
         ],
         "write_fast": [

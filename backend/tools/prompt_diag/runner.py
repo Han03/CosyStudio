@@ -75,7 +75,6 @@ class SideEffectGuard:
         ("webnovel.pipeline.executors.chapter_plot_generator_executor", "add_chapter_plot", None),
         ("webnovel.pipeline.executors.chapter_plot_reviewer_executor", "add_chapter_plot", None),
         ("webnovel.pipeline.executors.setting_recorder_executor", "add_worldview", {}),
-        ("webnovel.pipeline.executors.character_state_recorder_executor", "upsert_character_state", None),
     ]
 
     def __init__(self, commit: bool = False):
