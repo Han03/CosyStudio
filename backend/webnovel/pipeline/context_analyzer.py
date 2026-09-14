@@ -395,7 +395,9 @@ class ContextAnalyzer:
             if not states:
                 return "    （无状态记录）"
             return "\n".join(
-                f"    {st.get('character_name') or st.get('name', '?')}: 位置 {str(st.get('location', ''))[:20]} | 状态 {str(st.get('state', ''))[:40]}"
+                f"    {st.get('character_name') or st.get('name', '?')}: "
+                f"位置 {str(st.get('location', ''))[:20]} | "
+                f"状态 {(str(st.get('state_summary') or st.get('state', '')))[:40]}"
                 for st in states[:10]
             )
         if res_name == "previous_hook":
