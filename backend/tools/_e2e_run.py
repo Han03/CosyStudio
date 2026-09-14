@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 SCRIPT_ID = 999913
 PROJECT_ID = 93
 CHAPTER_INDEX = int(os.environ.get("CH_INDEX", "4"))
+TARGET_WORDS = int(os.environ.get("WORDS", "1000"))
 
 
 def clear_plot_cache():
@@ -47,8 +48,8 @@ async def main():
     from webnovel.pipeline.orchestrator import PipelineOrchestrator
 
     orch = PipelineOrchestrator(script_id=SCRIPT_ID, chapter_index=CHAPTER_INDEX, task_id=task_id)
-    # 字数参数化：目标成品 4000 字
-    orch._context["chapter_words"] = 4000
+    # 字数参数化：目标成品字数（默认 1000，可用 WORDS 环境变量覆盖）
+    orch._context["chapter_words"] = TARGET_WORDS
 
     steps = [
         "context_builder",
