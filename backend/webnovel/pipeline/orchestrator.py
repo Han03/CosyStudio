@@ -16,7 +16,7 @@ class PipelineOrchestrator:
 
     DEFAULT_STEPS = [
         "chapter_splitter",
-        "timeline_fixer",
+        "volume_timeline_generator",
         "context_builder",
         "chapter_plot_generator",
         "chapter_plot_reviewer",

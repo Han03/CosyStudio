@@ -507,7 +507,7 @@ CALL_POINT_CATEGORIES = [
         "color": "#00b894",
         "call_points": {
             "chapter_splitter": {"name": "章节拆分", "description": "章节内容拆分"},
-            "timeline_fixer": {"name": "时间线修复", "description": "时间线一致性修复"},
+            "volume_timeline_generator": {"name": "卷首时间轴", "description": "卷首时间轴生成"},
             "context_builder": {"name": "上下文构建", "description": "写作上下文构建"},
             "chapter_plot_generator": {"name": "剧情生成", "description": "章节剧情列表"},
             "chapter_plot_reviewer_score": {"name": "剧情审查评分", "description": "剧情多维度质量评分"},

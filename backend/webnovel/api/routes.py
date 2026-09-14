@@ -17,7 +17,7 @@ from webnovel.repositories import (
     get_chapter_meta_list, get_chapter_meta, add_chapter_meta, update_chapter_meta,
     get_worldview_by_project, add_worldview, get_worldview,
     get_worldview_factions, get_worldview_history,
-    get_timelines_by_project, add_timeline, add_timeline_chapter, add_timeline_countdown,
+    get_timelines_by_project,
     get_timeline_chapters, get_timeline_countdowns,
     get_open_loops_by_project, get_active_open_loops, get_cool_points_by_project,
     get_cool_points_by_chapter, get_cool_points_count_by_type,
@@ -465,7 +465,7 @@ async def split_volume_to_chapters(
     from webnovel.repositories import (
         get_character_cards_by_project, delete_chapter_plans_in_range,
         get_chapter_plans_by_volume, get_character_group_by_project,
-        get_character_group_members, get_timelines_by_project
+        get_character_group_members
     )
 
     project = get_webnovel_project_by_script(script_id)
@@ -598,44 +598,6 @@ async def split_volume_to_chapters(
 
             success = plan_count > 0
             message = f"智能拆章完成：生成{plan_count}章规划" if success else "智能拆章失败：未生成有效章节规划"
-
-            # 章纲生成成功后，检查该卷是否已有时间线，若无则补充生成
-            if success:
-                try:
-                    existing_timelines = get_timelines_by_project(project["id"])
-                    has_volume_timeline = any(
-                        tl.get("volume_number") == volume_number for tl in existing_timelines
-                    )
-                    if not has_volume_timeline:
-                        from utils.logger import logger
-                        logger.info(
-                            f"[split-chapter] 第{volume_number}卷无时间线，开始补充生成..."
-                        )
-                        update_writing_task(
-                            task_id, progress=90,
-                            progress_message=f"章纲生成完成，正在补充生成时间线..."
-                        )
-                        timeline = await executor._generate_timeline(
-                            project, outline, protagonist, volume_number,
-                            chapter_plans=chapter_plans
-                        )
-                        if timeline:
-                            tl_id = executor._save_timeline(project["id"], volume_number, timeline)
-                            message += f"，时间线ID={tl_id}"
-                            from utils.logger import logger
-                            logger.info(
-                                f"[split-chapter] 时间线生成成功，tl_id={tl_id}"
-                            )
-                        else:
-                            from utils.logger import logger
-                            logger.warning(
-                                f"[split-chapter] 时间线生成返回空数据"
-                            )
-                except Exception as tl_err:
-                    from utils.logger import logger
-                    logger.warning(
-                        f"[split-chapter] 补充时间线失败（不影响章纲）: {tl_err}"
-                    )
 
             if success:
                 update_writing_task(

@@ -1,5 +1,5 @@
 from .chapter_splitter_executor import ChapterSplitterExecutor
-from .timeline_fixer_executor import TimelineFixerExecutor
+from .volume_timeline_generator_executor import VolumeTimelineGeneratorExecutor
 from .context_builder_executor import ContextBuilderExecutor
 from .draft_generator_executor import DraftGeneratorExecutor
 from .draft_reviewer_executor import DraftReviewerExecutor
@@ -16,7 +16,7 @@ from .chapter_plot_reviewer_executor import ChapterPlotReviewerExecutor
 
 EXECUTORS = [
     ChapterSplitterExecutor,
-    TimelineFixerExecutor,
+    VolumeTimelineGeneratorExecutor,
     ContextBuilderExecutor,
     ChapterPlotGeneratorExecutor,
     ChapterPlotReviewerExecutor,

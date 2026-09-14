@@ -25,7 +25,6 @@ from webnovel.repositories import (
     get_power_system_by_project, get_worldview_by_project,
     get_villain_by_project, get_idea_bank_by_project,
     add_volume_outline, add_volume_crisis, update_volume_outline,
-    add_timeline, add_timeline_chapter, add_timeline_countdown,
     add_chapter_plan, get_chapter_plans_by_volume,
     update_webnovel_state, get_webnovel_state_by_project,
     update_worldview, update_power_system, update_character_card,
@@ -201,19 +200,7 @@ class PlanExecutor(BaseExecutor):
                         step_summary="章节规划生成失败"
                     )
 
-                # 章节规划重新生成后，同步重新生成时间线
-                timeline = await self._generate_timeline(
-                    project, existing_vo, protagonist, volume_number,
-                    chapter_plans=chapter_plans
-                )
-                tl_id = None
-                if timeline:
-                    # 删除旧时间线后重建
-                    from webnovel.repositories import get_timelines_by_project
-                    old_timelines = get_timelines_by_project(project_id)
-                    tl_id = self._save_timeline(project_id, volume_number, timeline)
-
-                summary = f"第{volume_number}卷章节规划已重新生成：{plan_count}章，时间线ID={tl_id}"
+                summary = f"第{volume_number}卷章节规划已重新生成：{plan_count}章"
                 return ExecutorResult(
                     success=True,
                     step_summary=summary,
@@ -221,7 +208,6 @@ class PlanExecutor(BaseExecutor):
                         "volume_number": volume_number,
                         "volume_outline_id": vo_id,
                         "chapter_plans_count": plan_count,
-                        "timeline_id": tl_id
                     }
                 )
 
@@ -243,10 +229,8 @@ class PlanExecutor(BaseExecutor):
             result_data = {
                 "volume_number": volume_number,
                 "volume_outline_id": None,
-                "timeline_id": None,
                 "chapter_plans_count": 0
             }
-            tl_id = None
             plan_count = 0
 
             volume_outline = await self._generate_volume_outline(
@@ -287,22 +271,13 @@ class PlanExecutor(BaseExecutor):
                 plan_count = self._save_chapter_plans(vo_id, chapter_plans)
                 result_data["chapter_plans_count"] = plan_count
 
-            # 时间线在章节规划之后生成，基于实际章节内容设计时间锚点
-            timeline = await self._generate_timeline(
-                project, volume_outline, protagonist, volume_number,
-                chapter_plans=chapter_plans
-            )
-            if timeline:
-                tl_id = self._save_timeline(project_id, volume_number, timeline)
-                result_data["timeline_id"] = tl_id
-
             self._writeback_settings(project_id, volume_outline, beat_sheet, chapter_plans)
 
             self._writeback_master_outline(project_id, vo_id, volume_number, volume_outline)
 
             self._update_project_state(project_id, volume_number, end_chapter)
 
-            summary = f"第{volume_number}卷规划完成：卷纲ID={vo_id}，章纲{plan_count}章，时间线ID={tl_id}"
+            summary = f"第{volume_number}卷规划完成：卷纲ID={vo_id}，章纲{plan_count}章"
             return ExecutorResult(
                 success=True,
                 step_summary=summary,
@@ -481,79 +456,6 @@ class PlanExecutor(BaseExecutor):
                     cost_risk_upgrade=crisis.get("cost_risk_upgrade", ""),
                     result_change=crisis.get("result_change", "")
                 )
-
-    async def _generate_timeline(
-        self, project: Dict, volume_outline: Dict, protagonist: Dict, volume_number: int,
-        chapter_plans: Optional[Dict] = None
-    ) -> Optional[Dict]:
-        """生成卷时间线。基于章节规划内容设计时间锚点。"""
-        # 将章节规划预格式化为文本，供 prompt 模板使用
-        plans_list = chapter_plans.get("chapter_plans", []) if chapter_plans else []
-        if plans_list:
-            lines = []
-            for plan in plans_list:
-                if isinstance(plan, dict):
-                    ch_idx = plan.get("chapter_index", "?")
-                    title = plan.get("chapter_title", "")
-                    summary = str(plan.get("summary", ""))[:60]
-                    lines.append(f"第{ch_idx}章 {title}：{summary}")
-            chapter_plans_text = "\n".join(lines)
-        else:
-            chapter_plans_text = "（暂无章节规划）"
-
-        context = {
-            "project": project,
-            "volume_outline": volume_outline,
-            "protagonist": protagonist,
-            "volume_number": volume_number,
-            "chapter_plans_text": chapter_plans_text
-        }
-
-        timeline_data = await self._call_llm("plan_timeline", context)
-        if not timeline_data or "error" in timeline_data:
-            return None
-
-        return timeline_data
-
-    def _save_timeline(self, project_id: int, volume_number: int, timeline: Dict) -> int:
-        """保存时间线到数据库。"""
-        tl_data = {
-            "volume_number": volume_number,
-            "time_base": timeline.get("time_base", ""),
-            "time_span": timeline.get("time_span", ""),
-            "countdown_events": json.dumps(timeline.get("countdown_events", []), ensure_ascii=False)
-        }
-
-        tl = add_timeline(project_id, **tl_data)
-        tl_id = tl["id"]
-
-        chapters = timeline.get("chapter_timeline", [])
-        for chapter in chapters:
-            if isinstance(chapter, dict):
-                add_timeline_chapter(
-                    tl_id,
-                    chapter_number=chapter.get("chapter_number", 0),
-                    time_anchor=chapter.get("time_anchor", ""),
-                    chapter_duration=chapter.get("chapter_duration", ""),
-                    interval_from_prev=chapter.get("interval_from_prev", ""),
-                    countdown_status=chapter.get("countdown_status", ""),
-                    notes=chapter.get("notes", "")
-                )
-
-        countdowns = timeline.get("countdown_tracking", [])
-        for countdown in countdowns:
-            if isinstance(countdown, dict):
-                add_timeline_countdown(
-                    tl_id,
-                    event_name=countdown.get("event_name", ""),
-                    start_countdown=countdown.get("start_countdown", ""),
-                    # 初始化阶段强制覆写为"未触发"，避免 LLM 填入终态值
-                    current_status="未触发",
-                    trigger_chapter=countdown.get("trigger_chapter", 0),
-                    result=countdown.get("result", "")
-                )
-
-        return tl_id
 
     # 每批生成的章节数上限（参考 webnovel-writer SKILL.md Step 7 批次规则）
     CHAPTER_BATCH_SIZE = 10
