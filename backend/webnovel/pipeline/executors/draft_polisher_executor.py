@@ -87,6 +87,7 @@ class DraftPolisherExecutor(BaseExecutor):
                 project_id=project_id,
                 executor_name=self.step_name,
                 prompt_name="draft_polish",
+                expect_json=False,
             )
 
             if polished_data and "content" in polished_data:

@@ -330,6 +330,7 @@ class DraftReviewerExecutor(BaseExecutor):
             project_id=project_id,
             executor_name="draft_reviewer_revise",
             prompt_name="revise_draft",
+            expect_json=False,
         )
 
         if revised_data and "content" in revised_data:

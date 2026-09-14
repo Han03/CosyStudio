@@ -96,6 +96,7 @@ class DraftGeneratorExecutor(BaseExecutor):
                 project_id=project_id,
                 executor_name=self.step_name,
                 prompt_name=f"draft_chapter_{chapter_index}",
+                expect_json=False,
             )
 
             if not draft_data or "content" not in draft_data:
