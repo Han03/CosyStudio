@@ -784,7 +784,7 @@ function renderTimeline(data) {
             <div class="world-empty">
                 <i class="fas fa-clock"></i>
                 <p>暂无时间线数据</p>
-                <p style="font-size: 11px; margin-top: 4px;">请先进行章节规划</p>
+                <p style="font-size: 11px; margin-top: 4px;">创作后生成</p>
             </div>
         `;
         return;
