@@ -3,14 +3,8 @@ system_prompt: 你是一位专业的网文编辑，擅长修改草稿，输出�
 user_prompt: |
   请根据以下审查意见修改白描草稿：
 
-  【本章剧情目标】
-  {plot_summary}
-
-  【角色设定（修改时不得反转）】
-  {characters_detail}
-
-  【前文末尾】
-  {previous_chapter_tail}
+  【装配上下文】
+  {assembled_context}
 
   【待修改问题】
   {issues_text}

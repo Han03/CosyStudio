@@ -1,12 +1,13 @@
 """执行器8：草稿审查器。
 
 审查修改效果有限，最多修改1次。
-上下文通过 ContextAnalyzer 按需组装，替代原有全量加载策略。
+上下文由 ContextAnalyzer 三段式装配（Analyze→Gather），executor 不再自行拼装；
+草稿（draft）为循环内变动的任务输入，由模板占位符实时注入。
 """
 
 import re
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from ..base_executor import BaseExecutor, ExecutorResult
 from ..context_analyzer import ContextAnalyzer
 from utils.llm_json_parser import parse_llm_json
@@ -42,7 +43,7 @@ class DraftReviewerExecutor(BaseExecutor):
         try:
             script_id = self.script_id
             draft_content = context.get("draft_content", "")
-            
+
             if not draft_content:
                 return ExecutorResult(
                     success=False,
@@ -59,7 +60,7 @@ class DraftReviewerExecutor(BaseExecutor):
                 )
             project_id = project["id"]
 
-            # ── 通过 ContextAnalyzer 按需组装上下文（审查循环共用） ──
+            # ── 通过 ContextAnalyzer 三段式装配上下文（审查循环共用） ──
             analyzer = ContextAnalyzer(script_id, self.chapter_index)
             step_ctx = await analyzer.analyze_and_assemble(
                 step_name="draft_reviewer",
@@ -75,11 +76,10 @@ class DraftReviewerExecutor(BaseExecutor):
                 context["step_selections"] = {}
             selection = step_ctx.get("_selection", {})
             context["step_selections"]["draft_reviewer"] = {
-                "character_ids": selection.get("character_ids", []),
                 "character_names": [
                     c.get("character_name", "") for c in step_ctx.get("characters", [])
                 ],
-                "consistency_notes": selection.get("consistency_notes", []),
+                "consistency_notes": selection.get("custom_notes", []),
             }
 
             review_history = []
@@ -90,6 +90,8 @@ class DraftReviewerExecutor(BaseExecutor):
             best_draft = draft_content
             best_avg_score = -1.0
             best_review_result = []
+
+            word_cfg = context.get("word_config") or {}
 
             while revision_count < self.MAX_REVISIONS:
                 review_result = await self._review_draft(current_draft, step_ctx, project_id)
@@ -124,7 +126,8 @@ class DraftReviewerExecutor(BaseExecutor):
                     break
 
                 revision_count += 1
-                revised = await self._revise_draft(current_draft, review_result, step_ctx, project_id)
+                revised = await self._revise_draft(
+                    current_draft, review_result, step_ctx, project_id, word_cfg)
 
                 if revised and len(current_draft) > 0:
                     change_ratio = abs(len(revised) - len(current_draft)) / len(current_draft)
@@ -140,24 +143,24 @@ class DraftReviewerExecutor(BaseExecutor):
                     break
 
             final_avg_score = best_avg_score if best_avg_score >= 0 else 0
-            
+
             summary = (
                 f"草稿审查完成：经过{revision_count}次修改，"
                 f"最优平均评分{final_avg_score:.1f}/10"
             )
-            
+
+            # 保存草稿修改历史
             return ExecutorResult(
                 success=True,
                 step_summary=summary,
                 output_data={
-                    "review_result": best_review_result or (review_history[-1]["review_result"] if review_history else []),
+                    "review_result": best_review_result,
+                    "reviewed_draft": best_draft,
                     "review_history": review_history,
-                    "revised_draft": best_draft,
-                    "revision_count": revision_count,
-                    "final_avg_score": final_avg_score
+                    "avg_score": final_avg_score,
                 }
             )
-            
+
         except Exception as e:
             return ExecutorResult(
                 success=False,
@@ -165,36 +168,14 @@ class DraftReviewerExecutor(BaseExecutor):
                 step_summary="草稿审查执行失败"
             )
 
-    # ── 审查与修改 ──────────────────────────────────────────
-
-    async def _review_draft(self, draft: str, step_ctx: Dict[str, Any], project_id: int) -> List[Dict[str, Any]]:
+    async def _review_draft(
+        self, draft: str, step_ctx: Dict[str, Any], project_id: int
+    ) -> List[Dict[str, Any]]:
         """审查草稿（单次LLM调用完成所有维度）。"""
-        # 从 step_ctx 构建审查上下文
-        characters_detail = self._format_characters(step_ctx.get("characters", []))
-        world_settings_text = self._format_world_settings(step_ctx.get("world_settings", []))
-        plot_summary = self._build_plot_summary(step_ctx)
-        character_states_text = self._format_character_states(
-            step_ctx.get("last_character_states", []))
-        previous_chapter_tail = self._build_previous_chapter_tail(step_ctx)
-        consistency_notes = step_ctx.get("consistency_notes", [])
-        consistency_text = "\n".join(f"- {note}" for note in consistency_notes) if consistency_notes else ""
-
-        # 构建维度说明列表
-        dimension_lines = []
-        for d in self.REVIEW_DIMENSIONS:
-            dimension_lines.append(f"- {d['name']}({d['key']})：{d['description']}")
-        dimensions_text = "\n".join(dimension_lines)
-
         prompt_data = self._load_prompt("review_draft")
         prompt = prompt_data["user_prompt"].format(
-            dimensions_text=dimensions_text,
-            world_settings_text=world_settings_text,
-            characters_detail=characters_detail,
-            plot_summary=plot_summary,
-            previous_chapter_tail=previous_chapter_tail,
-            character_states_text=character_states_text,
+            assembled_context=step_ctx.get("assembled_context", ""),
             draft=draft,
-            consistency_notes=consistency_text,
         )
         system_prompt = prompt_data["system_prompt"] or "你是一位资深网文编辑，擅长从多维度进行草稿质量审查，输出严格的JSON格式"
 
@@ -283,6 +264,7 @@ class DraftReviewerExecutor(BaseExecutor):
     async def _revise_draft(
         self, draft: str, review_result: List[Dict[str, Any]],
         step_ctx: Dict[str, Any], project_id: int,
+        word_cfg: Optional[Dict[str, Any]] = None,
     ) -> str:
         """根据审查结果修改草稿。"""
         issues = []
@@ -302,22 +284,13 @@ class DraftReviewerExecutor(BaseExecutor):
             if review.get("suggestions_actionable") and review.get("suggestions"):
                 suggestions.append(f"- [{review['name']}] {review['suggestions']}")
 
-        characters_detail = self._format_characters(step_ctx.get("characters", []))
-        plot_summary = self._build_plot_summary(step_ctx)
-        previous_chapter_tail = self._build_previous_chapter_tail(step_ctx)
-        character_states_text = self._format_character_states(
-            step_ctx.get("last_character_states", []))
-
         prompt_data = self._load_prompt("revise_draft")
-        word_cfg = (step_ctx.get("word_config") or {})
+        word_cfg = word_cfg or {}
         prompt = prompt_data["user_prompt"].format(
             issues_text=chr(10).join(issues),
             suggestions_text=chr(10).join(suggestions),
             draft=draft,
-            characters_detail=characters_detail,
-            plot_summary=plot_summary,
-            character_states_text=character_states_text,
-            previous_chapter_tail=previous_chapter_tail,
+            assembled_context=step_ctx.get("assembled_context", ""),
             draft_word_min=int(word_cfg.get("draft_word_min", 1200)),
             draft_word_max=int(word_cfg.get("draft_word_max", 1800)),
         )
@@ -329,7 +302,7 @@ class DraftReviewerExecutor(BaseExecutor):
         result = await executor.execute_text_chat(
             prompt=prompt,
             system_prompt=system_prompt,
-            max_tokens=max(3000, int((step_ctx.get("word_config") or {}).get("draft_word_max", 1800)) * 3),
+            max_tokens=max(3000, int(word_cfg.get("draft_word_max", 1800)) * 3),
             script_id=self.script_id,
             project_id=project_id,
             executor_name="draft_reviewer_revise",
@@ -352,93 +325,3 @@ class DraftReviewerExecutor(BaseExecutor):
             return revised_data["content"].strip()
 
         return raw_content.strip() if raw_content.strip() else draft
-
-    # ── 格式化方法 ──────────────────────────────────────────
-
-    def _format_characters(self, characters: list) -> str:
-        """构建角色详情文本。"""
-        if not characters:
-            return "（无角色信息）"
-        lines = []
-        for c in characters:
-            if not isinstance(c, dict):
-                continue
-            name = c.get('character_name', '') or c.get('name', '')
-            if not name:
-                continue
-            personality = c.get('personality', '') or c.get('core_personality', '')
-            flaw = c.get('flaw', '') or c.get('personality_flaw', '')
-            identity = c.get('identity', '')
-            line = f"- {name}"
-            if personality:
-                line += f" | 性格: {personality[:80]}"
-            if flaw:
-                line += f" | 缺陷: {flaw[:60]}"
-            if identity:
-                line += f" | 身份: {identity[:60]}"
-            abilities = c.get("abilities", "") or ""
-            if abilities:
-                line += f" | 能力: {str(abilities)[:100]}"
-            goals = c.get("goals", "") or ""
-            if goals:
-                line += f" | 目标: {str(goals)[:60]}"
-            items = c.get("items", []) or []
-            item_names = [it.get("name", "") for it in items if isinstance(it, dict) and it.get("name")]
-            if item_names:
-                line += f" | 持有物品: {'、'.join(item_names[:6])}"
-            lines.append(line)
-        return "\n".join(lines) if lines else "（无角色信息）"
-
-    def _format_world_settings(self, world_settings: list) -> str:
-        """构建世界观详情文本。"""
-        if not world_settings:
-            return "（无世界观设定）"
-        lines = []
-        for s in world_settings:
-            if not isinstance(s, dict):
-                continue
-            name = s.get('name', '')
-            content = s.get('content', '') or s.get('world_summary', '')
-            if name and content:
-                lines.append(f"- {name}: {content[:150]}")
-            elif name:
-                lines.append(f"- {name}")
-            elif content:
-                lines.append(f"- {content[:150]}")
-        return "\n".join(lines) if lines else "（无世界观设定）"
-
-    def _build_plot_summary(self, step_ctx: Dict[str, Any]) -> str:
-        """从 step_ctx 提取本章剧情规划摘要。"""
-        chapter_plan = step_ctx.get('current_chapter_plan')
-        if chapter_plan:
-            parts = []
-            if chapter_plan.get('summary'):
-                parts.append(f"概要: {chapter_plan['summary'][:300]}")
-            if chapter_plan.get('key_events'):
-                parts.append(f"关键事件: {chapter_plan['key_events'][:200]}")
-            if chapter_plan.get('must_cover_nodes'):
-                nodes = chapter_plan['must_cover_nodes']
-                if isinstance(nodes, list):
-                    parts.append(f"必须覆盖节点: {json.dumps(nodes, ensure_ascii=False)[:200]}")
-            if parts:
-                return "\n".join(parts)
-        return "（无剧情规划）"
-
-    def _build_previous_chapter_tail(self, step_ctx: Dict[str, Any]) -> str:
-        """从 step_ctx 提取前章末尾内容。"""
-        prev_chapters = step_ctx.get('previous_chapters', [])
-        if not prev_chapters:
-            return "（无前文，本章为开篇）"
-        latest = None
-        for pc in prev_chapters:
-            if pc.get('is_latest'):
-                latest = pc
-                break
-        if not latest and prev_chapters:
-            latest = prev_chapters[-1]
-        if not latest:
-            return "（无前文）"
-        content = latest.get('content', '')
-        if len(content) > 500:
-            content = content[-500:]
-        return content if content else "（前文为空）"

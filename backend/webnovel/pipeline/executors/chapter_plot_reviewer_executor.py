@@ -3,17 +3,20 @@
 在剧情生成后、草稿生成前，对剧情列表进行多维度质量审查。
 采用标记驱动决策：LLM 对问题/建议显式标记是否值得修正，
 存在标记项则触发修正（最多2轮），确保好建议被真正落实。
+
+上下文由 ContextAnalyzer 三段式装配（Analyze→Gather），executor 不再自行拼装；
+待审查剧情（plot_list）为循环内变动的任务输入，由模板占位符实时注入。
 """
 
 import json
 import re
 from typing import Dict, Any, List, Optional
 from ..base_executor import BaseExecutor, ExecutorResult
+from ..context_analyzer import ContextAnalyzer
 from core.model_executor import get_model_executor
 from utils.llm_json_parser import parse_llm_json
 from webnovel.repositories import (
-    get_webnovel_project_by_script, get_character_cards_by_project,
-    get_volume_outlines_by_project, add_chapter_plot
+    get_webnovel_project_by_script, add_chapter_plot
 )
 
 
@@ -59,8 +62,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             # 章节规划位于 structural_data（context_builder 输出），不在顶层键
             chapter_plan = (context.get("structural_data") or {}).get("current_chapter_plan") or context.get("current_chapter_plan")
 
-            # 通过 ContextAnalyzer 组装对照上下文（角色能力/金手指/世界观/伏笔）
-            from webnovel.pipeline.context_analyzer import ContextAnalyzer
+            # 通过 ContextAnalyzer 三段式装配对照上下文（角色能力/金手指/世界观/伏笔）
             analyzer = ContextAnalyzer(script_id, chapter_index)
             step_ctx = await analyzer.analyze_and_assemble(
                 step_name="chapter_plot_reviewer",
@@ -75,7 +77,7 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
             last_review = []
 
             while revision_count < self.MAX_REVISIONS:
-                review_result = await self._review_plot(current_plot, chapter_plan, chapter_index, step_ctx)
+                review_result = await self._review_plot(current_plot, chapter_index, step_ctx)
                 last_review = review_result
 
                 # 标记驱动：存在值得修正的问题或可落实的建议才触发修正，分数仅作观测指标
@@ -131,147 +133,21 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
                 step_summary="剧情审查执行失败"
             )
 
-    def _format_characters(self, characters: list) -> str:
-        """构建角色详情文本（含能力/目标/物品）。"""
-        if not characters:
-            return "（无角色信息）"
-        lines = []
-        for c in characters:
-            if not isinstance(c, dict):
-                continue
-            name = c.get("character_name", "") or c.get("name", "")
-            if not name:
-                continue
-            line = f"- {name}"
-            personality = c.get("personality", "") or c.get("core_personality", "")
-            if personality:
-                line += f" | 性格: {personality[:80]}"
-            flaw = c.get("flaw", "") or c.get("personality_flaw", "")
-            if flaw:
-                line += f" | 缺陷: {flaw[:60]}"
-            identity = c.get("identity", "")
-            if identity:
-                line += f" | 身份: {identity[:60]}"
-            abilities = c.get("abilities", "") or ""
-            if abilities:
-                line += f" | 能力: {str(abilities)[:100]}"
-            goals = c.get("goals", "") or ""
-            if goals:
-                line += f" | 目标: {str(goals)[:60]}"
-            items = c.get("items", []) or []
-            item_names = [it.get("name", "") for it in items if isinstance(it, dict) and it.get("name")]
-            if item_names:
-                line += f" | 持有物品: {'、'.join(item_names[:6])}"
-            lines.append(line)
-        return "\n".join(lines) if lines else "（无角色信息）"
-
-    def _format_world_settings(self, world_settings: list) -> str:
-        """格式化世界观规则文本。"""
-        if not world_settings:
-            return ""
-        parts = []
-        for s in world_settings:
-            if isinstance(s, dict):
-                summary = s.get("world_summary", "") or s.get("content", "")
-                if summary:
-                    parts.append(f"- 世界简介: {str(summary)[:200]}")
-                social = s.get("social_common_sense", "")
-                if social:
-                    parts.append(f"- 社会常识: {str(social)[:200]}")
-                factions = s.get("factions_list", [])
-                if factions:
-                    names = "、".join(f.get("faction_name", "") for f in factions[:5])
-                    parts.append(f"- 主要势力: {names}")
-        return "\n".join(parts) if parts else ""
-
-    def _format_foreshadows(self, foreshadows: list) -> str:
-        """格式化活跃伏笔文本（含埋设章节）。"""
-        if not foreshadows:
-            return ""
-        lines = []
-        for f in foreshadows[:8]:
-            tier = f.get("tier", "")
-            content = f.get("content", "")
-            planted = f.get("planted_chapter") or f.get("planted_ch") or 0
-            lines.append(f"- [{tier}] {content} (第{planted}章埋下)")
-        return "\n".join(lines) if lines else ""
-
     async def _review_plot(
-        self, plot_list: list, chapter_plan: dict, chapter_index: int,
-        step_ctx: Optional[dict] = None,
+        self, plot_list: list, chapter_index: int,
+        step_ctx: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """单次 LLM 调用完成所有维度审查。"""
         project = get_webnovel_project_by_script(self.script_id)
         project_id = project["id"] if project else 0
 
-        # 章节规划信息
-        summary = chapter_plan.get("summary", "") if chapter_plan else ""
-        key_events = chapter_plan.get("key_events", "") if chapter_plan else ""
-        must_cover = ""
-        if chapter_plan:
-            nodes = chapter_plan.get("must_cover_nodes", [])
-            must_cover = json.dumps(nodes, ensure_ascii=False) if nodes else ""
-
-        # 卷纲
-        volume_outlines = get_volume_outlines_by_project(project_id)
-        current_volume = None
-        for vo in volume_outlines:
-            if vo.get("chapter_start") <= chapter_index <= vo.get("chapter_end", chapter_index):
-                current_volume = vo
-                break
-        volume_conflict = (current_volume.get("core_conflict", "") or "（未设定）")[:200] if current_volume else ""
-        volume_goal = (current_volume.get("protagonist_goal", "") or "（未设定）")[:200] if current_volume else ""
-
-        # 角色（含能力）与金手指，来自 ContextAnalyzer step_ctx；无 ctx 时兜底仅主角三字段
-        characters_detail = ""
-        world_settings_text = ""
-        foreshadow_text = ""
-        if step_ctx:
-            characters_detail = self._format_characters(step_ctx.get("characters", []))
-            undisclosed_text = self._format_undisclosed(
-                step_ctx.get("undisclosed_foreshadows", []))
-            golden = step_ctx.get("golden_finger") or {}
-            if golden:
-                gf_lines = [f"- 金手指类型: {golden.get('type', '')}"]
-                core = golden.get("core_function") or ""
-                if core:
-                    gf_lines.append(f"- 核心能力: {core[:200]}")
-                cost = golden.get("irreversible_cost") or ""
-                if cost:
-                    gf_lines.append(f"- 代价: {str(cost)[:150]}")
-                characters_detail += "\n【主角金手指】\n" + "\n".join(gf_lines)
-            world_settings_text = self._format_world_settings(step_ctx.get("world_settings", []))
-            foreshadow_text = self._format_foreshadows(step_ctx.get("foreshadows", []))
-        else:
-            protagonists = get_character_cards_by_project(project_id, "protagonist")
-            if protagonists:
-                p = protagonists[0]
-                characters_detail = (
-                    f"- {p.get('name', '')} | 性格: {p.get('core_personality', '')} | 缺陷: {p.get('personality_flaw', '')}"
-                )
-
-        # 维度说明
-        dimension_lines = []
-        for d in self.REVIEW_DIMENSIONS:
-            dimension_lines.append(f"- {d['name']}({d['key']})：{d['description']}")
-        dimensions_text = "\n".join(dimension_lines)
-
-        # 剧情文本
+        # 待审查剧情文本（循环内实时，可能经修正更新）
         plot_text = json.dumps(plot_list, ensure_ascii=False, indent=2)
 
         prompt_data = self._load_prompt("chapter_plot_review")
         prompt = prompt_data["user_prompt"].format(
             chapter_index=chapter_index,
-            summary=summary,
-            key_events=key_events,
-            must_cover_nodes=must_cover,
-            volume_conflict=volume_conflict,
-            volume_goal=volume_goal,
-            characters_detail=characters_detail,
-            world_settings_text=world_settings_text,
-            foreshadow_text=foreshadow_text,
-            undisclosed_text=undisclosed_text,
-            dimensions_text=dimensions_text,
+            assembled_context=step_ctx.get("assembled_context", "") if step_ctx else "",
             plot_text=plot_text,
         )
         system_prompt = prompt_data["system_prompt"]

@@ -7,35 +7,22 @@ user_prompt: |
   {step_description}
   重点关注：{focus}
 
-  【本章规划】
-  {chapter_plan_summary}
+  【资源目录】
+  以下列出本步骤可选的参考资源（含候选条目与可选深度）。请根据任务需要选择最相关的条目：
+  {resource_catalog}
 
-  【可用数据清单】
-  角色（id: 名称/类型/摘要）：
-  {character_inventory_text}
-
-  活跃伏笔（id: 层级/内容/埋设章节/紧迫度）：
-  {foreshadow_inventory_text}
-
-  世界观（id: 名称/摘要）：
-  {world_settings_inventory_text}
-
-  力量体系：{power_system_summary}
-  金手指：{golden_finger_summary}
-  前文摘要：
-  {previous_chapters_inventory_text}
-  RAG候选（id: 类型/章节/预览）：
-  {rag_candidates_inventory_text}
+  【RAG候选】（预检索结果，供参考；若与需求高度相关可减少查询数量）
+  {rag_candidates_text}
 
   {prev_step_selections_text}
 
   【选择约束】
-  - 上下文总字数不超过 {budget} 字
-  - 上一章衔接信息（前文/追读钩子）始终保留，无需在清单中选择
-  - 当前章节规划和卷纲已包含，无需重复选择
-  - 优先选择与本章剧情直接相关的条目
-  - 核心伏笔（紧迫度高、与本章规划相关）必须选入
+  - 只选择与本章剧情直接相关的条目，宁少勿滥；每个资源至少给出 1 个条目（若清单中有）
+  - 深度选择：需要精确承接/核对细节用 full；只需要概要用 summary；前文结尾衔接用 tail
+  - 上一章结尾衔接、章节规划、卷纲、角色状态等核心信息通常必须选择，除非本章确实不涉及
   - 如果前序步骤已选择了某些条目，你应当至少保留它们（除非确实不相关）
+  - structured_refs 中的 resource 只能取【资源目录】中列出的资源名
+  - 引用参数必填：previous_chapter 必须填 chapter_index（前文清单中的章节号，如 2 表示第2章）；character_card/foreshadow 必须填 ids（清单中条目编号）
 
   {dimension_checklist_text}
 
@@ -43,8 +30,8 @@ user_prompt: |
   - 每条 rag_query 必须是具体的语义检索语句，格式为「核心实体（角色名/地点/物品/组织）+ 关系或事件 + 状态/场景限定」，例如「李承言对张大牛敌意的应对」「林若兮追查密道线索的进展」，而不是「团队内部矛盾」这类泛化短语
   - 禁止原样复制关键事件、章节规划或剧情节点的原文短句（如「争吵爆发；冷静讨论；达成共识」）
   - 每条查询只聚焦一个主题，不同查询覆盖不同主题，避免相互重叠
-  - 一般 1~3 条；若【RAG候选】清单已含与需求高度相关的条目（按 id 可辨），可减少查询数量，优先依赖候选
-  - types 选择指引：chapter_paragraph（对话/动作/场景细节）、character（角色状态/行为/关系）、foreshadow（伏笔线索/埋设与回收）、chapter_summary（章节梗概）
+  - 一般 1~3 条；若【RAG候选】清单已含与需求高度相关的条目，可减少查询数量，优先依赖候选
+  - types 选择指引：chapter_paragraph（对话/动作/场景细节）、character（角色状态/行为/关系）、foreshadow（伏笔线索/埋设与回收）、chapter_summary（章节梗概）、worldview/power_system/golden_finger（设定细节）
   - limit 建议：chapter_paragraph 取 5~8，其他类型 3~5
 
   查询示例（好 vs 坏）：

@@ -87,45 +87,6 @@ class BaseExecutor:
 
         return {"system_prompt": system_prompt.strip(), "user_prompt": user_prompt.strip()}
 
-    def _format_character_states(self, states: list) -> str:
-        """格式化上章末角色状态（最多 6 角色，一行一条）。"""
-        if not states:
-            return "（无上一章状态记录）"
-        parts = []
-        for s in states[:6]:
-            name = s.get("character_name", "")
-            loc = s.get("location", "") or ""
-            state = s.get("state_summary", "") or ""
-            emotion = s.get("emotion", "") or ""
-            knowledge = s.get("knowledge", "") or ""
-            line = f"- {name}"
-            if loc:
-                line += f"（{loc}）"
-            if state:
-                line += f": {state}"
-            if emotion:
-                line += f"；情绪:{emotion}"
-            if knowledge:
-                line += f"；已知:{knowledge[:60]}"
-            parts.append(line)
-        return "\n".join(parts) if parts else "（无上一章状态记录）"
-
-    def _format_undisclosed(self, loops: list) -> str:
-        """格式化不可提前揭示的伏笔清单。"""
-        if not loops:
-            return "（无）"
-        parts = []
-        for lp in loops[:6]:
-            content = lp.get("content", "")
-            planted = lp.get("planted_chapter", 0)
-            tier = lp.get("tier", "")
-            line = f"- 「{content}」（第{planted}章埋设"
-            if tier:
-                line += f"，等级:{tier}"
-            line += "）"
-            parts.append(line)
-        return "\n".join(parts)
-
     def get_step_info(self) -> Dict[str, Any]:
         """获取步骤信息。"""
         return {

@@ -25,15 +25,8 @@ user_prompt: |
   - 禁止出现超过100字的密集段落，这是网文排版大忌
   - 整体节奏：短句加速、长句减速，用换行制造视觉呼吸感
 
-  {issues_section}{suggestions_section}{worldview_section}
-  【文风锚点】
-  {style_anchor}
-
-  【力量体系描写规范】
-  {power_spec}
-
-  【一致性约束】
-  {consistency_notes}
+  【装配上下文】
+  {assembled_context}
 
   【草稿内容】
   {draft_content}
@@ -50,5 +43,5 @@ user_prompt: |
   【润色红线（必须遵守）】
   - 只改表达不改事实：不得改变设定、剧情走向、对话原意与角色行为
   - 不得新增草稿中不存在的新场景、新角色、新情节、新信息
-  - 润色后不得出现与【一致性约束】【世界观规则】相悖的描写
+  - 润色后不得出现与装配上下文【一致性约束】【世界观】相悖的描写
 ---
