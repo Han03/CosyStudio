@@ -29,7 +29,6 @@ from repositories import (
 )
 from webnovel.repositories import (
     get_webnovel_project, get_webnovel_project_by_script, get_volume_outlines_by_project,
-    get_chapter_meta_list, get_chapter_meta, update_chapter_meta,
     add_review_record, get_review_records, delete_chapter_review_records,
     get_worldview_by_project,
     get_webnovel_state_by_project, update_webnovel_state, add_webnovel_state,
@@ -1302,12 +1301,7 @@ class WebnovelService:
         else:
             self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 跨章节事件处理失败（已降级） - {event_result.error_message}")
 
-        # 章节元数据标记（hook_type 字段由 apply 流程标记状态）
-        if project_id:
-            _meta = get_chapter_meta(project_id, chapter_index)
-            if _meta:
-                update_chapter_meta(_meta["id"], hook_type="已完成")
-
+        # 章节元数据（结尾钩子）由 fact_recorder._save_hook 插入，此处不再标记
         if time.time() - start_time >= _APPLY_TASK_TIMEOUT:
             raise TimeoutError("应用任务超时")
 
@@ -1510,56 +1504,6 @@ class WebnovelService:
             )
         except Exception as e:
             self._logger.error(f"[WebnovelService] 更新 webnovel_state 失败: {e}")
-
-    async def _extract_and_save_hook(self, project_id: int, chapter_index: int, content: str):
-        """从润色内容中提取结尾状态并回写到 chapter_meta。
-
-        注意：不回写 hook_type，该字段由调用方用于标记状态（如"已完成"）。
-        """
-        try:
-            chapter_meta = get_chapter_meta(project_id, chapter_index)
-            if not chapter_meta:
-                return
-
-            prompt = f"""请从以下章节内容末尾提取结尾留下的故事状态与未了线索（若结尾安静收束、无明显悬念，不要强行提取）：
-
-【章节内容末尾】
-{content[-800:]}
-
-请输出严格的JSON格式：
-{{"hook_content": "结尾故事状态/未了线索描述", "hook_type": "悬念式/冲突式/反转型/情感式/安静收束", "hook_strength": "强/中/弱", "hook_pattern": "结尾手法（如：悬念留白/矛盾激化/信息差/反转/情绪落点）", "ending_emotion": "期待/紧张/感动/愤怒/平静", "ending_time": "场景时间（如：白天/夜晚/黄昏/清晨）", "ending_location": "场景地点"}}
-如果没有明显的悬念或未了线索，hook_content输出空字符串。
-"""
-            result = await self._model_executor.execute_text_chat(
-                prompt=prompt,
-                system_prompt="你是一位专业的网文编辑，擅长识别章节结尾的故事状态。请输出严格的JSON格式。",
-                max_tokens=300,
-                script_id=0,
-                project_id=project_id,
-                executor_name="webnovel_service",
-                prompt_name="extract_hook",
-            )
-            response = result.get("content", "") if result else ""
-
-            from utils.llm_json_parser import parse_llm_json
-            hook_data = parse_llm_json(
-                response,
-                executor_name="webnovel_service",
-                prompt_name="extract_hook",
-            )
-            if hook_data and hook_data.get("hook_content"):
-                update_chapter_meta(
-                    chapter_meta["id"],
-                    hook_content=hook_data.get("hook_content", ""),
-                    hook_strength=hook_data.get("hook_strength", "中"),
-                    hook_pattern=hook_data.get("hook_pattern", ""),
-                    ending_emotion=hook_data.get("ending_emotion", ""),
-                    ending_time=hook_data.get("ending_time", ""),
-                    ending_location=hook_data.get("ending_location", ""),
-                )
-                self._logger.info(f"[WebnovelService] 已提取并保存第{chapter_index}章结尾状态")
-        except Exception as e:
-            self._logger.error(f"[WebnovelService] 提取结尾状态失败: {e}")
 
     async def _generate_chapter_summary(self, project_id: int, chapter_index: int, content: str) -> str:
         """调用 LLM 生成章节的结构化摘要（200字以内）。

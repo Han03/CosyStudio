@@ -15,7 +15,6 @@ class PipelineOrchestrator:
     EXECUTOR_REGISTRY: Dict[str, Type[BaseExecutor]] = {}
 
     DEFAULT_STEPS = [
-        "chapter_splitter",
         "volume_timeline_generator",
         "context_builder",
         "chapter_plot_generator",
