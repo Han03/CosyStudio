@@ -71,7 +71,7 @@ class DraftPolisherExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=full_prompt,
                 system_prompt=system_prompt,
-                max_tokens=max(8000, int(word_cfg.get("polish_word_max", 5000)) * 2),
+                max_tokens=int(word_cfg.get("polish_max_tokens", 8000)),
                 script_id=script_id,
                 project_id=project_id,
                 executor_name=self.step_name,

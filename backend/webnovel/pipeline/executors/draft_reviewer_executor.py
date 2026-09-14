@@ -92,7 +92,7 @@ class DraftReviewerExecutor(BaseExecutor):
             word_cfg = context.get("word_config") or {}
 
             while revision_count < self.MAX_REVISIONS:
-                review_result = await self._review_draft(current_draft, step_ctx, project_id)
+                review_result = await self._review_draft(current_draft, step_ctx, project_id, context.get("word_config") or {})
                 review_history.append({
                     "revision": revision_count + 1,
                     "review_result": review_result
@@ -167,7 +167,8 @@ class DraftReviewerExecutor(BaseExecutor):
             )
 
     async def _review_draft(
-        self, draft: str, step_ctx: Dict[str, Any], project_id: int
+        self, draft: str, step_ctx: Dict[str, Any], project_id: int,
+        word_cfg: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
         """审查草稿（单次LLM调用完成所有维度）。"""
         prompt_data = self._load_prompt("review_draft")
@@ -183,7 +184,7 @@ class DraftReviewerExecutor(BaseExecutor):
         result = await executor.execute_text_chat(
             prompt=prompt,
             system_prompt=system_prompt,
-            max_tokens=3000,
+            max_tokens=int((word_cfg or {}).get("review_max_tokens", 800)),
             script_id=self.script_id,
             project_id=project_id,
             executor_name="draft_reviewer_score",
@@ -312,7 +313,7 @@ class DraftReviewerExecutor(BaseExecutor):
         result = await executor.execute_text_chat(
             prompt=prompt,
             system_prompt=system_prompt,
-            max_tokens=max(3000, int(word_cfg.get("draft_word_max", 1800)) * 3),
+            max_tokens=int(word_cfg.get("revise_draft_max_tokens", 3000)),
             script_id=self.script_id,
             project_id=project_id,
             executor_name="draft_reviewer_revise",

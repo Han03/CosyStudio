@@ -84,10 +84,13 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
 
             # 加载 prompt 模板并填充
             prompt_data = self._load_prompt("chapter_plot_generate")
+            word_cfg = context.get("word_config") or {}
             full_prompt = prompt_data["user_prompt"].format(
                 chapter_index=chapter_index,
                 continue_prev=continue_prev,
                 assembled_context=step_ctx["assembled_context"],
+                plot_count=int(word_cfg.get("plot_count", 8)),
+                plot_desc_max=int(word_cfg.get("plot_desc_max", 60)),
             )
             system_prompt = prompt_data["system_prompt"] or "你是一位资深网文策划编辑，擅长将章节规划拆解为详细的场景级剧情列表"
 
@@ -95,7 +98,7 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=full_prompt,
                 system_prompt=system_prompt,
-                max_tokens=3000,
+                max_tokens=int((context.get("word_config") or {}).get("plot_max_tokens", 3000)),
                 script_id=script_id,
                 project_id=project_id,
                 executor_name=self.step_name,

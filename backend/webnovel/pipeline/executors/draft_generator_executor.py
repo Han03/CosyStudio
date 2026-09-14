@@ -73,6 +73,7 @@ class DraftGeneratorExecutor(BaseExecutor):
                 assembled_context=step_ctx["assembled_context"],
                 draft_word_min=int(word_cfg.get("draft_word_min", 1200)),
                 draft_word_max=int(word_cfg.get("draft_word_max", 1800)),
+                draft_point_max=int(word_cfg.get("draft_point_max", 80)),
             )
             system_prompt = prompt_data["system_prompt"] or "你是一位畅销网文作家，擅长创作精彩的网络小说章节"
 
@@ -80,7 +81,7 @@ class DraftGeneratorExecutor(BaseExecutor):
             result = await executor.execute_text_chat(
                 prompt=full_prompt,
                 system_prompt=system_prompt,
-                max_tokens=max(3500, int(word_cfg.get("draft_word_max", 1800)) * 3),
+                max_tokens=int(word_cfg.get("draft_max_tokens", 3500)),
                 script_id=script_id,
                 project_id=project_id,
                 executor_name=self.step_name,

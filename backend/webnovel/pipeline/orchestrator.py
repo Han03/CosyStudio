@@ -96,12 +96,27 @@ class PipelineOrchestrator:
         # 草稿为白描骨架，约为成品的 40%-60%（0.4→0.5：草稿过短导致润色扩写不达标）
         draft_min = round(polish_min * 0.5)
         draft_max = round(polish_max * 0.5)
+        # 剧情点数量：每点成品约 250 字，clamp 4-10；每点描述上限固定 60 字
+        plot_count = max(4, min(10, round(raw / 250)))
+        plot_desc_max = 60
+        # 每点草稿上限：草稿总量 / 剧情点数（不低于 60 字）
+        draft_point_max = max(60, draft_max // max(plot_count, 1))
+        # max_tokens：中文 1 字 ≈ 1.5-2 tok，按上限 ×2 留余量
         self._context["word_config"] = {
             "chapter_words": raw,
             "polish_word_min": polish_min,
             "polish_word_max": polish_max,
             "draft_word_min": draft_min,
             "draft_word_max": draft_max,
+            "plot_count": plot_count,
+            "plot_desc_max": plot_desc_max,
+            "draft_point_max": draft_point_max,
+            "polish_max_tokens": max(1500, polish_max * 2),
+            "draft_max_tokens": max(800, draft_max * 2),
+            "revise_draft_max_tokens": max(800, draft_max * 2),
+            "plot_max_tokens": max(1200, plot_count * 400),
+            "plot_revise_max_tokens": max(1200, plot_count * 400),
+            "review_max_tokens": 800,
         }
 
     async def execute_workflow(self, mode: str, context_data: Dict[str, Any] = None, user_prompt: str = "", enable_polish: bool = True) -> Dict[str, Any]:
