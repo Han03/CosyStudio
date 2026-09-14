@@ -95,8 +95,9 @@ class PipelineOrchestrator:
             raw = 4000
         polish_min = round(raw * 0.8)
         polish_max = round(raw * 1.2)
-        draft_min = round(polish_min * 0.4)
-        draft_max = round(polish_max * 0.4)
+        # 草稿为白描骨架，约为成品的 40%-60%（0.4→0.5：草稿过短导致润色扩写不达标）
+        draft_min = round(polish_min * 0.5)
+        draft_max = round(polish_max * 0.5)
         self._context["word_config"] = {
             "chapter_words": raw,
             "polish_word_min": polish_min,
