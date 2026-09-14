@@ -34,7 +34,7 @@ from webnovel.repositories import (
     get_webnovel_state_by_project, update_webnovel_state, add_webnovel_state,
     get_chapter_plans_by_volume,
     get_character_cards_by_project, get_golden_finger_by_project,
-    get_power_system_by_project, get_foreshadows_by_project, get_villains_by_project,
+    get_power_system_by_project, get_villains_by_project,
     get_character_card, get_character_items_by_project,
 )
 from core.model_executor import get_model_executor
@@ -243,26 +243,6 @@ def _build_volume_outline_chunk_text(vol: dict) -> str:
     if not body:
         return ""
     return opener + body + "。"
-
-
-def _build_foreshadow_chunk_text(fs: dict) -> str:
-    """将伏笔格式化为自然描述的 RAG 索引文本。"""
-    if not fs:
-        return ""
-    content = str(fs.get('content', '') or '').strip()
-    if not content:
-        return ""
-    parts = [f"作品埋入了一条伏笔：{content}"]
-    planted = fs.get('buried_chapter', 0)
-    payoff = fs.get('payoff_chapter', 0)
-    if planted:
-        parts.append(f"该伏笔埋入第{planted}章")
-    if payoff:
-        parts.append(f"预计在第{payoff}章回收")
-    level = str(fs.get('level', '') or '').strip()
-    if level:
-        parts.append(f"伏笔级别为{level}")
-    return "，".join(parts) + "。"
 
 
 def _build_villain_chunk_text(v: dict) -> str:
@@ -1824,13 +1804,6 @@ class WebnovelService:
                 _collect_one("volume_outline", _build_volume_outline_chunk_text(vol),
                              chapter_number=vol.get('volume_number', 0),
                              metadata=json.dumps({"source": "volume_outline", "volume_id": vol.get("id")}))
-
-            # 6. 伏笔
-            foreshadows = get_foreshadows_by_project(project_id)
-            for fs in foreshadows:
-                planted = fs.get('buried_chapter', 0) or 0
-                _collect_one("foreshadow", _build_foreshadow_chunk_text(fs), chapter_number=planted,
-                           metadata=json.dumps({"source": "foreshadow", "foreshadow_id": fs.get("id")}))
 
             # 7. 反派（字段名须与 webnovel_villain 表 schema 一致）
             villains = get_villains_by_project(project_id)

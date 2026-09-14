@@ -32,7 +32,7 @@ from webnovel.repositories import (
     update_villain, add_worldview_faction, add_worldview_history,
     get_worldview_factions, get_worldview_history,
     add_power_level, add_character_growth, add_villain_hierarchy,
-    add_open_loop, add_foreshadow,
+    add_open_loop,
     get_character_group_by_project, get_character_group_members
 )
 
@@ -955,26 +955,7 @@ class PlanExecutor(BaseExecutor):
         core_conflict_anchor = volume_outline.get("new_hook", "") or "待规划"
         update_volume_outline(vo_id, core_conflict_anchor=core_conflict_anchor)
 
-        # 2. 铺垫碎片 → webnovel_foreshadow
-        key_foreshadowing_raw = volume_outline.get("key_foreshadowing", "")
-        if isinstance(key_foreshadowing_raw, str):
-            key_foreshadowing = self._parse_json_field(key_foreshadowing_raw)
-            if not key_foreshadowing and key_foreshadowing_raw:
-                key_foreshadowing = [key_foreshadowing_raw]
-        else:
-            key_foreshadowing = key_foreshadowing_raw if isinstance(key_foreshadowing_raw, list) else []
-
-        for item in key_foreshadowing[:5]:
-            add_foreshadow(
-                project_id=project_id,
-                volume_outline_id=vo_id,
-                content=item if isinstance(item, str) else str(item),
-                buried_chapter=volume_outline.get("chapter_start", 0),
-                payoff_chapter=0,
-                level="卷级"
-            )
-
-        # 3. 开放线索 → webnovel_open_loops
+        # 2. 开放线索 → webnovel_open_loops
         unresolved = volume_outline.get("unresolved_issues", "")
         if unresolved:
             add_open_loop(

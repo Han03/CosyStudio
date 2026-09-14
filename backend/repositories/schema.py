@@ -796,23 +796,6 @@ def _init_schema(conn: sqlite3.Connection):
 
         CREATE INDEX IF NOT EXISTS idx_webnovel_volume_project ON webnovel_volume_outline(project_id);
 
-        CREATE TABLE IF NOT EXISTS webnovel_foreshadow (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_id INTEGER NOT NULL,
-            volume_outline_id INTEGER NOT NULL,
-            content TEXT DEFAULT '',
-            buried_chapter INTEGER DEFAULT 0,
-            payoff_chapter INTEGER DEFAULT 0,
-            level TEXT DEFAULT '',
-            created_at REAL,
-            updated_at REAL,
-            FOREIGN KEY (project_id) REFERENCES webnovel_project(id) ON DELETE CASCADE,
-            FOREIGN KEY (volume_outline_id) REFERENCES webnovel_volume_outline(id) ON DELETE CASCADE
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_webnovel_foreshadow_project ON webnovel_foreshadow(project_id);
-        CREATE INDEX IF NOT EXISTS idx_webnovel_foreshadow_volume ON webnovel_foreshadow(volume_outline_id);
-
         CREATE TABLE IF NOT EXISTS webnovel_volume_crisis (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             volume_outline_id INTEGER NOT NULL,

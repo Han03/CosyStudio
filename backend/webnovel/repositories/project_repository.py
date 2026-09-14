@@ -173,7 +173,6 @@ def delete_webnovel_project(project_id: int) -> bool:
             "webnovel_state",
             "webnovel_genre_fusion",
             "webnovel_timeline",
-            "webnovel_foreshadow",
             "webnovel_volume_outline",
             "webnovel_worldview",
             "webnovel_power_system",
