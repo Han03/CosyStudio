@@ -506,7 +506,6 @@ CALL_POINT_CATEGORIES = [
         "icon": "fas fa-pen-fancy",
         "color": "#00b894",
         "call_points": {
-            "chapter_splitter": {"name": "章节拆分", "description": "章节内容拆分"},
             "volume_timeline_generator": {"name": "卷首时间轴", "description": "卷首时间轴生成"},
             "context_builder": {"name": "上下文构建", "description": "写作上下文构建"},
             "chapter_plot_generator": {"name": "剧情生成", "description": "章节剧情列表"},

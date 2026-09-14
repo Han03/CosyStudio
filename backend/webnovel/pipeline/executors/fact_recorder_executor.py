@@ -15,7 +15,7 @@ from webnovel.repositories import (
     delete_character_card, reassign_character_data,
     upsert_character_item, mark_character_item_lost,
     add_cool_point, update_open_loop_urgency,
-    get_chapter_meta, update_chapter_meta, upsert_character_state,
+    add_chapter_meta, upsert_character_state,
     get_worldview_by_project,
     get_worldview_settings_by_project, add_worldview_setting,
     add_setting_change,
@@ -342,15 +342,17 @@ class FactRecorderExecutor(BaseExecutor):
         update_open_loop_urgency(project_id, chapter_index)
 
     async def _save_hook(self, project_id: int, chapter_index: int, hook: Dict):
-        """落库结尾钩子到 chapter_meta（不回写 hook_type，该字段由调用方标记状态）。"""
+        """落库结尾钩子到 chapter_meta（每次应用结果插入一条新版本，保留历史）。
+
+        hook_type 一并落库（fact_record 结构化输出字段，此前被丢弃）。
+        """
         try:
             if not hook or not hook.get("hook_content"):
                 return
-            chapter_meta = get_chapter_meta(project_id, chapter_index)
-            if not chapter_meta:
-                return
-            update_chapter_meta(
-                chapter_meta["id"],
+            add_chapter_meta(
+                project_id=project_id,
+                chapter_number=chapter_index,
+                hook_type=str(hook.get("hook_type", "") or "").strip(),
                 hook_content=hook.get("hook_content", ""),
                 hook_strength=hook.get("hook_strength", "中"),
                 hook_pattern=hook.get("hook_pattern", ""),

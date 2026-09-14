@@ -14,7 +14,6 @@ from repositories import (
 from webnovel.repositories import (
     get_webnovel_project_by_script, get_volume_outlines_by_project,
     add_volume_outline, get_volume_outline, update_volume_outline, delete_volume_outline,
-    get_chapter_meta_list, get_chapter_meta, add_chapter_meta, update_chapter_meta,
     get_worldview_by_project, add_worldview, get_worldview,
     get_worldview_factions, get_worldview_history,
     get_timelines_by_project,
