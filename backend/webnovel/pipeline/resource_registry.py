@@ -310,22 +310,25 @@ def _fmt_character_states(states, depth="full"):
         if line_parts:
             lines.append("- " + " | ".join(line_parts))
     if not lines:
-        return "（无角色状态记录）"
+        return ""
     return "\n".join(lines)
 
 
 def _fmt_previous_hook(hook, depth="full"):
-    return (
-        f"- 结尾状态: {hook.get('hook_content', '')}\n"
-        f"- 状态类型: {hook.get('hook_type', '')}\n"
-        f"- 结尾情绪: {hook.get('ending_emotion', '')}"
-    )
+    parts = []
+    if hook.get("hook_content"):
+        parts.append(f"- 结尾状态: {hook['hook_content']}")
+    if hook.get("hook_type"):
+        parts.append(f"- 状态类型: {hook['hook_type']}")
+    if hook.get("ending_emotion"):
+        parts.append(f"- 结尾情绪: {hook['ending_emotion']}")
+    return "\n".join(parts)
 
 
 def _fmt_character_full(characters, depth="full"):
     """角色详情（审查/剧情生成用），含持有物品。"""
     if not characters:
-        return "（无角色信息）"
+        return ""
     lines = []
     for c in characters:
         name = c.get("character_name", "")
@@ -355,7 +358,7 @@ def _fmt_character_full(characters, depth="full"):
 def _fmt_character_summary(characters, depth="summary"):
     """角色速写（草稿生成用），含物品清单 + 物品一致性约束。"""
     if not characters:
-        return "（无角色）"
+        return ""
     lines = []
     for char in characters:
         name = char.get("character_name", "")
@@ -388,7 +391,7 @@ def _fmt_character_summary(characters, depth="summary"):
 
 def _fmt_character_group(char_group, depth="full"):
     if not char_group or not isinstance(char_group, dict):
-        return "（无主角团）"
+        return ""
     parts = []
     cg_goal = char_group.get("common_goal", "") or char_group.get("goal", "")
     if cg_goal:
@@ -409,12 +412,12 @@ def _fmt_character_group(char_group, depth="full"):
             if flaw:
                 line_parts.append(f"缺陷: {flaw}")
             parts.append(" | ".join(line_parts))
-    return "\n".join(parts) if parts else "（无主角团成员）"
+    return "\n".join(parts) if parts else ""
 
 
 def _fmt_worldview(world_settings, depth="full"):
     if not world_settings:
-        return "（无世界观设定）"
+        return ""
     parts = []
     for s in world_settings:
         if isinstance(s, dict):
@@ -428,12 +431,12 @@ def _fmt_worldview(world_settings, depth="full"):
             if factions:
                 names = "、".join(f.get("faction_name", "") for f in factions[:5])
                 parts.append(f"- 主要势力: {names}")
-    return "\n".join(parts) if parts else "（无世界观设定）"
+    return "\n".join(parts) if parts else ""
 
 
 def _fmt_power_system(ps, depth="full"):
     if not ps or not isinstance(ps, dict):
-        return "（未设定力量体系）"
+        return ""
     lines = []
     if ps.get("system_type"):
         lines.append(f"- 体系类型: {ps['system_type']}")
@@ -443,23 +446,27 @@ def _fmt_power_system(ps, depth="full"):
         lines.append(f"- 代价规则: {str(ps['cost_rules'])[:200]}")
     if lines:
         lines.append("- 描写要求：涉及修炼/战斗/能力使用时，须体现过程与代价，不得超出设定边界")
-    return "\n".join(lines) if lines else "（未设定力量体系）"
+    return "\n".join(lines) if lines else ""
 
 
 def _fmt_golden_finger(gf, depth="full"):
     if not gf or not isinstance(gf, dict):
-        return "（未设定金手指）"
-    return (
-        f"- 名称: {gf.get('main_role', '')}\n"
-        f"- 类型: {gf.get('type', '')}\n"
-        f"- 核心能力: {str(gf.get('core_function', ''))[:200]}\n"
-        f"- 不可逆代价: {str(gf.get('irreversible_cost', ''))[:200]}"
-    )
+        return ""
+    parts = []
+    if gf.get("main_role"):
+        parts.append(f"- 名称: {gf['main_role']}")
+    if gf.get("type"):
+        parts.append(f"- 类型: {gf['type']}")
+    if gf.get("core_function"):
+        parts.append(f"- 核心能力: {str(gf['core_function'])[:200]}")
+    if gf.get("irreversible_cost"):
+        parts.append(f"- 不可逆代价: {str(gf['irreversible_cost'])[:200]}")
+    return "\n".join(parts)
 
 
 def _fmt_foreshadows(loops, depth="full"):
     if not loops:
-        return "（无活跃伏笔）"
+        return ""
     lines = []
     for loop in loops[:8]:
         lines.append(
@@ -541,7 +548,7 @@ def _fmt_review_result(review_result, depth="full"):
 
 def _fmt_rag_results(rag_results, depth="full", limit=3):
     if not rag_results:
-        return "（无检索结果）"
+        return ""
     parts = []
     for r in rag_results[:limit]:
         if isinstance(r, str):
@@ -559,13 +566,13 @@ def _fmt_rag_results(rag_results, depth="full", limit=3):
 
 def _fmt_consistency_notes(notes, depth="full"):
     if not notes:
-        return "（无）"
+        return ""
     return "\n".join(f"- {note}" for note in notes)
 
 
 def _fmt_undisclosed(undisclosed, depth="full"):
     if not undisclosed:
-        return "（无）"
+        return ""
     lines = []
     for f in undisclosed:
         lines.append(
@@ -578,7 +585,7 @@ def _fmt_undisclosed(undisclosed, depth="full"):
 def _fmt_dimensions(step_name, depth="full"):
     dims = REVIEW_DIMENSIONS.get(step_name, [])
     if not dims:
-        return "（无审查维度）"
+        return ""
     lines = []
     for d in dims:
         lines.append(f"- {d['name']}({d['key']})：{d['description']}")

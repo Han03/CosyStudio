@@ -616,6 +616,9 @@ class ContextAnalyzer:
                 body = sections[sec_name]
                 if sec_name not in _JSON_SECTIONS:
                     body = normalize_text_block(body, mode="preserve_md_list")
+                if not body or not body.strip():
+                    # 空区块整体跳过，不保留空标题
+                    continue
                 ordered.append(f"{header}\n{body}")
         ctx["assembled_context"] = normalize_text_block(
             "\n\n".join(ordered), mode="preserve_md_list")
