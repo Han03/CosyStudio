@@ -30,7 +30,7 @@ from webnovel.repositories import (
     get_webnovel_project, get_webnovel_project_by_script, get_volume_outlines_by_project,
     get_chapter_meta_list, get_chapter_meta, update_chapter_meta,
     add_review_record, get_review_records, delete_chapter_review_records,
-    get_worldview_by_project, get_timelines_by_project, add_timeline, add_timeline_chapter,
+    get_worldview_by_project,
     get_webnovel_state_by_project, update_webnovel_state, add_webnovel_state,
     get_chapter_plans_by_volume,
     get_character_cards_by_project, get_golden_finger_by_project,
@@ -740,27 +740,6 @@ class WebnovelService:
 
             if plan_count > 0:
                 summary = f"第{chapter_num}章规划已生成：{plan_count}章"
-
-                # 章节规划生成成功后，检查是否需要补充时间线
-                # （单章回退路径不会自动生成时间线，需在此补上）
-                existing_timelines = get_timelines_by_project(project["id"])
-                has_volume_timeline = any(
-                    tl.get("volume_number") == volume_number for tl in existing_timelines
-                )
-                tl_id = None
-                if not has_volume_timeline:
-                    try:
-                        timeline = await executor._generate_timeline(
-                            project, volume_outline, protagonist, volume_number,
-                            chapter_plans=chapter_plans
-                        )
-                        if timeline:
-                            tl_id = executor._save_timeline(project["id"], volume_number, timeline)
-                            summary += f"，时间线ID={tl_id}"
-                    except Exception as tl_err:
-                        self._logger.warning(
-                            f"[WebnovelService] 单章规划后补充时间线失败: {tl_err}"
-                        )
 
                 update_writing_task(
                     task_id, progress=8, progress_message=summary,
