@@ -64,3 +64,15 @@ def update_chapter_meta(meta_id: int, **kwargs) -> bool:
         )
         conn.commit()
         return True
+
+
+def delete_chapter_meta(project_id: int, chapter_number: int) -> int:
+    """删除指定章节的元数据。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM webnovel_chapter_meta WHERE project_id = ? AND chapter_number = ?",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount

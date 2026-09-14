@@ -292,12 +292,22 @@ async def delete_chapter(
     script_id: int,
     chapter_index: int,
 ):
-    """删除章节（含文件和台词）。"""
+    """删除章节（与取消应用结果等同：正文文件+DB行+台词+全部关联数据按章清理）。"""
     service = get_script_service()
-    ok, message = service.delete_chapter(script_id, chapter_index)
-    if not ok:
-        raise HTTPException(status_code=404, detail=message)
-    return {"success": True, "message": message}
+    script = service.get_script(script_id)
+    if script is None:
+        raise HTTPException(status_code=404, detail="剧本不存在")
+    try:
+        from webnovel.services.webnovel_service import get_webnovel_service
+        result = await get_webnovel_service().rollback_apply_by_chapter(script_id, chapter_index)
+        if not result.get("deleted", {}).get("script_chapter"):
+            detail = result.get("errors") or ["章节不存在"]
+            raise HTTPException(status_code=404, detail="；".join(detail))
+        return {"success": True, "message": "章节已删除", "rollback": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除章节失败: {e}")
 
 
 @router.put("/api/books/scripts/chapters/content")

@@ -66,7 +66,8 @@ from .state_repository import (
     add_plot_thread, get_plot_threads
 )
 from .chapter_meta_repository import (
-    add_chapter_meta, get_chapter_meta, get_chapter_meta_list, update_chapter_meta
+    add_chapter_meta, get_chapter_meta, get_chapter_meta_list, update_chapter_meta,
+    delete_chapter_meta
 )
 from .review_repository import (
     add_review_record, get_review_records, get_chapter_review_summary,
