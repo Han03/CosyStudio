@@ -1244,18 +1244,21 @@ class WebnovelService:
                                        start_time: float):
         """执行应用任务的后处理步骤（并行优化版）。
 
-        Phase 1: 事实记录 + 伏笔爽点提取（含回收检查）+ 结尾钩子 并行
+        Phase 1: 事实记录（fact_recorder）+ 跨章节事件处理（提取/回收）+ 结尾钩子
         Phase 2: RAG 索引构建
 
-        云端模式下 Phase 1 的 3 次 LLM 调用并发执行，延迟取最慢一个；
+        云端模式下 Phase 1 的 LLM 调用并发执行，延迟取最慢一个；
         本地模式下 _LOCAL_INFERENCE_LOCK 自动串行，行为不变。
         供 _execute_apply_workflow 和 retry_post_process 复用。
         """
         from webnovel.pipeline.executors.fact_recorder_executor import FactRecorderExecutor
+        from webnovel.pipeline.executors.cross_chapter_event_processor_executor import (
+            CrossChapterEventProcessorExecutor,
+        )
 
-        # ── Phase 1: 事实提取（事实/伏笔爽点/结尾钩子/角色状态 全部归口 fact_recorder）──
+        # ── Phase 1: 事实提取（事实/爽点/结尾钩子/角色状态 归口 fact_recorder）──
         update_writing_task(apply_task_id, progress=40,
-                            progress_message="正在执行事实提取（事实/伏笔/爽点/钩子/角色状态）...",
+                            progress_message="正在执行事实提取（事实/爽点/钩子/角色状态）...",
                             current_step="后处理")
         await ws_broadcast_manager.broadcast_apply_task_update(
             script_id, {
@@ -1266,7 +1269,7 @@ class WebnovelService:
             }
         )
 
-        # 事实提取（fact_recorder 内部：主提取1次 + 伏笔回收检查1次 + 新角色建卡1次）
+        # 事实提取（fact_recorder 内部：主提取1次 + 新角色建卡1次）
         fact_executor = FactRecorderExecutor(script_id, chapter_index, apply_task_id)
         fact_result = await fact_executor.execute({
             "polished_content": filtered_content,
@@ -1276,6 +1279,17 @@ class WebnovelService:
             self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id}: 事实提取完成 - {fact_result.step_summary}")
         else:
             self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 事实提取失败 - {fact_result.error_message}")
+
+        # 跨章节事件处理（提取本章新悬念/倒计时 + 回收活跃事件；失败降级不阻断）
+        event_executor = CrossChapterEventProcessorExecutor(script_id, chapter_index, apply_task_id)
+        event_result = await event_executor.execute({
+            "polished_content": filtered_content,
+            "context_inventory": context_inventory,
+        })
+        if event_result.success:
+            self._logger.info(f"[WebnovelService] 应用任务 {apply_task_id}: 跨章节事件处理完成 - {event_result.step_summary}")
+        else:
+            self._logger.warning(f"[WebnovelService] 应用任务 {apply_task_id}: 跨章节事件处理失败（已降级） - {event_result.error_message}")
 
         # 章节元数据标记（hook_type 字段由 apply 流程标记状态）
         if project_id:

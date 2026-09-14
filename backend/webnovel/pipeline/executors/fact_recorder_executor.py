@@ -14,8 +14,7 @@ from webnovel.repositories import (
     add_character_growth, get_character_power, add_character_power, add_character_card,
     delete_character_card, reassign_character_data,
     upsert_character_item, mark_character_item_lost,
-    add_open_loop, add_cool_point, get_active_open_loops,
-    update_open_loop_resolved, update_open_loop_urgency, get_open_loops_by_project,
+    add_cool_point, update_open_loop_urgency,
     get_chapter_meta, update_chapter_meta, upsert_character_state,
     get_worldview_by_project, add_worldview, update_worldview,
     get_volume_outlines_by_project, get_timelines_by_project,
@@ -46,7 +45,7 @@ class FactRecorderExecutor(BaseExecutor):
     step_weight = 10
 
     async def execute(self, context: Dict[str, Any]) -> ExecutorResult:
-        """执行事实记录（归口：事实/伏笔爽点/结尾钩子/角色状态/世界观设定 一次提取 + 回收检查 + 新角色建卡）。"""
+        """执行事实记录（归口：事实/爽点/结尾钩子/角色状态/世界观设定/章节时间轴 一次提取 + 新角色建卡）。"""
         try:
             script_id = self.script_id
 
@@ -137,8 +136,7 @@ class FactRecorderExecutor(BaseExecutor):
                 except Exception:
                     pass  # 索引失败不阻断主流程
 
-            # 2. 爽点落库（含标签补充+去重）+ 3. 结尾钩子 + 4. 角色状态 + 5. 伏笔处理（新埋+回收，一次 LLM）
-            planted_loop_count = 0
+            # 2. 爽点落库（含标签补充+去重）+ 3. 结尾钩子 + 4. 角色状态 + 5. 世界观设定
             if project_id:
                 await self._save_cool_points(project_id, self.chapter_index, cool_points, polished_content)
                 await self._save_hook(project_id, self.chapter_index, hook)
@@ -146,8 +144,7 @@ class FactRecorderExecutor(BaseExecutor):
                 await self._save_world_settings(project_id, self.chapter_index, world_settings)
                 # 5.5 章节时间轴（基于原文补写 webnovel_timeline_chapter）
                 await self._save_chapter_timeline(project_id, self.chapter_index, chapter_timeline)
-                planted_loop_count = await self._process_foreshadows(
-                    project_id, self.chapter_index, polished_content)
+            # 跨章节事件（开放悬念/倒计时 提取+回收）由 apply 后处理中独立执行器处理
 
             # 6. 检测并创建新角色
             await self._create_new_characters(script_id, polished_content, inventory)
@@ -159,7 +156,7 @@ class FactRecorderExecutor(BaseExecutor):
             timeline_tail = ""
             if chapter_timeline and chapter_timeline.get("time_anchor"):
                 timeline_tail = f"，时间轴:{chapter_timeline.get('time_anchor', '')[:20]}"
-            summary = (f"事实记录完成：{planted_loop_count}个伏笔，"
+            summary = (f"事实记录完成："
                        f"{len(cool_points)}个爽点，{len(character_states)}条角色状态"
                        f"{item_tail}{char_tail}"
                        + (f"，{len(world_settings)}条设定" if world_settings else "")
@@ -173,7 +170,6 @@ class FactRecorderExecutor(BaseExecutor):
                     "item_changes_count": item_change_count,
                     "character_updates": character_updates,
                     "character_updates_count": char_update_count,
-                    "open_loops_count": planted_loop_count,
                     "cool_points_count": len(cool_points),
                     "character_states_count": len(character_states),
                     "world_settings_count": len(world_settings),
@@ -445,100 +441,6 @@ class FactRecorderExecutor(BaseExecutor):
             pass
         return count
 
-    async def _process_foreshadows(
-        self, project_id: int, chapter_index: int, content: str
-    ) -> int:
-        """伏笔处理：识别并落库本章新埋伏笔 + 判断活跃伏笔回收（一次 LLM 调用）。
-
-        新埋伏笔提取与回收判断在同一上下文完成，清单中已有伏笔不会被重复提取，
-        天然避免"同章埋设+回收"矛盾，无需 exclude_ids 排除。
-        """
-        active_loops = get_active_open_loops(project_id) or []
-        loops_text = "\n".join([
-            f"[{i}] [{loop.get('tier', '')}] {loop.get('content', '')} "
-            f"(第{loop.get('planted_chapter', 0)}章埋下)"
-            for i, loop in enumerate(active_loops)
-        ]) if active_loops else "（无活跃伏笔）"
-
-        from core.model_executor import get_model_executor
-
-        prompt_data = self._load_prompt("foreshadow_processor")
-        prompt = prompt_data["user_prompt"].format(
-            chapter_content=content[:3500],
-            active_loops=loops_text,
-        )
-        system_prompt = prompt_data["system_prompt"] or (
-            "你是一位专业的故事分析助手，擅长识别伏笔的埋设与回收")
-
-        executor = get_model_executor()
-        result = await executor.execute_text_chat(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            max_tokens=1200,
-            script_id=self.script_id,
-            project_id=project_id,
-            executor_name=self.step_name,
-            prompt_name="foreshadow_processor",
-        )
-        response_content = result.get("content", "") if result else ""
-        data = {}
-        try:
-            data = parse_llm_json(
-                response_content,
-                script_id=self.script_id,
-                project_id=project_id,
-                executor_name=self.step_name,
-                prompt_name="foreshadow_processor",
-            ) or {}
-        except Exception:
-            data = {}
-
-        # 新埋伏笔：LLM 提取 + 正文标记补充 → 本章去重 → 跨章去重 → 落库
-        open_loops = [l for l in (data.get("open_loops") or [])
-                      if isinstance(l, dict) and l.get("content")]
-        open_loops += self._extract_from_tags(content)
-        open_loops = self._deduplicate_loops(open_loops)
-        open_loops = self._deduplicate_against_existing(open_loops, project_id)
-        planted_count = 0
-        for loop in open_loops:
-            saved = add_open_loop(
-                project_id=project_id,
-                content=loop["content"],
-                tier=loop.get("tier", ""),
-                planted_chapter=chapter_index,
-                target_chapter=loop.get("target_chapter", 0),
-                evidence=loop.get("evidence", "")
-            )
-            if saved and saved.get("id"):
-                planted_count += 1
-
-        # 回收判断：更新被回收伏笔状态
-        resolved_indices = data.get("resolved_indices") or []
-        for idx in resolved_indices:
-            if isinstance(idx, int) and 0 <= idx < len(active_loops):
-                update_open_loop_resolved(active_loops[idx]["id"], chapter_index)
-
-        update_open_loop_urgency(project_id, chapter_index)
-        return planted_count
-
-    @staticmethod
-    def _extract_from_tags(content: str) -> List[Dict]:
-        """从内容中的[伏笔: ...]标记提取伏笔。"""
-        pattern = r'\[伏笔:\s*(.*?)\]'
-        matches = re.findall(pattern, content)
-        loops = []
-        for match in matches:
-            parts = match.strip().split('|')
-            content_text = parts[0].strip()
-            tier = parts[1].strip() if len(parts) > 1 else "装饰"
-            loops.append({
-                "content": content_text,
-                "tier": tier,
-                "target_chapter": 0,
-                "evidence": f"[伏笔: {match}]"
-            })
-        return loops
-
     @staticmethod
     def _extract_cool_points_from_tags(content: str) -> List[Dict]:
         """从内容中的[爽点: ...]标记提取爽点。"""
@@ -563,18 +465,6 @@ class FactRecorderExecutor(BaseExecutor):
         return cool_points
 
     @staticmethod
-    def _deduplicate_loops(loops: List[Dict]) -> List[Dict]:
-        """去重伏笔列表。"""
-        seen = set()
-        result = []
-        for loop in loops:
-            key = loop.get("content", "")[:100]
-            if key not in seen:
-                seen.add(key)
-                result.append(loop)
-        return result
-
-    @staticmethod
     def _deduplicate_cool_points(cool_points: List[Dict]) -> List[Dict]:
         """去重爽点列表。"""
         seen = set()
@@ -584,27 +474,6 @@ class FactRecorderExecutor(BaseExecutor):
             if key not in seen:
                 seen.add(key)
                 result.append(cp)
-        return result
-
-    def _deduplicate_against_existing(self, loops: List[Dict], project_id: int) -> List[Dict]:
-        """跨章去重：与数据库中已有伏笔比对，过滤重复埋线。"""
-        if not loops or not project_id:
-            return loops
-        try:
-            existing = get_open_loops_by_project(project_id)
-        except Exception:
-            return loops
-        if not existing:
-            return loops
-        existing_contents = [e.get("content", "") for e in existing if e.get("content")]
-        result = []
-        for loop in loops:
-            new_key = loop.get("content", "")[:50]
-            if not new_key:
-                continue
-            is_dup = any(new_key in ec or ec[:50] in new_key for ec in existing_contents)
-            if not is_dup:
-                result.append(loop)
         return result
 
     async def _create_new_characters(

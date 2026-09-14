@@ -128,3 +128,27 @@ def get_timeline_countdowns(timeline_id: int) -> List[dict]:
             (timeline_id,)
         )
         return [dict(row) for row in cursor.fetchall()]
+
+
+def update_timeline_countdown(countdown_id: int, current_status: str = "",
+                              trigger_chapter: int = 0, result: str = "") -> Optional[dict]:
+    """更新倒计时事件状态（触发/解决）。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "SELECT id FROM webnovel_timeline_countdown WHERE id = ?",
+            (safe_int(countdown_id),)
+        )
+        existing = cursor.fetchone()
+        if not existing:
+            return None
+        conn.execute(
+            """UPDATE webnovel_timeline_countdown
+               SET current_status = ?, trigger_chapter = ?, result = ?
+               WHERE id = ?""",
+            (safe_str(current_status), safe_int(trigger_chapter),
+             safe_str(result), existing["id"])
+        )
+        conn.commit()
+        return {"id": existing["id"], "current_status": current_status,
+                "trigger_chapter": trigger_chapter, "result": result}

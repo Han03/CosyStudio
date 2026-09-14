@@ -50,7 +50,7 @@ from .volume_outline_repository import (
 from .timeline_repository import (
     add_timeline, get_timeline, get_timelines_by_project, get_timeline_by_project,
     add_timeline_chapter, upsert_timeline_chapter, get_timeline_chapters,
-    add_timeline_countdown, get_timeline_countdowns
+    add_timeline_countdown, get_timeline_countdowns, update_timeline_countdown
 )
 from .genre_fusion_repository import (
     add_genre_fusion, get_genre_fusion, get_genre_fusion_by_project
