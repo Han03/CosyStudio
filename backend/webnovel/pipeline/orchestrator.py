@@ -17,7 +17,6 @@ class PipelineOrchestrator:
     DEFAULT_STEPS = [
         "chapter_splitter",
         "timeline_fixer",
-        "setting_recorder",
         "context_builder",
         "chapter_plot_generator",
         "chapter_plot_reviewer",
@@ -36,7 +35,6 @@ class PipelineOrchestrator:
             "draft_generator",
             "draft_reviewer",
             "draft_polisher",
-            "setting_recorder",
         ],
         "write_fast": [
             "context_builder",

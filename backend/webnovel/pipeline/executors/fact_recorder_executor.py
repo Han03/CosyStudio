@@ -17,6 +17,7 @@ from webnovel.repositories import (
     add_open_loop, add_cool_point, get_active_open_loops,
     update_open_loop_resolved, update_open_loop_urgency, get_open_loops_by_project,
     get_chapter_meta, update_chapter_meta, upsert_character_state,
+    get_worldview_by_project, add_worldview, update_worldview,
 )
 
 
@@ -43,7 +44,7 @@ class FactRecorderExecutor(BaseExecutor):
     step_weight = 10
 
     async def execute(self, context: Dict[str, Any]) -> ExecutorResult:
-        """执行事实记录（归口：事实/伏笔爽点/结尾钩子/角色状态 一次提取 + 回收检查 + 新角色建卡）。"""
+        """执行事实记录（归口：事实/伏笔爽点/结尾钩子/角色状态/世界观设定 一次提取 + 回收检查 + 新角色建卡）。"""
         try:
             script_id = self.script_id
 
@@ -107,7 +108,8 @@ class FactRecorderExecutor(BaseExecutor):
             )
 
             content = result.get("content", "") if result else ""
-            item_changes, character_updates, open_loops, cool_points, hook, character_states = self._parse_all(
+            (item_changes, character_updates, open_loops, cool_points, hook,
+             character_states, world_settings) = self._parse_all(
                 content, script_id, project_id)
 
             # 1. 结构化物品变化落库（item_changes）
@@ -135,6 +137,7 @@ class FactRecorderExecutor(BaseExecutor):
                     project_id, self.chapter_index, open_loops, cool_points, polished_content)
                 await self._save_hook(project_id, self.chapter_index, hook)
                 await self._save_character_states(project_id, self.chapter_index, character_states)
+                await self._save_world_settings(project_id, self.chapter_index, world_settings)
                 await self._check_resolved_loops(
                     project_id, self.chapter_index, polished_content, exclude_ids=newly_planted_ids)
 
@@ -147,7 +150,8 @@ class FactRecorderExecutor(BaseExecutor):
             char_tail = f"，{char_update_count}条角色更新" if char_update_count else ""
             summary = (f"事实记录完成：{len(open_loops)}个伏笔，"
                        f"{len(cool_points)}个爽点，{len(character_states)}条角色状态"
-                       f"{item_tail}{char_tail}")
+                       f"{item_tail}{char_tail}"
+                       + (f"，{len(world_settings)}条设定" if world_settings else ""))
 
             return ExecutorResult(
                 success=True,
@@ -160,6 +164,7 @@ class FactRecorderExecutor(BaseExecutor):
                     "open_loops_count": len(open_loops),
                     "cool_points_count": len(cool_points),
                     "character_states_count": len(character_states),
+                    "world_settings_count": len(world_settings),
                 }
             )
 
@@ -171,10 +176,10 @@ class FactRecorderExecutor(BaseExecutor):
             )
 
     def _parse_all(self, content: str, script_id: int, project_id: int):
-        """解析六块提取结果：item_changes / character_updates / open_loops / cool_points / hook / character_states（容错）。"""
-        item_changes, character_updates, open_loops, cool_points, hook, character_states = [], [], [], [], {}, []
+        """解析七块提取结果：item_changes / character_updates / open_loops / cool_points / hook / character_states / world_settings（容错）。"""
+        item_changes, character_updates, open_loops, cool_points, hook, character_states, world_settings = [], [], [], [], {}, [], []
         if not content:
-            return item_changes, character_updates, open_loops, cool_points, hook, character_states
+            return item_changes, character_updates, open_loops, cool_points, hook, character_states, world_settings
 
         fact_data = parse_llm_json(
             content,
@@ -197,8 +202,10 @@ class FactRecorderExecutor(BaseExecutor):
                 hook = {}
             character_states = [s for s in (fact_data.get("character_states") or [])
                                 if isinstance(s, dict) and s.get("character_id")]
+            world_settings = [w for w in (fact_data.get("world_settings") or [])
+                              if isinstance(w, dict) and w.get("name") and w.get("content")]
         # JSON 解析失败或缺失：全部结构化块为空（无文本兜底）
-        return item_changes, character_updates, open_loops, cool_points, hook, character_states
+        return item_changes, character_updates, open_loops, cool_points, hook, character_states, world_settings
 
 
     async def _save_foreshadow_and_cool_point(
@@ -292,6 +299,55 @@ class FactRecorderExecutor(BaseExecutor):
                 from utils.logger import log_manager
                 logger = log_manager.get_logger("fact_recorder")
                 logger.info(f"[fact_recorder] 角色状态记录完成：{count} 条（第{chapter_index}章）")
+        except Exception:
+            pass
+        return count
+
+    async def _save_world_settings(
+        self, project_id: int, chapter_index: int, world_settings: List[Dict]
+    ) -> int:
+        """落库本章新交代的世界观设定（追加到 webnovel_worldview.world_summary）。
+
+        无世界观时新建；有则按章分区追加（world_summary 上限 20000 字截断）。
+        返回新增条目数。单条失败不阻断。
+        """
+        count = 0
+        try:
+            from utils.logger import log_manager
+            logger = log_manager.get_logger("fact_recorder")
+
+            if not project_id or not world_settings:
+                return 0
+
+            existing = get_worldview_by_project(project_id)
+            existing_summary = (existing or {}).get("world_summary", "") or ""
+
+            for ws in world_settings:
+                try:
+                    name = str(ws.get("name", "") or "").strip()
+                    content = str(ws.get("content", "") or "").strip()
+                    category = str(ws.get("category", "") or "").strip()
+                    if not name or not content or len(name) > 40 or len(content) > 600:
+                        continue
+                    # 简单查重：名称或内容前缀已存在于世界观则不重复追加
+                    if name in existing_summary or content[:30] in existing_summary:
+                        continue
+                    line = f"【第{chapter_index}章·{category or '其他'}】{name}：{content}"
+                    if len(existing_summary) + len(line) > 20000:
+                        logger.warning(f"[fact_recorder] 世界观 world_summary 接近上限，跳过: {name}")
+                        continue
+                    existing_summary = (existing_summary + "\n\n" + line).strip()
+                    count += 1
+                except Exception:
+                    continue
+
+            if count == 0:
+                return 0
+            if existing:
+                update_worldview(existing["id"], world_summary=existing_summary)
+            else:
+                add_worldview(project_id=project_id, world_summary=existing_summary)
+            logger.info(f"[fact_recorder] 世界观设定追加完成：{count} 条（第{chapter_index}章）")
         except Exception:
             pass
         return count

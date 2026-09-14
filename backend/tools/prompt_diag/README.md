@@ -49,7 +49,7 @@ python -m tools.prompt_diag --script 999912 --chapter 8 --with-create
 | 参数 | 说明 |
 | --- | --- |
 | `--script` / `--chapter` | 剧本与章节（必填） |
-| `--node` | 指定诊断节点，可重复：`context_analyzer`、`chapter_plot_generator`、`chapter_plot_reviewer`、`chapter_plot_reviewer_revise`、`draft_generator`、`draft_reviewer`、`draft_polisher`、`setting_recorder` |
+| `--node` | 指定诊断节点，可重复：`context_analyzer`、`chapter_plot_generator`、`chapter_plot_reviewer`、`chapter_plot_reviewer_revise`、`draft_generator`、`draft_reviewer`、`draft_polisher` |
 | `--sub review\|revise\|both` | 评审类节点的子调用细分（默认 both） |
 | `--mode` | `write` / `write_fast` / `write_minimal`（默认 write） |
 | `--only-context` | 默认行为：仅 context_analyzer 真实调用 |

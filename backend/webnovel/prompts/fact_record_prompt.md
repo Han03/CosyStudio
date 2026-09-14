@@ -61,8 +61,14 @@ user_prompt: |
   - knowledge: 本章新获得的信息与认知（无则空字符串）
   - notes: 其他关键状态变化（无则空字符串）
 
+  【世界观设定 world_settings】本章正文中**新交代**、读者需要理解的设定/名词（如历史事件、历史人物、官职、兵器、地理位置、文化习俗、金手指规则、力量体系细则等），每条一个名词：
+  - name: 设定/名词名称（纯名词，不含标点修饰）
+  - content: 该设定的简要解释（2-4 句话，可独立理解）
+  - category: 历史事件/历史人物/地理位置/科学概念/文化习俗/传统节日/古代官职/兵器名称/诗词典故/成语出处/金手指规则/其他
+  注意：与【已知设定】中已存在的内容重复的不提取；正文中没有明确交代的不要臆造。
+
   【输出格式】
   请严格按照JSON格式输出，只输出JSON，不要包含任何其他内容：
-  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "open_loops": [{{"content": "伏笔内容", "tier": "核心/支线/装饰", "target_chapter": 0, "evidence": "证据"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 1, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}]}}
-  open_loops/cool_points/character_states/item_changes/character_updates 无内容时输出空数组，hook 无内容时输出空对象。
+  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "open_loops": [{{"content": "伏笔内容", "tier": "核心/支线/装饰", "target_chapter": 0, "evidence": "证据"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 1, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}], "world_settings": [{{"name": "名词", "content": "解释", "category": "分类"}}]}}
+  open_loops/cool_points/character_states/item_changes/character_updates/world_settings 无内容时输出空数组，hook 无内容时输出空对象。
 ---
