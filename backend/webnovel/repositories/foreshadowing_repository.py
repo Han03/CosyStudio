@@ -192,3 +192,41 @@ def get_cool_points_count_by_type(project_id: int) -> Dict[str, int]:
     )
     return {row["cool_point_type"] or "未分类": row["count"] for row in cursor.fetchall()}
 
+
+def delete_open_loops_by_planted_chapter(project_id: int, chapter_number: int) -> int:
+    """删除指定埋设章埋下的所有开放悬念（取消应用埋设章时）。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM webnovel_open_loops WHERE project_id = ? AND planted_chapter = ?",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def restore_open_loops_by_resolved_chapter(project_id: int, chapter_number: int) -> int:
+    """恢复指定回收章被解决的开放悬念为 active（取消应用回收章时）。返回恢复数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """UPDATE webnovel_open_loops
+               SET status = 'active', resolved_chapter = 0
+               WHERE project_id = ? AND resolved_chapter = ?""",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def delete_cool_points_by_chapter(project_id: int, chapter_number: int) -> int:
+    """删除指定章节的爽点记录。返回删除数。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM webnovel_cool_points WHERE project_id = ? AND chapter_number = ?",
+            (safe_int(project_id), safe_int(chapter_number))
+        )
+        conn.commit()
+        return cursor.rowcount
+

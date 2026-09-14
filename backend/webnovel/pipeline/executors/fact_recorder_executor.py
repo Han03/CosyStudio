@@ -16,7 +16,9 @@ from webnovel.repositories import (
     upsert_character_item, mark_character_item_lost,
     add_cool_point, update_open_loop_urgency,
     get_chapter_meta, update_chapter_meta, upsert_character_state,
-    get_worldview_by_project, add_worldview, update_worldview,
+    get_worldview_by_project,
+    get_worldview_settings_by_project, add_worldview_setting,
+    add_setting_change,
     get_volume_outlines_by_project, get_timelines_by_project,
     get_timeline_chapters, upsert_timeline_chapter,
 )
@@ -395,9 +397,10 @@ class FactRecorderExecutor(BaseExecutor):
     async def _save_world_settings(
         self, project_id: int, chapter_index: int, world_settings: List[Dict]
     ) -> int:
-        """落库本章新交代的世界观设定（追加到 webnovel_worldview.world_summary）。
+        """落库本章新交代的世界观设定（逐条写入 webnovel_worldview_setting）。
 
-        无世界观时新建；有则按章分区追加（world_summary 上限 20000 字截断）。
+        不再追加进 webnovel_worldview.world_summary（总纲保持初始化内容）；
+        独立条目支持按章查询/删除（取消应用结果时回退）。
         返回新增条目数。单条失败不阻断。
         """
         count = 0
@@ -408,8 +411,16 @@ class FactRecorderExecutor(BaseExecutor):
             if not project_id or not world_settings:
                 return 0
 
-            existing = get_worldview_by_project(project_id)
-            existing_summary = (existing or {}).get("world_summary", "") or ""
+            # 查重基准：初始化总纲 + 新表历史条目（避免跨章重复记录）
+            existing_summary = ((get_worldview_by_project(project_id) or {}).get("world_summary", "") or "")
+            existing_keys = set()
+            for it in (get_worldview_settings_by_project(project_id) or []):
+                n = str(it.get("name", "") or "").strip()
+                c = str(it.get("content", "") or "").strip()
+                if n:
+                    existing_keys.add(n)
+                if c:
+                    existing_keys.add(c[:30])
 
             for ws in world_settings:
                 try:
@@ -418,25 +429,21 @@ class FactRecorderExecutor(BaseExecutor):
                     category = str(ws.get("category", "") or "").strip()
                     if not name or not content or len(name) > 40 or len(content) > 600:
                         continue
-                    # 简单查重：名称或内容前缀已存在于世界观则不重复追加
+                    # 简单查重：名称或内容前缀已存在于总纲或历史条目则不重复记录
                     if name in existing_summary or content[:30] in existing_summary:
                         continue
-                    line = f"【第{chapter_index}章·{category or '其他'}】{name}：{content}"
-                    if len(existing_summary) + len(line) > 20000:
-                        logger.warning(f"[fact_recorder] 世界观 world_summary 接近上限，跳过: {name}")
+                    if name in existing_keys or content[:30] in existing_keys:
                         continue
-                    existing_summary = (existing_summary + "\n\n" + line).strip()
+                    add_worldview_setting(
+                        project_id=project_id, chapter_number=chapter_index,
+                        name=name, content=content, category=category,
+                    )
                     count += 1
                 except Exception:
                     continue
 
-            if count == 0:
-                return 0
-            if existing:
-                update_worldview(existing["id"], world_summary=existing_summary)
-            else:
-                add_worldview(project_id=project_id, world_summary=existing_summary)
-            logger.info(f"[fact_recorder] 世界观设定追加完成：{count} 条（第{chapter_index}章）")
+            if count:
+                logger.info(f"[fact_recorder] 世界观设定新增完成：{count} 条（第{chapter_index}章）")
         except Exception:
             pass
         return count
@@ -603,6 +610,18 @@ class FactRecorderExecutor(BaseExecutor):
                 created.append(name)
                 if new_card and new_card.get("id"):
                     created_ids.append(new_card["id"])
+                    # 记录基础设定变更（回退用）：新建角色卡
+                    try:
+                        add_setting_change(
+                            project_id=project_id, chapter_number=self.chapter_index,
+                            entity_type="character_card", entity_id=new_card["id"],
+                            change_type="create",
+                            before_data="",
+                            after_data=json.dumps({"name": name, "character_type": char_type,
+                                                   **card_kwargs}, ensure_ascii=False),
+                        )
+                    except Exception:
+                        pass
 
             # 写作中自动创建的角色卡即时写入 RAG，无需等待全量重建索引
             if created_ids:
@@ -663,7 +682,8 @@ class FactRecorderExecutor(BaseExecutor):
                                 relation_type=utype,
                                 target_character_id=char_name_map[target]["id"],
                                 target_name=target,
-                                description=f"第{chapter_index}章: {desc[:100]}"
+                                description=f"第{chapter_index}章: {desc[:100]}",
+                                source_chapter=chapter_index,
                             )
                             changed.add(char_name_map[character]["id"])
                             changed.add(char_name_map[target]["id"])
@@ -692,7 +712,7 @@ class FactRecorderExecutor(BaseExecutor):
                     if utype == "成长":
                         add_character_growth(
                             character_id=char_id, stage=f"第{chapter_index}章",
-                            description=desc[:200]
+                            description=desc[:200], source_chapter=chapter_index,
                         )
                         logger.info(f"[fact_recorder] 角色成长：'{matched}'")
                     else:  # 能力：直接追加 ability_limit（不再依赖 power 记录存在）
@@ -703,6 +723,13 @@ class FactRecorderExecutor(BaseExecutor):
                         if piece not in existing:
                             new_limit = (f"{existing}；第{chapter_index}章 {piece}"[:500]
                                          if existing else f"第{chapter_index}章 {piece}"[:500])
+                            add_setting_change(
+                                project_id=project_id, chapter_number=chapter_index,
+                                entity_type="character_card", entity_id=char_id,
+                                change_type="update_ability",
+                                before_data=json.dumps({"ability_limit": existing}, ensure_ascii=False),
+                                after_data=json.dumps({"ability_limit": new_limit}, ensure_ascii=False),
+                            )
                             update_character_card(char_id, ability_limit=new_limit)
                             card["ability_limit"] = new_limit
                             logger.info(f"[fact_recorder] 角色能力更新：'{matched}' + {ability or desc[:20]}")
@@ -846,6 +873,23 @@ class FactRecorderExecutor(BaseExecutor):
                     updates["identity"] = identity_desc[:200]
                 update_character_card(new_id, **updates)
                 reassign_character_data(old_id, new_id)
+                # 记录基础设定变更（回退用）：身份揭露合并（旧卡被删除，数据迁至真名卡）
+                try:
+                    add_setting_change(
+                        project_id=project_id, chapter_number=chapter_index,
+                        entity_type="character_card", entity_id=old_id,
+                        change_type="reveal",
+                        before_data=json.dumps({"name": old_name,
+                                                "alias": old_card.get("alias", ""),
+                                                "identity": old_card.get("identity", ""),
+                                                "character_type": old_card.get("character_type", "")},
+                                               ensure_ascii=False),
+                        after_data=json.dumps({"merged_to": new_id, "alias": alias_parts,
+                                               "identity": updates.get("identity", "")},
+                                              ensure_ascii=False),
+                    )
+                except Exception:
+                    pass
                 delete_character_card(old_id)
                 char_name_map.pop(old_name, None)
                 logger.info(
@@ -863,6 +907,23 @@ class FactRecorderExecutor(BaseExecutor):
                 if p and p != real_name and p not in alias_parts:
                     alias_parts.append(p)
             new_alias = "、".join(alias_parts)
+            # 记录基础设定变更（回退用）：身份揭露改名
+            try:
+                add_setting_change(
+                    project_id=project_id, chapter_number=chapter_index,
+                    entity_type="character_card", entity_id=old_id,
+                    change_type="reveal",
+                    before_data=json.dumps({"name": old_name,
+                                            "alias": old_card.get("alias", ""),
+                                            "identity": old_card.get("identity", ""),
+                                            "character_type": old_card.get("character_type", "")},
+                                           ensure_ascii=False),
+                    after_data=json.dumps({"name": real_name, "alias": new_alias,
+                                           "identity": new_identity},
+                                          ensure_ascii=False),
+                )
+            except Exception:
+                pass
             update_character_card(old_id, name=real_name, alias=new_alias, identity=new_identity)
             # 同步更新内存映射，保证同批次后续事实能命中真名
             char_name_map.pop(old_name, None)

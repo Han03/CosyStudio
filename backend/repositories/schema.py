@@ -1291,6 +1291,35 @@ def _init_schema(conn: sqlite3.Connection):
         );
 
         CREATE INDEX IF NOT EXISTS idx_webnovel_anti_pattern_project ON webnovel_anti_pattern(project_id);
+
+        CREATE TABLE IF NOT EXISTS webnovel_worldview_setting (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            chapter_number INTEGER DEFAULT 0,
+            name TEXT DEFAULT '',
+            content TEXT DEFAULT '',
+            category TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES webnovel_project(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_wv_setting_project ON webnovel_worldview_setting(project_id, chapter_number);
+
+        CREATE TABLE IF NOT EXISTS webnovel_setting_change (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            chapter_number INTEGER DEFAULT 0,
+            entity_type TEXT DEFAULT '',
+            entity_id INTEGER DEFAULT 0,
+            change_type TEXT DEFAULT '',
+            before_data TEXT DEFAULT '',
+            after_data TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES webnovel_project(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_setting_change_chapter ON webnovel_setting_change(project_id, chapter_number);
         """
     )
 
@@ -1303,3 +1332,35 @@ def _init_schema(conn: sqlite3.Connection):
             conn.commit()  # WAL 模式下必须显式提交，否则变更可能不可见
     except Exception:
         pass  # 表不存在时忽略
+
+    # 迁移：webnovel_timeline_countdown 增加 project_id / planted_chapter（按章回退）
+    try:
+        cursor = conn.execute("PRAGMA table_info(webnovel_timeline_countdown)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "project_id" not in columns:
+            conn.execute("ALTER TABLE webnovel_timeline_countdown ADD COLUMN project_id INTEGER DEFAULT 0")
+        if "planted_chapter" not in columns:
+            conn.execute("ALTER TABLE webnovel_timeline_countdown ADD COLUMN planted_chapter INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass
+
+    # 迁移：webnovel_character_relationship 增加 source_chapter（按章回退）
+    try:
+        cursor = conn.execute("PRAGMA table_info(webnovel_character_relationship)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "source_chapter" not in columns:
+            conn.execute("ALTER TABLE webnovel_character_relationship ADD COLUMN source_chapter INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception:
+        pass
+
+    # 迁移：webnovel_character_growth 增加 source_chapter（按章回退）
+    try:
+        cursor = conn.execute("PRAGMA table_info(webnovel_character_growth)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "source_chapter" not in columns:
+            conn.execute("ALTER TABLE webnovel_character_growth ADD COLUMN source_chapter INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception:
+        pass

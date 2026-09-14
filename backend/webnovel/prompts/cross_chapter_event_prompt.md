@@ -1,8 +1,9 @@
 ---
 system_prompt: 你是一位专业的跨章节事件分析师，擅长识别开放悬念与倒计时事件的埋设和回收，输出严格JSON
 user_prompt: |
-  请对本章内容做跨章节事件分析：识别【本章新出现的开放悬念与倒计时事件】与
-  【活跃清单中被回收/触发的开放悬念与倒计时事件】。
+  请对本章内容做跨章节事件分析,识别以下内容:
+    1.本章新出现的开放悬念与倒计时事件;
+    2.活跃清单中被回收/触发的开放悬念与倒计时事件;
 
   【本章内容】
   {chapter_content}
@@ -33,6 +34,6 @@ user_prompt: |
     "resolved_open_loop_indices": [0, 2, 5],
     "resolved_countdown_indices": [1, 3]
   }}
-  - tier：核心伏笔回收周期50-300章，支线30-100章，装饰10-30章；target_chapter：预计回收章节（0表示未定）
+  - tier：核心伏笔回收周期30-200章，支线20-50章，装饰10-30章；target_chapter：预计回收章节（0表示未定）
   - new_open_loops / new_countdowns 无内容时输出空数组；resolved_open_loop_indices / resolved_countdown_indices 无回收时输出空数组。
 ---
