@@ -1164,21 +1164,6 @@ def clear_rag_chunks(script_id: int):
 
 # ========== 伏笔和爽点 ==========
 
-@router.get("/foreshadowing")
-def list_foreshadowing(script_id: int, status: str = Query("")):
-    """获取伏笔列表。"""
-    project = get_webnovel_project_by_script(script_id)
-    if not project:
-        return {"success": True, "foreshadowing": []}
-    
-    if status == "active":
-        loops = get_active_open_loops(project["id"])
-    else:
-        loops = get_open_loops_by_project(project["id"], status)
-    
-    return {"success": True, "foreshadowing": loops}
-
-
 @router.get("/cool-points")
 def list_cool_points(script_id: int, chapter_index: int = Query(-1)):
     """获取爽点列表。"""
