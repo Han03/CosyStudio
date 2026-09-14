@@ -14,8 +14,8 @@ user_prompt: |
 
   【角色更新 character_updates】当章节中出现影响角色卡的关键变化时提取，每类一条，character/target 必须与【角色】清单一致，无法匹配清单角色的不要提取：
   - type 枚举：关系 | 身份揭露 | 成长 | 能力
-  - 关系：角色间关系变化（character=角色A, target=角色B, description=变化说明），如 {"type": "关系", "character": "李威", "target": "苏婉清", "description": "因路线选择产生激烈冲突，最终因林若兮的调解妥协"}
-  - 身份揭露：化名/曾用名角色的真实身份揭晓（alias=曾用名或化名, real_name=真名, description=身份说明），如 {"type": "身份揭露", "alias": "神秘黑袍男人", "real_name": "李岩", "description": "总兵府护卫统领"}；未揭露真实姓名的不要提取
+  - 关系：角色间关系变化（character=角色A, target=角色B, description=变化说明），如 {{"type": "关系", "character": "李威", "target": "苏婉清", "description": "因路线选择产生激烈冲突，最终因林若兮的调解妥协"}}
+  - 身份揭露：化名/曾用名角色的真实身份揭晓（alias=曾用名或化名, real_name=真名, description=身份说明），如 {{"type": "身份揭露", "alias": "神秘黑袍男人", "real_name": "李岩", "description": "总兵府护卫统领"}}；未揭露真实姓名的不要提取
   - 成长：角色升级/突破/成长（character=角色名, description=成长说明）
   - 能力：角色获得/提升能力或技能（character=角色名, ability=能力名, description=能力说明）
 

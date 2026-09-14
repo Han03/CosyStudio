@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 SCRIPT_ID = 999913
 PROJECT_ID = 93
-CHAPTER_INDEX = 3
+CHAPTER_INDEX = int(os.environ.get("CH_INDEX", "4"))
 
 
 def clear_plot_cache():
