@@ -126,6 +126,9 @@ class PipelineOrchestrator:
         if not enable_polish and "draft_polisher" in steps:
             steps.remove("draft_polisher")
 
+        # 字数归一化：真实创作链路（execute_pipeline）也生效
+        self._normalize_word_config()
+
         self._context["user_prompt"] = user_prompt
 
         total_weight = sum(
@@ -197,6 +200,8 @@ class PipelineOrchestrator:
                         f"{step_display}失败: {result.error_message}",
                         step_display
                     )
+                    # 失败即中断：后续步骤缺失依赖继续执行只会产生无效产物
+                    break
 
                 current_progress += step_info["weight"]
 
@@ -238,6 +243,8 @@ class PipelineOrchestrator:
                     f"执行异常: {error_msg[:100]}",
                     step_info.get("description", step_name) if executor_class else step_name
                 )
+                # 执行异常即中断
+                break
 
         self._context["end_time"] = datetime.now().isoformat()
         self._context["execution_log"] = self._execution_log

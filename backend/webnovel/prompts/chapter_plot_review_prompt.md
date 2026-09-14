@@ -5,29 +5,8 @@ user_prompt: |
   注意：审查对象是"剧情点列表"（故事骨架），只关注剧情结构层面（规划覆盖、铺垫充分性、因果逻辑、冲突设计）。
   "缺乏心理描写""细节描写简略""环境渲染不足"等正文文笔类问题不属于本阶段职责（由草稿与润色阶段负责），不得上报、不得扣分。
 
-  【章节规划（必须覆盖）】
-  - 概要: {summary}
-  - 关键事件: {key_events}
-  - 必须覆盖节点: {must_cover_nodes}
-
-  【当前卷纲】
-  - 核心冲突: {volume_conflict}
-  - 主角目标: {volume_goal}
-
-  【角色与金手指】
-  {characters_detail}
-
-  【世界观规则】
-  {world_settings_text}
-
-  【活跃伏笔】
-  {foreshadow_text}
-
-  【不可提前揭示的伏笔（不得要求或暗示提前回收）】
-  {undisclosed_text}
-
-  【审查维度】
-  {dimensions_text}
+  【装配上下文】
+  {assembled_context}
 
   【待审查剧情列表】
   {plot_text}
