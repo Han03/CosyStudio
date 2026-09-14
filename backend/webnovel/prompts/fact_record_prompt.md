@@ -26,12 +26,6 @@ user_prompt: |
   - quantity: 数量整数 >=1，获得与失去都必填（"8两银子" → quantity=8）；失去时显式 0 表示全部失去；不填默认 1
   - note: 变化说明（保留原文，如"从流民处搜得8两"、"客栈食宿花费5两"）
   
-  【伏笔 open_loops】本章新埋下的伏笔（不要提取已在前面章节交代过的物品、设定或事件作为新伏笔）：
-  - content: 伏笔内容描述
-  - tier: 核心/支线/装饰（核心伏笔回收周期50-300章，支线30-100章，装饰10-30章）
-  - target_chapter: 预计回收章节（0表示未定）
-  - evidence: 原文证据片段
-
   【爽点 cool_points】本章让读者感到爽快、满足的情节：
   - content: 爽点内容描述
   - cool_point_type: 装逼打脸/扮猪吃虎/越级反杀/打脸权威/反派翻车/甜蜜超预期/突破/升级/寻宝/奇遇/逆袭/情感/解谜/反转/发现
@@ -69,6 +63,6 @@ user_prompt: |
 
   【输出格式】
   请严格按照JSON格式输出，只输出JSON，不要包含任何其他内容：
-  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "open_loops": [{{"content": "伏笔内容", "tier": "核心/支线/装饰", "target_chapter": 0, "evidence": "证据"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 1, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}], "world_settings": [{{"name": "名词", "content": "解释", "category": "分类"}}]}}
-  open_loops/cool_points/character_states/item_changes/character_updates/world_settings 无内容时输出空数组，hook 无内容时输出空对象。
+  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 1, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}], "world_settings": [{{"name": "名词", "content": "解释", "category": "分类"}}]}}
+  cool_points/character_states/item_changes/character_updates/world_settings 无内容时输出空数组，hook 无内容时输出空对象。
 ---
