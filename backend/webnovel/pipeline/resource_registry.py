@@ -539,15 +539,15 @@ def _fmt_review_result(review_result, depth="full"):
     return "\n".join(parts) if parts else "（无审查问题与建议）"
 
 
-def _fmt_rag_results(rag_results, depth="full", limit=5):
+def _fmt_rag_results(rag_results, depth="full", limit=3):
     if not rag_results:
         return "（无检索结果）"
     parts = []
     for r in rag_results[:limit]:
         if isinstance(r, str):
-            parts.append(r[:200])
+            parts.append(r[:150])
         elif isinstance(r, dict):
-            content = r.get("content", "")[:200]
+            content = r.get("content", "")[:150]
             chunk_type = r.get("chunk_type", "")
             ch_num = r.get("chapter_number", 0)
             if chunk_type and ch_num:
