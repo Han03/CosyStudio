@@ -16,6 +16,7 @@ import sys
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.paths import resolve_project_path
 
 EXTRACT_SYSTEM = (
     "你是一位小说章节状态分析助手。阅读给定章节正文，提取各主要角色在本章"
@@ -48,7 +49,7 @@ EXTRACT_USER = """【角色清单（含ID，仅限清单内角色）】
 
 def load_content(script_id: int, chapter: int) -> str:
     p = os.path.join(
-        r"C:\MyProjects\ai\CosyStudio\media\document\scripts",
+        resolve_project_path(r"media\document\scripts"),
         str(script_id), "chapters", f"{chapter}.txt",
     )
     if not os.path.exists(p):

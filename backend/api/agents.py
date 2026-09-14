@@ -9,7 +9,7 @@ from core.global_manager import global_manager
 
 router = APIRouter()
 
-from core.paths import AGENTS_DATA_DIR
+from core.paths import AGENTS_DATA_DIR, resolve_project_path, to_project_relpath
 
 cosyvoice_model = global_manager.cosyvoice_model
 agent_manager = global_manager.agent_manager
@@ -195,8 +195,8 @@ async def _process_tone_voice_files(agent_id: str, voice_tones: list, form) -> l
         if not _preprocess_voice_file(original_path, processed_path, range_start, range_end):
             raise HTTPException(status_code=400, detail=f"语气「{vt['tone']}」的语音文件预处理失败")
 
-        vt["original_path"] = original_path
-        vt["voice_path"] = processed_path
+        vt["original_path"] = to_project_relpath(original_path)
+        vt["voice_path"] = to_project_relpath(processed_path)
         add_log(f"语气「{vt['tone']}」原始文件已保存: {original_path}")
         add_log(f"语气「{vt['tone']}」处理文件已保存: {processed_path}")
 
@@ -209,7 +209,7 @@ def _cleanup_removed_tone_files(agent_id: str, old_tones: list, new_tones: list)
     for old_vt in old_tones:
         if old_vt["tone"] not in new_tone_names:
             for path_key in ("voice_path", "original_path"):
-                old_path = old_vt.get(path_key, "")
+                old_path = resolve_project_path(old_vt.get(path_key, ""))
                 if old_path and os.path.exists(old_path):
                     try:
                         os.remove(old_path)
@@ -240,13 +240,14 @@ def _register_tone_speakers(agent_id: str, voice_tones: list):
     for vt in voice_tones:
         voice_path = vt.get("voice_path", "")
         prompt_text = vt.get("prompt_text", "")
-        if not voice_path or not os.path.exists(voice_path) or not prompt_text:
+        resolved_voice_path = resolve_project_path(voice_path)
+        if not resolved_voice_path or not os.path.exists(resolved_voice_path) or not prompt_text:
             add_log(f"语气「{vt['tone']}」缺少语音文件或提示文本，跳过注册", "WARNING")
             continue
 
         spk_id = _tone_speaker_id(agent_id, vt["tone"])
         add_log(f"注册语气 speaker: {spk_id}")
-        result = cosyvoice_model.add_custom_speaker(spk_id, voice_path, prompt_text)
+        result = cosyvoice_model.add_custom_speaker(spk_id, resolved_voice_path, prompt_text)
         if result.get("status") == "success":
             vt["speaker_id"] = spk_id
             add_log(f"语气「{vt['tone']}」speaker 注册成功: {spk_id}")

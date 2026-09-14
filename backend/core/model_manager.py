@@ -11,6 +11,7 @@ from utils.common_utils import get_directory_size
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.logger import log_manager
+from core.paths import resolve_project_path
 
 MODEL_CATEGORIES = {
     "cosyvoice": {
@@ -491,8 +492,10 @@ def find_cosyvoice_model() -> str:
     try:
         from core.config_manager import get_cosyvoice_config
         config = get_cosyvoice_config()
-        if config.get("model_path") and os.path.exists(config["model_path"]):
-            return config["model_path"]
+        if config.get("model_path"):
+            resolved = resolve_project_path(config["model_path"])
+            if os.path.exists(resolved):
+                return resolved
     except:
         pass
 
@@ -507,8 +510,10 @@ def find_qwen_model() -> str:
     try:
         from core.config_manager import get_qwen_config
         config = get_qwen_config()
-        if config.get("model_path") and os.path.exists(config["model_path"]):
-            return config["model_path"]
+        if config.get("model_path"):
+            resolved = resolve_project_path(config["model_path"])
+            if os.path.exists(resolved):
+                return resolved
     except:
         pass
 
@@ -523,8 +528,10 @@ def find_dreamlite_model():
     from core.config_manager import get_dreamlite_model_config
     dreamlite_config = get_dreamlite_model_config()
     model_path = dreamlite_config.get("model_path", "")
-    if model_path and os.path.exists(model_path):
-        return model_path
+    if model_path:
+        resolved = resolve_project_path(model_path)
+        if os.path.exists(resolved):
+            return resolved
 
     for model in get_models("dreamlite"):
         path = model.get("path")
@@ -536,6 +543,8 @@ def find_dreamlite_model():
 
 def load_cosyvoice_model(model_path, force=False):
     from core.global_manager import global_manager
+
+    model_path = resolve_project_path(model_path or "")
 
     cosyvoice_model = global_manager.cosyvoice_model
     cosyvoice_model_lock = global_manager.cosyvoice_model_lock
@@ -574,6 +583,8 @@ def load_cosyvoice_model(model_path, force=False):
 def load_qwen_model(model_path, force=False):
     from core.global_manager import global_manager
 
+    model_path = resolve_project_path(model_path or "")
+
     qwen_model = global_manager.qwen_model
     qwen_model_lock = global_manager.qwen_model_lock
     model_loading_status = global_manager.model_loading_status
@@ -607,6 +618,8 @@ def load_qwen_model(model_path, force=False):
 
 def load_dreamlite_model(model_path, force=False):
     from core.global_manager import global_manager
+
+    model_path = resolve_project_path(model_path or "")
 
     dreamlite_model = global_manager.dreamlite_model
     dreamlite_model_lock = global_manager.dreamlite_model_lock

@@ -30,3 +30,45 @@ PRETRAINED_MODELS_DIR = os.path.join(PROJECT_ROOT, "pretrained_models")
 # 确保核心目录存在
 for _d in (DATA_DIR, CACHE_DIR, OUTPUT_DIR, LOG_DIR, AGENTS_DATA_DIR):
     os.makedirs(_d, exist_ok=True)
+
+
+def resolve_project_path(p: str) -> str:
+    """项目内路径统一解析为绝对路径（供运行时使用）。
+
+    - 空 / URL → 原样返回
+    - 绝对路径存在 → 原样返回
+    - 绝对路径不存在 → 若路径含 '/cosystudio/' 前缀，按项目根重组（容错迁移/换盘）
+    - 相对路径 → 拼接 PROJECT_ROOT（以 '/' 或 '\\' 分隔均可）
+    """
+    if not p:
+        return ""
+    if p.startswith(("http://", "https://", "data:")):
+        return p
+    if os.path.isabs(p):
+        if os.path.exists(p):
+            return p
+        norm = p.replace("\\", "/").lower()
+        marker = "/cosystudio/"
+        idx = norm.rfind(marker)
+        if idx >= 0:
+            # 用原始字符串按同索引切分，保留大小写
+            orig = p.replace("\\", "/")
+            rel = orig[idx + len(marker):].replace("/", os.sep)
+            cand = os.path.join(PROJECT_ROOT, rel)
+            if os.path.exists(cand):
+                return cand
+        return p
+    return os.path.normpath(os.path.join(PROJECT_ROOT, p.replace("/", os.sep)))
+
+
+def to_project_relpath(p: str) -> str:
+    """绝对路径 → 项目根相对路径（POSIX 分隔符）。不在项目内则原样返回。"""
+    if not p:
+        return ""
+    try:
+        rp = os.path.relpath(os.path.abspath(p), PROJECT_ROOT)
+    except Exception:
+        return p
+    if rp.startswith(".."):
+        return p
+    return rp.replace("\\", "/")
