@@ -8,10 +8,10 @@ user_prompt: |
   重点关注：{focus}
 
   【资源目录】
-  以下列出本步骤可选的参考资源（含候选条目与可选深度）。条目编号即引用键：structured_refs 的 ids 直接使用目录条目编号，previous_chapter 使用目录中的第N章章节号。目录仅列代表性条目（前文目录仅列最近 5 章，更早章节可指定 chapter_index 获取；结构化数据全量/筛选用 structured_queries 动态查询）。请根据任务需要选择最相关的条目：
+  以下仅列出本步骤的重要/热点参考信息（写作锚点），条目编号即引用键：structured_refs 的 ids 直接使用目录条目编号，previous_chapter 使用目录中的第N章章节号。目录未列出的数据（其他角色、历史章节、历史伏笔、角色关系、成长弧、剧情点、卷纲等）一律通过 structured_queries 按条件查询获取：
   {resource_catalog}
 
-  【RAG候选】（预检索结果，仅含正文细节与创作知识；设定类已由【资源目录】结构化资源提供，故不在 RAG 候选内。若与需求高度相关可减少查询数量）
+  【RAG候选】
   {rag_candidates_text}
 
   {prev_step_selections_text}
@@ -36,13 +36,6 @@ user_prompt: |
     chapter_paragraph（对话/动作/场景细节原文）、chapter_summary（章节梗概）、chapter（机械摘要回退）
     设定类（角色/世界观/力量体系/金手指/卷纲/反派/伏笔）已由【资源目录】结构化资源提供，禁止生成这些类型的 rag_query
   - limit 建议：chapter_paragraph 取 5~8，chapter_summary/chapter 取 3~5
-
-  查询示例（好 vs 坏）：
-  - 好：{{"text": "李承言对张大牛敌意的应对", "types": ["chapter_paragraph"], "limit": 5}}
-  - 好：{{"text": "林若兮追查密道线索的进展", "types": ["chapter_paragraph"], "limit": 5}}
-  - 好：{{"text": "王芳调解团队矛盾的言行", "types": ["chapter_paragraph"], "limit": 5}}（角色行为细节从正文段落检索）
-  - 坏：{{"text": "团队内部矛盾", "types": ["chapter_paragraph"], "limit": 5}}（无实体，检索命中差）
-  - 坏：{{"text": "争吵爆发；冷静讨论；达成共识", "types": ["chapter_paragraph"], "limit": 5}}（复制原文，禁止）
 
   【输出格式】
   请严格按以下 JSON 格式输出选择指令，直接输出JSON不要包含其他内容：
