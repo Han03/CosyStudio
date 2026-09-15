@@ -1,27 +1,33 @@
 ---
-system_prompt: 你是一位专业的网文卷纲设计师，擅长构建有张力、有节奏的卷级结构
+system_prompt: 你是一位专业的网文卷纲与节拍设计师，擅长构建有张力、有节奏的卷级结构，一次产出完整的卷纲骨架、节拍表与升级危机链
 user_prompt: |
-  请为以下网文项目的第{volume_number}卷设计卷纲：
-  
+  请为以下网文项目的第{volume_number}卷设计完整的卷纲与节拍表：
+
   【项目信息】
   书名：{project.title}
   题材：{project.genre}
-  
-  【世界观】
-  世界简介：{world.world_summary}
-  社会结构：{world.social_hierarchy}
-  主要势力：{factions_text}
-  
-  【总纲约束】
+  一句话故事：{project.one_liner}
+
+  【卷纲约束】
   卷名：{master_volume.volume_name}
   章节范围：{master_volume.chapter_range}
   核心冲突：{master_volume.core_conflict}
   卷末高潮：{master_volume.volume_climax}
-  
+
+  【世界观】
+  世界简介：{world.world_summary}
+  社会结构：{world.social_hierarchy}
+  主要势力：{factions_text}
+
+  【主角信息】
+  姓名：{protagonist.name}
+  欲望：{protagonist.true_desire}
+  缺陷：{protagonist.personality_flaw}
+
   【当前状态】
   主角当前境界：{protagonist_power.realm}
   当前时间线：{current_timeline}
-  
+
   【设计要求】
   1. 开卷承诺（Promise）：本卷读者承诺（爽点/悬念/情绪）、主要兑现类型
   2. 催化事件（Catalyst）：事件描述、不可逆变化、主角当下目标
@@ -29,7 +35,13 @@ user_prompt: |
   4. 中段反转：假胜利/假失败/反转事件、反转带来的新认知/新代价
   5. 卷末最低谷（All Is Lost）：最低谷事件、代价、主角选择
   6. 卷末大兑现 + 新钩子：本卷兑现、新钩子、章末未闭合问题
-  
+
+  【硬约束】
+  - 必须填写中段反转，确无则写"无（理由：...）"
+  - 危机链至少3次递增，代价与风险逐次升级
+  - 卷末新钩子必须能落到最后一章的章末未闭合问题
+  - 所有节拍字段须与卷纲约束中的核心冲突、卷末高潮保持一致，不得偏离
+
   【输出格式】JSON格式，包含以下字段：
   {{
     "volume_number": {volume_number},

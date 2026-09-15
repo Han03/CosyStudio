@@ -586,6 +586,40 @@ async def split_volume_to_chapters(
                 progress_message=f"正在调用 LLM 生成第{actual_start}-{actual_end}章规划..."
             )
 
+            # 拆章前补全卷纲细节（骨架+节拍+危机）：初始化卷纲仅含骨架字段，
+            # 缺节拍字段时一次 LLM 调用补齐，保证章纲/时间轴 prompt 引用字段有值
+            try:
+                outline = await executor._ensure_volume_detail(
+                    project, outline, protagonist,
+                    get_golden_finger_by_project(project["id"]),
+                    get_power_system_by_project(project["id"]),
+                    get_worldview_by_project(project["id"]),
+                    volume_number,
+                    char_group=char_group, char_group_members=char_group_members
+                )
+                if not all(outline.get(f) for f in executor.BEAT_FIELDS):
+                    message = "卷纲细节补全失败：LLM未返回有效数据，无法拆章"
+                    update_writing_task(
+                        task_id, status="failed", progress=0,
+                        progress_message=message
+                    )
+                    await ws_broadcast_manager.broadcast_chapter_plans_generated(
+                        script_id, outline_id, False, message, 0
+                    )
+                    return
+            except Exception as e:
+                from utils.logger import logger
+                logger.error(f"[split-chapter] 卷纲细节补全失败: {e}")
+                update_writing_task(
+                    task_id, status="failed", progress=0,
+                    progress_message=f"卷纲细节补全失败: {str(e)[:100]}",
+                    error_message=str(e)
+                )
+                await ws_broadcast_manager.broadcast_chapter_plans_generated(
+                    script_id, outline_id, False, f"卷纲细节补全失败: {str(e)}", 0
+                )
+                return
+
             chapter_plans = await executor._generate_chapter_plans(
                 project, outline, protagonist, volume_number,
                 start_chapter=actual_start, end_chapter=actual_end,
