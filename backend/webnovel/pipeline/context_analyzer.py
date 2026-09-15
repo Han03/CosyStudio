@@ -257,21 +257,27 @@ class ContextAnalyzer:
                         f"步骤 {step_name} 查询了本节点不可查的资源 {q['resource']}")
                 res = RESOURCE_REGISTRY.get(q["resource"])
                 allowed = set(res.get("query_filters", [])) if res else set()
-                for fk in (q.get("filters") or {}):
-                    if fk not in allowed:
-                        raise ContextAnalysisError(
-                            f"步骤 {step_name} structured_queries 资源 {q['resource']} "
-                            f"不支持 filters 字段 {fk}（允许: {'/'.join(sorted(allowed))}）")
+                # 非法 filters 字段剔除（保留合法字段继续执行），不中断创作：
+                # LLM 偶尔会用错过滤字段（如 timeline 用 keyword），查询只是参考检索，
+                # 剔除后仍可执行；结构性错误（resource 不可查/格式非法）仍报错。
+                f_raw = q.get("filters") or {}
+                f_clean = {k: v for k, v in f_raw.items() if k in allowed}
+                if f_clean != f_raw:
+                    dropped = sorted(set(f_raw) - set(f_clean))
+                    self._logger.warning(
+                        f"[ContextAnalyzer] {step_name} 查询 {q['resource']} 剔除非法"
+                        f" filters 字段: {dropped}（允许: {'/'.join(sorted(allowed))}）")
+                q["filters"] = f_clean
                 limit = q.get("limit")
                 if limit is not None:
                     try:
                         limit = int(limit)
                     except (TypeError, ValueError):
-                        raise ContextAnalysisError(
-                            f"步骤 {step_name} structured_queries limit 非法: {limit}")
+                        limit = 5  # 非法 limit 回落默认 5，不中断
+                        q["limit"] = limit
                     if not (1 <= limit <= 10):
-                        raise ContextAnalysisError(
-                            f"步骤 {step_name} structured_queries limit {limit} 超出 1~10")
+                        limit = 5  # 超范围回落默认 5，不中断
+                        q["limit"] = limit
 
             self._logger.info(
                 f"[ContextAnalyzer] {step_name} 分析完成："
