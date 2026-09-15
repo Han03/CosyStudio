@@ -206,7 +206,13 @@ def _load_foreshadows(ref, env):
         return []
     loops = [f for f in env["inventory"].get("foreshadows", []) if str(f.get("id")) in ids]
     if not loops:
-        raise ContextAnalysisError(f"伏笔资源加载失败：ids={sorted(ids)} 在活跃伏笔中不存在")
+        # ids 指定的伏笔均不存在（LLM 幻觉选中/分析后被回收）：跳过该区块并告警，
+        # 不中断创作——伏笔空态属正常状态（首章尚无伏笔），不应阻断整章生成。
+        # 与 character_card 的"部分存在注入部分"一致；全不存在的空态由装配层跳过。
+        _logger.warning(
+            f"[resource_registry] 活跃伏笔资源跳过：ids={sorted(ids)} "
+            f"在活跃伏笔中均不存在（当前活跃伏笔 {len(env['inventory'].get('foreshadows', []))} 条），跳过注入")
+        return []
     return loops
 
 
