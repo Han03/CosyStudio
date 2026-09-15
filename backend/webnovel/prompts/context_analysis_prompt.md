@@ -30,7 +30,7 @@ user_prompt: |
   - 查询命中结果将渲染为【资源名·查询】区块注入后续节点 prompt；无命中则跳过该区块
 
   【常见问题→查询资源映射】（示例，按本节点可查询资源取用）
-  - 功法/金手指能力 → golden_finger（金手指详情）；金手指升级/兑现/代价 → golden_finger_progress
+  - 金手指详情（功法能力描述，如青元剑诀）→ 用 structured_refs 选择 golden_finger（不可用 structured_queries 查询）；金手指升级/兑现/代价 → golden_finger_progress
   - 修仙境界/修为明细 → power_level（境界明细）；力量体系规则 → power_system
   - 剧情点/场景细节 → chapter_plot；章节规划 → chapter_plan；卷冲突/卷末高潮 → volume_outline
   - 角色身份/性格/能力 → character_card；角色位置/状态 → character_state；角色物品 → character_item

@@ -147,7 +147,6 @@ _QA_SYSTEM_PROMPT = (
 _RAG_TYPE_LABELS = {
     "chapter_paragraph": "段落原文",
     "chapter_summary": "章节梗概",
-    "chapter": "机械摘要回退",
     "csv_plot": "剧情模板",
     "csv_pacing": "节奏技巧",
     "csv_verdict": "裁决规则",
@@ -159,7 +158,7 @@ _RAG_TYPE_LABELS = {
     "csv_genre_tone": "题材基调",
 }
 
-_CHAPTER_RAG_TYPES = ("chapter_paragraph", "chapter_summary", "chapter")
+_CHAPTER_RAG_TYPES = ("chapter_paragraph", "chapter_summary")
 _CSV_RAG_TYPES = (
     "csv_plot", "csv_pacing", "csv_verdict", "csv_scene",
     "csv_writing", "csv_naming", "csv_character_knowledge",
@@ -183,7 +182,7 @@ def _format_rag_types_guide() -> str:
         f"  创作知识类：{csv_part}\n"
         "  设定类（角色/世界观/力量体系/金手指/卷纲/反派/伏笔）已由【资源目录】"
         "结构化资源提供，禁止生成这些类型的 rag_query\n"
-        "  limit 建议：chapter_paragraph 取 5~8，chapter_summary/chapter/csv_* 取 3~5"
+        "  limit 建议：chapter_paragraph 取 5~8，chapter_summary/csv_* 取 3~5"
     )
 
 
@@ -297,8 +296,14 @@ class ContextAnalyzer:
                     raise ContextAnalysisError(
                         f"步骤 {step_name} structured_queries 条目格式非法: {q}")
                 if q["resource"] not in queryable:
-                    raise ContextAnalysisError(
-                        f"步骤 {step_name} 查询了本节点不可查的资源 {q['resource']}")
+                    # 容错：LLM 偶尔把 selectable 资源误写入 structured_queries
+                    # （如用 golden_finger 查询），该查询项本身无意义（selectable
+                    # 资源已通过 structured_refs 注入），剔除后继续执行合法部分。
+                    # 结构性错误（格式非法/无 resource）仍报错。
+                    self._logger.warning(
+                        f"[ContextAnalyzer] {step_name} 剔除不可查资源查询项 "
+                        f"{q['resource']}（不可 structured_queries，仅可 structured_refs 选择）")
+                    continue
                 res = RESOURCE_REGISTRY.get(q["resource"])
                 allowed = set(res.get("query_filters", [])) if res else set()
                 # 非法 filters 字段剔除（保留合法字段继续执行），不中断创作：
@@ -737,7 +742,11 @@ class ContextAnalyzer:
     def _format_rag_candidates(self, candidates: list) -> str:
         """格式化 RAG 候选清单文本。"""
         if not candidates:
-            return "（无RAG候选）"
+            return (
+                "（无预检索候选）RAG 库已索引已创作章节的正文段落(chapter_paragraph)"
+                "与章节梗概(chapter_summary)，原文细节类问题（对话/价格/具体情节）"
+                "请用 rag_queries 主动检索；设定类数据已由【资源目录】提供，无需检索"
+            )
         lines = []
         for i, c in enumerate(candidates[:10]):
             doc_id = c.get("doc_id", f"rag_{i}")
