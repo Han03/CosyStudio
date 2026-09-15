@@ -869,13 +869,19 @@ class PlanExecutor(BaseExecutor):
             )
 
     def _parse_json_field(self, field: str) -> Any:
-        """解析JSON字段。"""
+        """解析JSON字段；兼容换行分隔的文本条目格式（每行一条）。"""
         if not field:
             return []
         try:
             return json.loads(field)
         except json.JSONDecodeError:
-            return []
+            # 非 JSON 文本：按换行拆分为条目（如 important_locations 每行一条的文本格式）
+            lines = []
+            for ln in field.splitlines():
+                ln = ln.strip().strip("-").strip("·").strip("•").strip()
+                if ln:
+                    lines.append(ln)
+            return lines if lines else []
 
     def _format_char_group_members(
         self, char_group: Optional[Dict], char_group_members: Optional[list],
