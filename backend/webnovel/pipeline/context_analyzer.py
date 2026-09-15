@@ -1079,12 +1079,42 @@ class ContextAnalyzer:
                     chunk_types=chunk_types,
                 )
                 for r in results:
+                    _r = dict(r)
+                    # 章节原文片段：扩展前后各1段上下文（与 RAG 浏览接口一致），
+                    # 避免命中段落孤立、叙事被切断，QA 与写作注入共用完整窗口。
+                    if _r.get("chunk_type") == "chapter_paragraph":
+                        try:
+                            meta = _r.get("metadata") or {}
+                            if isinstance(meta, str):
+                                meta = json.loads(meta) if meta.strip() else {}
+                            para_idx = meta.get("para_index")
+                            ch_num = _r.get("chapter_number", 0)
+                            if para_idx is not None and ch_num:
+                                ctx_tuples = rag_svc.get_paragraphs_context(
+                                    project_id, ch_num, para_idx, context_range=1)
+                                ctx_before = []
+                                ctx_after = []
+                                for text, idx in ctx_tuples:
+                                    if idx < para_idx:
+                                        ctx_before.append(text)
+                                    elif idx > para_idx:
+                                        ctx_after.append(text)
+                                _r["context_before"] = "\n".join(ctx_before)
+                                _r["context_after"] = "\n".join(ctx_after)
+                                segments = []
+                                if any(str(x).strip() for x in ctx_before):
+                                    segments.append("\n".join(ctx_before))
+                                segments.append(_r.get("content", ""))
+                                if any(str(x).strip() for x in ctx_after):
+                                    segments.append("\n".join(ctx_after))
+                                _r["content"] = "\n".join(segments)
+                        except Exception:
+                            pass
                     from utils.prompt_normalizer import normalize_text_block
-                    content = r.get("content", "")
+                    content = _r.get("content", "")
                     dedup = content[:50] + "|" + content[-50:] if len(content) > 100 else content
                     if dedup not in seen:
                         seen.add(dedup)
-                        _r = dict(r)
                         _r["content"] = normalize_text_block(content)
                         all_results.append(_r)
 
