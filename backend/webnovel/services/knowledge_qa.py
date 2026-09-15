@@ -255,8 +255,35 @@ async def answer_question(script_id: int, question: str) -> Dict[str, Any]:
         if not answer:
             return {"success": False, "answer": "", "error": "生成结果为空"}
 
-        # ④ 来源标注：rag 片段 + 结构化资源（同一类型+章节的 rag 片段去重）
+        # ④ Reranker 二次精排：按用户问题对召回片段重排（取 top 5），
+        # 使参考片段与问题强相关、弱相关/模板片段自然出局。
+        # 增强项：rerank 失败（模型/网络不可用）回退向量顺序，不中断问答。
         rag_results = step_ctx.get("rag_results") or []
+        reranked = False
+        if rag_results:
+            try:
+                from core.model_executor import get_model_executor
+                rk = await get_model_executor().execute_rerank(
+                    query=question,
+                    documents=[c.get("content", "") for c in rag_results],
+                    top_k=5,
+                )
+                rk_results = (rk or {}).get("results") or []
+                if rk_results:
+                    score_map = {r.get("index"): r.get("score") for r in rk_results
+                                 if r.get("index") is not None}
+                    reranked = True
+                    # 按 rerank 分数降序重排（仅保留有分数的片段，其余按原顺序追加）
+                    indexed = [(i, c) for i, c in enumerate(rag_results)]
+                    indexed.sort(key=lambda ic: score_map.get(ic[0], -1), reverse=True)
+                    rag_results = [c for _, c in indexed]
+                    for orig_idx, c in indexed:
+                        if orig_idx in score_map:
+                            c["rerank_score"] = score_map[orig_idx]
+            except Exception as e:
+                logger.warning(f"知识库问答 rerank 失败，回退向量顺序: {e}")
+
+        # ⑤ 来源标注：rag 片段 + 结构化资源（同一类型+章节的 rag 片段去重）
         selection = step_ctx.get("_selection") or {}
         sources: List[Dict[str, Any]] = []
         seen_sources = set()
@@ -297,7 +324,7 @@ async def answer_question(script_id: int, question: str) -> Dict[str, Any]:
                 "custom_notes": selection.get("custom_notes") or [],
             },
             "chunks": rag_results,
-            "reranked": False,
+            "reranked": reranked,
         }
 
     except ContextAnalysisError as e:
