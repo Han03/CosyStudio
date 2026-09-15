@@ -45,7 +45,7 @@ from webnovel.repositories import (
     delete_setting_changes_by_chapter, delete_character_card,
     update_character_card, get_character_items, mark_character_item_lost,
     delete_items_acquired_in_chapter, restore_items_lost_in_chapter,
-    delete_chapter_meta, delete_chapter_plot,
+    delete_chapter_meta, delete_chapter_plot, add_chapter_plot,
 )
 from core.model_executor import get_model_executor
 from infrastructure.websocket_broadcast import ws_broadcast_manager
@@ -931,6 +931,22 @@ class WebnovelService:
             # 获取 project_id 用于后处理
             project = get_webnovel_project_by_script(script_id)
             project_id = project["id"] if project else 0
+
+            # 剧情列表覆写：应用任务结果时，把任务暂存的 plot_list 覆写到 webnovel_chapter_plot。
+            # 该表语义为"已应用章节的剧情列表"，未应用/重创作的剧情不会出现在表中，
+            # 上下文分析器读取的永远是已应用剧情，保证与正文一致。
+            try:
+                _src_plot = source_task.get("plot_list") or ""
+                if _src_plot.strip():
+                    _plot_list = json.loads(_src_plot)
+                    if _plot_list and project_id:
+                        add_chapter_plot(project_id, chapter_index, _plot_list)
+                        self._logger.info(
+                            f"[WebnovelService] 应用任务 {apply_task_id}: 剧情列表已覆写"
+                            f"（第{chapter_index}章 {len(_plot_list)}个剧情点）"
+                        )
+            except Exception as e:
+                self._logger.warning(f"[WebnovelService] 覆写剧情列表失败（不阻断）: {e}")
 
             # 构建 context_inventory 供事实记录使用
             context_inventory = self._build_context_inventory_for_apply(script_id)

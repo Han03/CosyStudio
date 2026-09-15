@@ -14,8 +14,9 @@ from ..base_executor import BaseExecutor, ExecutorResult
 from ..context_analyzer import ContextAnalyzer
 from core.model_executor import get_model_executor
 from utils.llm_json_parser import parse_llm_json
+from repositories import update_writing_task
 from webnovel.repositories import (
-    get_webnovel_project_by_script, add_chapter_plot
+    get_webnovel_project_by_script
 )
 
 
@@ -107,8 +108,8 @@ class ChapterPlotReviewerExecutor(BaseExecutor):
                     current_plot = revised_plot
                 revision_count += 1
 
-            # 更新数据库
-            add_chapter_plot(project_id, chapter_index, current_plot)
+            # 审查修订后的剧情写回当前任务（覆盖生成版；应用结果时再覆写到 webnovel_chapter_plot）
+            update_writing_task(self.task_id, plot_list=json.dumps(current_plot, ensure_ascii=False))
 
             avg_score = sum(r["score"] for r in last_review) / len(last_review) if last_review else 0
             summary = f"剧情审查完成：{len(current_plot)}个剧情点，评分{avg_score:.1f}/10"

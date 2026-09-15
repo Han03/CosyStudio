@@ -12,9 +12,9 @@ from ..base_executor import BaseExecutor, ExecutorResult
 from ..context_analyzer import ContextAnalyzer
 from core.model_executor import get_model_executor
 from utils.llm_json_parser import parse_llm_json
+from repositories import get_writing_task, update_writing_task
 from webnovel.repositories import (
     get_webnovel_project_by_script,
-    add_chapter_plot, get_chapter_plot,
 )
 
 
@@ -41,18 +41,23 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
 
             project_id = project["id"]
 
-            # 检查是否已有本章剧情（避免重复生成）
-            existing_plot = get_chapter_plot(project_id, chapter_index)
-            if existing_plot and existing_plot.get("plot_list"):
-                plot_list = existing_plot["plot_list"]
-                return ExecutorResult(
-                    success=True,
-                    step_summary=f"使用已有剧情：{len(plot_list)}个剧情点",
-                    output_data={
-                        "chapter_plot": plot_list,
-                        "chapter_plot_source": "cache"
-                    }
-                )
+            # 检查当前任务是否已有本章剧情（同任务重试/中断续跑时复用，避免重复生成；
+            # 重新创作是新任务，plot_list 为空，必然重新生成）
+            task = get_writing_task(None, self.task_id)
+            if task and task.get("plot_list"):
+                try:
+                    plot_list = json.loads(task["plot_list"])
+                except Exception:
+                    plot_list = None
+                if plot_list:
+                    return ExecutorResult(
+                        success=True,
+                        step_summary=f"使用已有剧情：{len(plot_list)}个剧情点",
+                        output_data={
+                            "chapter_plot": plot_list,
+                            "chapter_plot_source": "cache"
+                        }
+                    )
 
             # ── 通过 ContextAnalyzer 三段式装配上下文 ──
             analyzer = ContextAnalyzer(script_id, chapter_index)
@@ -128,8 +133,8 @@ class ChapterPlotGeneratorExecutor(BaseExecutor):
                     step_summary="剧情生成失败"
                 )
 
-            # 存入数据库
-            add_chapter_plot(project_id, chapter_index, plot_list)
+            # 剧情列表写入当前任务（暂存创作产物，应用结果时再覆写到 webnovel_chapter_plot）
+            update_writing_task(self.task_id, plot_list=json.dumps(plot_list, ensure_ascii=False))
 
             plot_count = len(plot_list)
             return ExecutorResult(
