@@ -602,26 +602,31 @@ class ContextAnalyzer:
                 f"{query_example}\n"
                 '  ],\n'
             )
-            # 各可查询资源的用途与 filters 明细（防 LLM 用错资源）
+            # 各可查询资源的用途与 filters 明细（主字段用名字标识，id 辅助）
             query_res_lines = []
             for r in queryable:
                 res = RESOURCE_REGISTRY.get(r, {})
                 label = res.get("label", r)
                 filters = res.get("query_filters", [])
                 filter_desc = {
-                    "type": "角色类型（如 配角/反派）", "keyword": "名称·身份·性格关键词",
-                    "ids": "角色id列表", "chapter": "章节号", "name": "角色名",
-                    "character_id": "角色id", "status": "active/resolved",
-                    "tier": "伏笔层级（核心/支线等）", "character": "角色名或id",
-                    "only_held": "仅持有中（默认true）", "volume": "卷号",
+                    "character": "角色名", "keyword": "内容关键词", "ids": "角色id列表（辅助）",
+                    "chapter": "章号", "character_id": "角色id（辅助）", "type": "角色类型",
+                    "status": "active/resolved", "tier": "层级", "volume": "卷号（辅助）",
+                    "volume_name": "卷名", "scene": "场景名", "characters": "角色名",
+                    "emotion": "情绪", "relation_type": "关系类型", "cool_point_type": "爽点类型",
+                    "villain": "反派名", "only_held": "仅持有中",
                 }
-                f_desc = "、".join(f"{f}={filter_desc.get(f, f)}" for f in filters)
+                f_desc = "、".join(
+                    f"{f}={filter_desc.get(f, f)}" + ("（优先）" if f in (
+                        "character", "volume_name", "villain", "keyword") else "")
+                    for f in filters)
                 query_res_lines.append(f"    - {label}（{r}）: {f_desc}")
             query_res_text = "\n".join(query_res_lines)
             query_note = (
                 "structured_queries 可查资源与过滤条件：\n"
                 f"{query_res_text}\n"
-                "规则：resource 只能取上述类型；filters 仅支持对应资源列出的字段，未知字段无效；"
+                "规则：过滤优先用角色名/卷名/场景名等自然标识（模糊匹配即可），id 仅当你确知时使用；"
+                "resource 只能取上述类型，filters 仅支持对应资源列出的字段；"
                 "能通过 structured_refs 精确选择的优先用 structured_refs；一般 0~3 条；"
                 "text 简述查询意图供追溯。\n"
             )
