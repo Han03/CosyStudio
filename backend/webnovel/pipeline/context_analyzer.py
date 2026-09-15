@@ -62,6 +62,14 @@ STEP_GOALS = {
         ),
         "focus": "设定匹配、伏笔布局合理性、剧情因果、信息揭示时机",
     },
+    "qa_answer": {
+        "name": "知识问答",
+        "description": (
+            "回答用户关于小说故事状态与细节的问题。"
+            "需要定位相关角色/物品/关系/前文情节与当前状态。"
+        ),
+        "focus": "问题定位准确、只选必要资源、宁少勿滥",
+    },
 }
 
 # ── 各节点一致性维度清单（引导 custom_notes 输出方向）──
@@ -114,11 +122,31 @@ _RESOURCE_CTX_FIELD = {
 # 任务输入/约束/RAG 区块已并入 STEP_ASSEMBLY[step]["auto_sections"]，
 # 由装配器统一挂载，不经 LLM 选择（详见 resource_registry.STEP_ASSEMBLY）。
 
+# ── 分析 prompt 的【选择约束】文案（写作/问答两版）──
+_WRITING_SELECTION_CONSTRAINTS = """【选择约束】（按优先级）
+1. 必选：章节规划、卷纲、角色状态、上一章结尾衔接等核心资源——以【资源目录】实际列出为准；目录未列出的说明当前无内容，无需选择
+2. 建议：前序步骤已选择的条目——至少保留，除非确实不相关
+3. 可选：其他与本章剧情直接相关的条目——宁少勿滥
+4. 深度：前文承接用 tail，文风参照用 style；角色核对细节用 full，概要用 summary；设定类用 summary
+5. 参数：structured_refs 的 resource 只能取【资源目录】中列出的资源名；previous_chapter 必填 chapter_index；character_card/foreshadow 必填 ids（清单中条目编号）"""
+
+_QA_SELECTION_CONSTRAINTS = """【选择约束】（按优先级）
+1. 必选：直接回答用户问题所必需的事实类资源（角色状态、角色卡、伏笔、前文、时间轴等）——以【资源目录】实际列出为准；目录未列出的说明当前无内容，无需选择
+2. 可选：补充问题细节的其他资源——宁少勿滥，避免无关资源稀释回答
+3. 深度：前文承接用 tail；角色核对细节用 full，概要用 summary；设定类用 summary
+4. 参数：structured_refs 的 resource 只能取【资源目录】中列出的资源名；previous_chapter 必填 chapter_index；character_card/foreshadow 必填 ids（清单中条目编号）"""
+
+_QA_SYSTEM_PROMPT = (
+    "你是一位小说知识库问答专家，负责为用户问题选择最相关的参考信息。"
+    "输出严格的JSON格式。"
+)
+
 
 class ContextAnalyzer:
     """上下文分析器：Analyze → Gather → Generate 输入。"""
 
-    def __init__(self, script_id: int, chapter_index: int):
+    def __init__(self, script_id: int, chapter_index: Optional[int] = None):
+        # 写作流程传入章节号；问答模式（qa_answer）无章节概念，chapter_index=None
         self.script_id = script_id
         self.chapter_index = chapter_index
         self._logger = log_manager.get_logger("context_analyzer")
@@ -166,7 +194,7 @@ class ContextAnalyzer:
         if not prompt_text:
             raise ContextAnalysisError(f"步骤 {step_name} 分析 prompt 构建失败")
 
-        system_prompt = (
+        system_prompt = _QA_SYSTEM_PROMPT if step_name == "qa_answer" else (
             "你是一位小说创作的上下文管理专家，负责为每一步创作选择最相关的参考信息。"
             "输出严格的JSON格式。"
         )
@@ -272,6 +300,19 @@ class ContextAnalyzer:
             return ""
 
         chapter_index = self.chapter_index
+        is_qa = (step_name == "qa_answer")
+
+        # 任务上下文首句（写作/问答两版）
+        if is_qa:
+            question = (env.get("task_inputs") or {}).get("question", "")
+            task_context_line = (
+                f"你正在为用户问题「{question}」选择回答所需的参考信息。" if question
+                else "你正在为用户问题选择回答所需的参考信息。"
+            )
+        else:
+            task_context_line = (
+                f"你正在为第{chapter_index}章的【{goal['name']}】步骤选择参考上下文。"
+            )
 
         # 资源目录（按节点可选白名单裁剪展示）
         resource_catalog = self._build_resource_catalog(step_name, env)
@@ -280,6 +321,9 @@ class ContextAnalyzer:
         prev_step_selections_text = self._format_prev_selections(prev_selections)
         dimension_checklist_text = self._build_dimension_checklist(step_name)
         output_schema = self._build_output_schema(step_name)
+        selection_constraints_text = (
+            _QA_SELECTION_CONSTRAINTS if is_qa else _WRITING_SELECTION_CONSTRAINTS
+        )
 
         step_description = goal["description"].format(chapter_index=chapter_index)
         focus = goal["focus"]
@@ -289,12 +333,14 @@ class ContextAnalyzer:
             return normalize_text_block(user_prompt.format(
                 chapter_index=chapter_index,
                 step_name=goal["name"],
+                task_context_line=task_context_line,
                 step_description=step_description,
                 focus=focus,
                 resource_catalog=resource_catalog,
                 rag_candidates_text=rag_candidates_text,
                 prev_step_selections_text=prev_step_selections_text,
                 dimension_checklist_text=dimension_checklist_text,
+                selection_constraints_text=selection_constraints_text,
                 output_schema=output_schema,
             ))
         except KeyError as e:
