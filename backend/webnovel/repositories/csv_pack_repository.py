@@ -3,6 +3,7 @@
 提供 webnovel_csv_pack 表的 CRUD 操作，用于存储和检索分类约束包。
 """
 
+import json
 import re
 import time
 from typing import Dict, List, Optional
@@ -33,7 +34,10 @@ def _match_pack_genre_row(applicable_genre: str, norm_genre: str) -> bool:
     1. 题材列为空 → 兜底命中（通用约束包）
     2. 题材列为「通用」 → 兜底命中
     3. 题材列按 /、、, 拆分 token，任一 token 与归一化题材相等 → 命中
-    4. 任一 token 包含归一化题材（或反向包含，如"历史穿越-知识流"含"历史穿越"）→ 命中
+    4. 归一化题材是 token 的子串（如"种田"⊂"历史穿越-种田流"）→ 命中，保留合理子题材归并
+
+    注意：不做反向子串匹配（token 是题材子串），避免"历史古代"误命中"古代 / 古言脑洞"
+    这类跨题材误注入。
     """
     raw = (applicable_genre or "").strip()
     if not raw or raw == "通用":
@@ -42,9 +46,32 @@ def _match_pack_genre_row(applicable_genre: str, norm_genre: str) -> bool:
     for t in tokens:
         if t == norm_genre:
             return True
-        if norm_genre and (norm_genre in t or t in norm_genre):
+        if norm_genre and norm_genre in t:
             return True
     return False
+
+
+def filter_packs_by_template(packs: List[Dict], template_creative_constraints) -> List[Dict]:
+    """按题材模板点名的通用叠加包过滤（策略 a：模板精选通用包）。
+
+    题材类（M/F）全部保留（以运行时题材匹配为准）；通用类（U）只保留题材模板
+    creative_constraints 中点名的那个包。模板未点名任何 U 包时保持原样（兜底，
+    不因过滤导致约束包为空）。
+    """
+    if not packs:
+        return packs
+    cc = template_creative_constraints
+    if isinstance(cc, (list, dict)):
+        cc = json.dumps(cc, ensure_ascii=False)
+    elif not isinstance(cc, str):
+        cc = str(cc or "")
+    named_u = set(re.findall(r"Pack\s*(U\d{2})", cc))
+    if not named_u:
+        return packs
+    return [
+        p for p in packs
+        if not (p.get("pack_code") or "").startswith("U") or p.get("pack_code") in named_u
+    ]
 
 
 def get_csv_packs_by_genre(genre: str) -> List[Dict]:

@@ -1270,8 +1270,12 @@ class InitExecutor(BaseExecutor):
             # 约束包+叠加包：按题材从 CSV 加载，注入总纲生成 prompt
             if _genre:
                 try:
-                    from webnovel.repositories import get_csv_packs_by_genre, format_pack_for_prompt
+                    from webnovel.repositories import (
+                        get_csv_packs_by_genre, format_pack_for_prompt, filter_packs_by_template)
                     _packs = get_csv_packs_by_genre(_genre)
+                    # 策略 a：通用叠加包只保留题材模板点名的 1 个，题材类包保持运行时匹配
+                    _packs = filter_packs_by_template(
+                        _packs, llm_context.get("genre_creative_constraints", ""))
                     _packs_text = format_pack_for_prompt(_packs)
                     if _packs_text:
                         llm_context["csv_constraint_packs"] = _packs_text
