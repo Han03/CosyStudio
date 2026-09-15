@@ -1532,6 +1532,7 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_character_states,
         "query_filters": ["character", "chapter", "keyword", "character_id"],
+        "dedup_key": "character_id",
     },
     "previous_hook": {
         "label": "上一章结尾状态", "header": "【上一章结尾】", "category": "structured",
@@ -1545,6 +1546,7 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_character_cards,
         "query_filters": ["type", "keyword", "ids"],
+        "dedup_key": "id",
     },
     "character_item": {
         "label": "角色物品", "header": "【角色物品】", "category": "structured",
@@ -1580,6 +1582,7 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_chapter_plans,
         "query_filters": ["chapter", "keyword"],
+        "dedup_key": "id",
     },
     "volume_outline": {
         "label": "卷纲", "header": "【卷纲】", "category": "structured",
@@ -1587,6 +1590,7 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_volume_outlines,
         "query_filters": ["volume_name", "volume", "keyword"],
+        "dedup_key": "id",
     },
     "chapter_meta": {
         "label": "章节结尾钩子", "header": "【章节结尾】", "category": "structured",
@@ -1684,6 +1688,7 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_foreshadows,
         "query_filters": ["status", "tier", "chapter", "keyword"],
+        "dedup_key": "id",
     },
     "timeline": {
         "label": "章节时间轴", "header": "【章节时间轴】", "category": "structured",
@@ -1778,6 +1783,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
+            ("rag_results", "full"),
             ("dimensions", None),
         ],
     },
@@ -1816,6 +1822,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         ],
         "auto_sections": [
             ("dimensions", None),
+            ("rag_results", "full"),
             ("consistency_notes", None),
         ],
     },
@@ -1826,6 +1833,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         "queryable": [],
         "auto_sections": [
             ("review_result", "full"),
+            ("rag_results", "full"),
             ("consistency_notes", None),
         ],
     },
