@@ -238,6 +238,8 @@ def _load_previous_chapter(ref, env):
     chapter_index = ref.get("chapter_index")
     if chapter_index is None:
         raise ContextAnalysisError("前文资源加载失败：未指定 chapter_index")
+    # LLM 可能输出字符串章号（"2"），统一转 int 再比较
+    chapter_index = safe_int(chapter_index)
     if chapter_index <= 0:
         # 首章无前文属正常空态（LLM 可能以 chapter_index=0 表达"无前文"），
         # 返回空 dict 由装配层跳过空区块
