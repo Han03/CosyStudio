@@ -439,8 +439,9 @@ class ContextAnalyzer:
             if not chars:
                 return ""
             # 热点：仅主角+核心角色前 4（env 已按主角优先排序）；其他角色用查询
+            # id= 前缀显式标注引用键（= structured_refs.ids），与资源序号区分
             return "\n".join(
-                f"    {c.get('id')}. {c.get('name')}（{c.get('type')}）— {c.get('summary', '')[:40]}"
+                f"    id={c.get('id')} {c.get('name')}（{c.get('type')}）— {c.get('summary', '')[:40]}"
                 for c in chars[:4]
             )
         if res_name == "foreshadow":
@@ -453,9 +454,9 @@ class ContextAnalyzer:
                 tier_rank.get(str(f.get("tier", "")), 9),
                 -(f.get("planted_chapter") or 0),
             ))
-            # 条目编号 = 伏笔 id = structured_refs.ids 引用键
+            # id= 前缀显式标注引用键（= structured_refs.ids）
             return "\n".join(
-                f"    {f.get('id')}. [{f.get('tier', '')}] {f.get('content', '')[:40]} "
+                f"    id={f.get('id')} [{f.get('tier', '')}] {f.get('content', '')[:40]} "
                 f"（第{f.get('planted_chapter') or 0}章埋下）"
                 for f in loops[:4]
             )
@@ -663,7 +664,7 @@ class ContextAnalyzer:
             '  "custom_notes": ["[维度] 主体: 规则"]\n'
             "}\n"
             "字段说明：\n"
-            "- structured_refs 从【资源目录】选，条目编号即引用键：character_card/foreshadow 的 ids 直接使用目录中的条目编号；"
+            "- structured_refs 从【资源目录】选，`id=` 后的数字即引用键：character_card/foreshadow 的 ids 直接使用目录中 id= 后的数字；"
             "previous_chapter 的 chapter_index 使用目录中的第N章章节号；previous_chapter 建议 depth=tail(500字)或style(320字)。\n"
             f"{query_note}"
             "- rag_queries：RAG 语义检索查询（含实体限定，禁止复制原文）；types：chapter/chapter_summary/foreshadow/character/worldview/power_system/golden_finger/villain/volume_outline。\n"
