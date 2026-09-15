@@ -726,10 +726,19 @@ class ContextAnalyzer:
 
             all_results = []
             seen = set()
+            # RAG 职责重定位：查询类型白名单强制（正文类 + CSV 创作知识）。
+            # 设定类（角色/世界观/力量体系/金手指/卷纲/反派/伏笔）已由 selectable
+            # 结构化资源注入提供，LLM 若生成设定类查询在此被过滤，避免重复/死查询。
+            allowed = rag_svc.ALLOWED_QUERY_TYPES
             for query, emb in zip(queries, embeddings):
                 if not emb:
                     continue
-                chunk_types = query.get("types") or None
+                raw_types = query.get("types") or []
+                if not isinstance(raw_types, list):
+                    raw_types = [raw_types]
+                chunk_types = [t for t in raw_types if t in allowed]
+                if not chunk_types:
+                    continue  # 查询类型全部不在白名单内，跳过该查询
                 limit = query.get("limit", 5)
                 results = rag_svc.search(
                     project_id, emb,

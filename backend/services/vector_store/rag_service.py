@@ -24,13 +24,20 @@ class RAGService:
     """WebNovel RAG 语义检索服务。"""
 
     NAMESPACE = "rag"
-    SETTINGS_TYPES = frozenset({
-        "character", "worldview", "power_system", "golden_finger",
-        "volume_outline", "foreshadow", "villain",
+
+    # RAG 仅保留两类"无法结构化"的片段：
+    # 1. 正文类：章节摘要/段落切片（前文细节，写作一致性来源）
+    # 2. 创作知识类：CSV 题材知识表（通用知识库，非项目业务数据）
+    CHAPTER_TYPES = frozenset({
+        "chapter", "chapter_summary", "chapter_paragraph",
+    })
+    CSV_KNOWLEDGE_TYPES = frozenset({
         "csv_plot", "csv_pacing", "csv_verdict", "csv_scene",
         "csv_writing", "csv_naming", "csv_character_knowledge",
         "csv_golden_finger_knowledge", "csv_genre_tone",
     })
+    # 查询侧允许的完整类型白名单（写作上下文分析/宽泛检索均以此过滤）
+    ALLOWED_QUERY_TYPES = CHAPTER_TYPES | CSV_KNOWLEDGE_TYPES
 
     # 默认最低相似度阈值（低于此值的结果会被过滤）
     DEFAULT_MIN_SCORE = 0.25
@@ -44,13 +51,6 @@ class RAGService:
         "chapter_summary": 0.30,    # LLM 结构化摘要，质量较高
         "chapter": 0.28,            # 机械截断摘要（机械拼接，语义稀释）
         "chapter_paragraph": 0.22,  # 段落切片，语义被前后叙事稀释，分数普遍偏低
-        "character": 0.20,          # 角色卡，语义空间差异大
-        "foreshadow": 0.22,         # 伏笔信息
-        "worldview": 0.20,          # 世界观设定
-        "power_system": 0.20,       # 力量体系
-        "golden_finger": 0.20,      # 金手指设定
-        "villain": 0.20,            # 反派信息
-        "volume_outline": 0.22,     # 卷纲
         # CSV 知识类型（写文/审查时语义检索）
         "csv_plot": 0.22,           # 剧情模板
         "csv_pacing": 0.22,         # 节奏技巧
@@ -102,10 +102,13 @@ class RAGService:
         if not chunks or not embeddings:
             return []
 
-        contents = [c["content"] for c in chunks]
+        # 幂等：按 metadata.source_key 查重，已存在的片段跳过，避免重复资源反复索引
+        existing_keys = self._get_source_keys(self._collection(project_id))
 
+        contents = []
         metadatas = []
-        for c in chunks:
+        valid_embeddings = []
+        for c, emb in zip(chunks, embeddings):
             extra = c.get("metadata")
             if isinstance(extra, str):
                 try:
@@ -114,15 +117,26 @@ class RAGService:
                     extra = {}
             elif extra is None:
                 extra = {}
-            metadatas.append(self._build_metadata(
+            source_key = extra.get("source_key") if isinstance(extra, dict) else None
+            if source_key and source_key in existing_keys:
+                continue
+            meta = self._build_metadata(
                 c.get("chunk_type", "chapter"),
                 c.get("chapter_number", 0),
                 extra,
-            ))
+            )
+            if source_key:
+                existing_keys.add(source_key)
+            contents.append(c["content"])
+            metadatas.append(meta)
+            valid_embeddings.append(emb)
+
+        if not contents:
+            return []
 
         return self._store.batch_add(
             self.NAMESPACE, self._collection(project_id),
-            contents, embeddings, metadatas,
+            contents, valid_embeddings, metadatas,
         )
 
     def delete_by_type(self, project_id: int, chunk_type: str) -> int:
@@ -150,24 +164,6 @@ class RAGService:
         deleted = 0
         for doc in self._get_all_docs(collection, chunk_type):
             if doc.get("chapter_number") == chapter_number:
-                if self._store.delete(doc["id"]):
-                    deleted += 1
-        return deleted
-
-    def delete_by_char_id(self, project_id: int, char_id: int) -> int:
-        """删除指定角色卡的全部 character 片段（角色卡变更后增量重建用）。
-
-        Args:
-            project_id: 项目 ID
-            char_id: 角色卡 ID（与索引时 metadata 中的 char_id 对应）
-
-        Returns:
-            删除的文档数量
-        """
-        collection = self._collection(project_id)
-        deleted = 0
-        for doc in self._get_all_docs(collection, "character"):
-            if doc.get("metadata", {}).get("char_id") == char_id:
                 if self._store.delete(doc["id"]):
                     deleted += 1
         return deleted
@@ -283,12 +279,12 @@ class RAGService:
                 result.append((d["content"], idx))
         return result
 
-    def has_settings_chunks(self, project_id: int) -> bool:
-        """检查项目是否存在设定类型的 RAG 片段。"""
+    def has_csv_knowledge(self, project_id: int) -> bool:
+        """检查项目是否已索引 CSV 创作知识片段（缺失时才触发补索引）。"""
         collection = self._collection(project_id)
         for doc in self._get_all_docs_raw(collection):
             meta = doc.get("metadata", {})
-            if meta.get("chunk_type") in self.SETTINGS_TYPES:
+            if meta.get("chunk_type") in self.CSV_KNOWLEDGE_TYPES:
                 return True
         return False
 
@@ -344,6 +340,16 @@ class RAGService:
             return results
         except Exception:
             return []
+
+    def _get_source_keys(self, collection: str) -> set:
+        """获取集合中全部已存在的 metadata.source_key（用于写入幂等查重）。"""
+        keys = set()
+        for doc in self._get_all_docs_raw(collection):
+            meta = doc.get("metadata", {})
+            key = meta.get("source_key") if isinstance(meta, dict) else None
+            if key:
+                keys.add(key)
+        return keys
 
     def _get_all_docs(self, collection: str, chunk_type: str = "") -> List[Dict[str, Any]]:
         """获取集合中所有文档（不含 embedding），可按 chunk_type 过滤。"""
