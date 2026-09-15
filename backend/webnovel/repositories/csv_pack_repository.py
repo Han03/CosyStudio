@@ -3,10 +3,65 @@
 提供 webnovel_csv_pack 表的 CRUD 操作，用于存储和检索分类约束包。
 """
 
+import re
 import time
 from typing import Dict, List, Optional
 
 from repositories.base_repository import _get_conn, _lock, safe_str, safe_int
+
+# 约束包题材归一化：genres_json 题材模板名 ↔ webnovel_csv_pack 题材标签 的映射。
+# csv_pack 题材列（applicable_genre）用"题材模板体系"命名（玄幻/修真/高武、都市日常、
+# 宫斗宅斗…），与项目 genre（如「修仙」）存在命名错位，先归一化再匹配避免 0 命中。
+_PACK_GENRE_ALIASES = {
+    "修仙": "修真", "凡人流": "修真", "仙侠": "修真", "修真": "修真",
+    "电竞": "游戏体育", "直播文": "游戏体育",
+}
+
+
+def _normalize_pack_genre(genre: str) -> str:
+    """约束包题材归一化：去空格 + 别名映射。"""
+    if not genre:
+        return ""
+    g = (genre or "").strip()
+    return _PACK_GENRE_ALIASES.get(g, g)
+
+
+def _match_pack_genre_row(applicable_genre: str, norm_genre: str) -> bool:
+    """判断约束包行是否匹配归一化题材。
+
+    匹配规则（按优先级）：
+    1. 题材列为空 → 兜底命中（通用约束包）
+    2. 题材列为「通用」 → 兜底命中
+    3. 题材列按 /、、, 拆分 token，任一 token 与归一化题材相等 → 命中
+    4. 任一 token 包含归一化题材（或反向包含，如"历史穿越-知识流"含"历史穿越"）→ 命中
+    """
+    raw = (applicable_genre or "").strip()
+    if not raw or raw == "通用":
+        return True
+    tokens = [t.strip() for t in re.split(r"[/、,，]", raw) if t.strip()]
+    for t in tokens:
+        if t == norm_genre:
+            return True
+        if norm_genre and (norm_genre in t or t in norm_genre):
+            return True
+    return False
+
+
+def get_csv_packs_by_genre(genre: str) -> List[Dict]:
+    """根据题材获取相关的约束包（归一化 + token 匹配，含空题材/通用兜底）。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """
+            SELECT * FROM webnovel_csv_pack
+            ORDER BY category_group, sort_order, pack_code
+            """
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+    if not genre:
+        return rows
+    norm_genre = _normalize_pack_genre(genre)
+    return [r for r in rows if _match_pack_genre_row(r.get("applicable_genre", ""), norm_genre)]
 
 
 def add_csv_pack(
@@ -127,22 +182,6 @@ def get_all_csv_packs(
         query += " ORDER BY category_group, sort_order, pack_code"
         
         cursor = conn.execute(query, params)
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-
-
-def get_csv_packs_by_genre(genre: str) -> List[Dict]:
-    """根据题材获取相关的约束包。"""
-    with _lock:
-        conn = _get_conn()
-        cursor = conn.execute(
-            """
-            SELECT * FROM webnovel_csv_pack
-            WHERE applicable_genre LIKE ? OR applicable_genre = ''
-            ORDER BY category_group, sort_order, pack_code
-            """,
-            (f"%{genre}%",)
-        )
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
