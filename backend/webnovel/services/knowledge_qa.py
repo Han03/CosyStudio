@@ -225,6 +225,9 @@ async def answer_question(script_id: int, question: str) -> Dict[str, Any]:
         for ref in (selection.get("structured_refs") or []):
             if isinstance(ref, dict) and ref.get("resource"):
                 sources.append({"type": "state", "resource": ref["resource"]})
+        for q in (selection.get("structured_queries") or []):
+            if isinstance(q, dict) and q.get("resource"):
+                sources.append({"type": "state_query", "resource": q["resource"]})
 
         return {
             "success": True,
@@ -232,6 +235,7 @@ async def answer_question(script_id: int, question: str) -> Dict[str, Any]:
             "sources": sources,
             "selected": {
                 "structured_refs": selection.get("structured_refs") or [],
+                "structured_queries": selection.get("structured_queries") or [],
                 "rag_queries": selection.get("rag_queries") or [],
                 "custom_notes": selection.get("custom_notes") or [],
             },
