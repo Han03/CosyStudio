@@ -49,6 +49,443 @@ def _safe_str(value) -> str:
     return ""
 
 
+# ── 题材模板部分 → 中文标签映射（文本渲染用，未覆盖的 key 用原名兜底）──
+_GENRE_PART_FIELD_LABELS = {
+    "worldview": {
+        "description": "世界描述", "dynasty_features": "朝代特点",
+        "dynasty": "朝代", "features": "特点", "core_conflict": "核心冲突",
+        "social_class": "社会阶层", "class": "阶层", "upward_path": "上升路径",
+        "power_system": "权力机构", "institution": "机构", "function": "职能", "power": "权力",
+    },
+    "power_system": {
+        "description": "体系描述", "promotion_paths": "晋升路径",
+        "imperial_examination": "科举", "military_merit": "军功", "family_connection": "荫补",
+        "political_resources": "政治资源", "resource": "资源", "acquisition": "获取",
+        "court_game": "朝堂博弈", "information_war": "情报战", "personnel_war": "人事战",
+        "policy_war": "政策战",
+    },
+    "golden_finger_guidelines": {
+        "types": "类型", "fit_requirements": "契合要求",
+    },
+    "character_guidelines": {
+        "protagonist_archetypes": "主角原型", "villain_types": "反派类型",
+        "supporting_roles": "配角定位", "role": "角色", "relationship": "关系",
+        "relationship_patterns": "关系模式",
+    },
+}
+
+# 条目（list[dict] 元素）内部字段的标签覆盖：处理与顶层同 key 不同语义的字段
+_GENRE_PART_ENTRY_LABELS = {
+    "power_system": {"description": "说明"},
+    "character_guidelines": {"function": "职能"},
+}
+
+# 跨题材通用字段 → 中文标签（各题材 JSON 结构差异大，part 映射未覆盖的常见字段在此兜底）
+_GENRE_COMMON_FIELD_LABELS = {
+    "name": "名称", "type": "类型", "types": "类型", "level": "等级", "levels": "等级体系",
+    "features": "特点", "feature": "特点", "rules": "规则", "rule": "规则",
+    "cost": "代价", "costs": "代价", "role": "定位", "faction": "势力", "factions": "势力",
+    "conflict": "冲突", "relation": "关系", "relations": "关系", "example": "示例",
+    "knowledge": "知识", "ability": "能力", "abilities": "能力", "description": "描述",
+    "function": "职能", "resources": "资源", "resource": "资源", "risk": "风险",
+    "stage": "阶段", "stages": "阶段", "ending": "结局", "template": "模板", "templates": "模板",
+    "status": "地位", "identity": "身份", "goal": "目标", "purpose": "目的",
+    "method": "方式", "methods": "方式", "requirement": "要求", "requirements": "要求",
+    "limitation": "限制", "limits": "限制", "trait": "特质", "traits": "特质",
+    "element": "要素", "elements": "要素", "content": "内容", "category": "类别",
+    "core": "核心", "style": "风格", "mood": "基调", "tone": "基调",
+    "title": "称号", "rank": "品级", "grade": "品级", "position": "职位",
+    "structure": "结构", "design": "设计", "system": "体系", "mechanism": "机制",
+    "source": "来源", "origin": "起源", "influence": "影响", "effect": "效果",
+    "value": "数值", "boundary": "边界", "condition": "条件", "trigger": "触发",
+    "principle": "原则", "principles": "原则", "pattern": "模式", "patterns": "模式",
+    "growth": "成长", "path": "路径", "paths": "路径", "arc": "弧线",
+    "hook": "钩子", "clue": "线索", "clues": "线索", "twist": "反转", "payoff": "爽点",
+    "setup": "铺垫", "climax": "高潮", "ending_types": "结局类型", "pacing": "节奏",
+    # 题材特有高频字段（单段 key）
+    "lifespan": "寿命", "nature": "本质", "people": "人群", "gongdou": "宫斗",
+    "quanmou": "权谋", "zhaidou": "宅斗", "affection": "情感羁绊", "cooldown": "冷却",
+    "threat": "威胁", "analysis": "分析", "collection": "收集", "emotion": "情感",
+    "bond": "羁绊", "race": "种族", "races": "种族", "danger": "危险",
+    "obvious": "显性", "hidden": "隐性", "misleading": "误导", "percentage": "占比",
+    "reveal": "揭示", "layer": "层级", "opportunities": "机遇", "economy": "经济",
+    "politics": "政治", "marriage": "婚姻", "angle": "角度", "issue": "议题",
+    "note": "说明", "handling": "处理", "scene": "场景", "plot": "剧情",
+    "dilemma": "困境", "school": "学派", "energy": "能量", "field": "领域",
+    "means": "手段", "games": "博弈", "explicit": "显性", "interaction": "互动",
+    "attitude": "态度", "drive": "驱动力", "realm": "境界", "usage": "运用",
+    "acquisition": "获取", "domain": "领域", "agriculture": "农业", "commerce": "商贸",
+    "industry": "产业", "military": "军事", "era": "时代", "eras": "时代",
+    "atmosphere": "氛围", "categories": "类别", "power": "实力", "recovery": "恢复",
+    "impact": "影响", "advancement": "晋升", "promotion": "晋升", "workplace": "职场",
+    "roles": "角色", "identities": "身份", "scenes": "场景", "character": "角色",
+    "boss": "霸总", "president": "总裁", "sweet": "甜宠", "pain": "虐点",
+    "abuse": "虐", "chase": "追", "rising": "高潮", "hooks": "钩子",
+    "templates": "模板", "items": "物件", "situations": "处境", "periods": "时期",
+    "forms": "形态", "pillars": "支柱", "commandments": "诫律", "suspect": "嫌疑人",
+    "trick": "骗术", "triangle": "三角", "transformation": "转变", "stages": "阶段",
+    "response": "应对", "transmission": "传递", "counter": "反制", "intelligence": "情报",
+    "daily": "日常", "prevention": "防范", "emergency": "紧急", "methods": "方式",
+    "factors": "因素", "success": "成功", "live": "直播", "key": "关键",
+    "team": "团队", "teams": "队伍", "positions": "岗位", "dimension": "维度",
+    "rhythm": "节奏", "game": "游戏", "matches": "比赛", "victory": "胜利",
+    "league": "联赛", "early": "前期", "mid": "中期", "late": "后期",
+    "growth": "成长", "content": "内容", "function": "职能", "institution": "机构",
+    "building": "建设", "talent": "天赋", "core": "核心", "task": "任务",
+    "internal": "内部", "affairs": "事务", "domestic": "家庭", "life": "生活",
+    "management": "管理", "view": "观", "world": "世界", "conflict": "冲突",
+    "types": "类型", "alien": "外星", "social": "社会", "clauses": "条款",
+    "contracts": "契约", "duration": "期限", "reason": "原因", "rank": "品级",
+    "ranks": "品级", "status": "地位", "harem": "后宫", "secret": "秘术",
+    "open": "明面", "taboo": "禁忌", "red": "红线", "lines": "线", "defense": "防御",
+    "development": "发展", "ending": "结局", "features": "特点", "opponent": "对手",
+    "relation": "关系", "eighties": "八十年代", "nineties": "九十年代",
+    "sixties": "六十年代", "seventies": "七十年代", "elements": "要素",
+    "systems": "体系", "worldview": "世界观", "domestic": "家庭", "life": "生活",
+    "story": "故事", "opening": "开篇", "templates": "模板", "structure": "结构",
+    "emotion": "情感", "relation": "关系", "plot": "剧情", "scenes": "场景",
+    "conflicts": "冲突", "mechanics": "机制", "background": "背景", "options": "选项",
+    "family": "家族", "resource": "资源", "resources": "资源", "title": "称号",
+    "number": "数量", "identity": "身份", "contract": "契约", "clause": "条款",
+    "asset": "资产", "scale": "规模", "power": "权力", "nature": "本质",
+    "features": "特点", "core": "核心", "rules": "规则", "system": "体系",
+    "levels": "等级体系", "level": "等级", "name": "名称", "type": "类型",
+    "rule": "规则", "cost": "代价", "role": "定位", "faction": "势力",
+    "factions": "势力", "conflict": "冲突", "relation": "关系", "example": "示例",
+    "knowledge": "知识", "ability": "能力", "description": "描述", "function": "职能",
+    "risk": "风险", "stage": "阶段", "template": "模板", "method": "方式",
+    "requirement": "要求", "limitation": "限制", "trait": "特质", "element": "要素",
+    "content": "内容", "category": "类别", "style": "风格", "tone": "基调",
+    "title": "称号", "grade": "品级", "position": "职位", "structure": "结构",
+    "design": "设计", "mechanism": "机制", "source": "来源", "origin": "起源",
+    "influence": "影响", "effect": "效果", "value": "数值", "boundary": "边界",
+    "condition": "条件", "trigger": "触发", "principle": "原则", "pattern": "模式",
+    "growth": "成长", "path": "路径", "arc": "弧线", "principles": "原则",
+    "patterns": "模式", "paths": "路径", "purpose": "目的", "limits": "限制",
+    "methods": "方式", "goals": "目标", "stages": "阶段", "types": "类型",
+    # 题材特有高频单段词（单段 key 只走本表，不经过分词表）
+    "lifespan": "寿命", "nature": "本质", "people": "人群", "gongdou": "宫斗",
+    "quanmou": "权谋", "zhaidou": "宅斗", "affection": "情感羁绊", "cooldown": "冷却",
+    "threat": "威胁", "analysis": "分析", "collection": "收集", "emotion": "情感",
+    "bond": "羁绊", "race": "种族", "races": "种族", "danger": "危险",
+    "obvious": "显性", "hidden": "隐性", "misleading": "误导", "percentage": "占比",
+    "reveal": "揭示", "layer": "层级", "opportunities": "机遇", "economy": "经济",
+    "politics": "政治", "marriage": "婚姻", "angle": "角度", "issue": "议题",
+    "note": "说明", "handling": "处理", "scene": "场景", "plot": "剧情",
+    "dilemma": "困境", "school": "学派", "energy": "能量", "field": "领域",
+    "means": "手段", "games": "博弈", "explicit": "显性", "interaction": "互动",
+    "attitude": "态度", "drive": "驱动力", "realm": "境界", "usage": "运用",
+    "acquisition": "获取", "domain": "领域", "agriculture": "农业", "commerce": "商贸",
+    "industry": "产业", "military": "军事", "era": "时代", "eras": "时代",
+    "atmosphere": "氛围", "categories": "类别", "power": "实力", "recovery": "恢复",
+    "impact": "影响", "advancement": "晋升", "promotion": "晋升", "workplace": "职场",
+    "roles": "角色", "identities": "身份", "scenes": "场景", "character": "角色",
+    "boss": "霸总", "president": "总裁", "sweet": "甜宠", "pain": "虐点",
+    "abuse": "虐", "chase": "追", "rising": "高潮", "hooks": "钩子",
+    "templates": "模板", "items": "物件", "situations": "处境", "periods": "时期",
+    "forms": "形态", "pillars": "支柱", "commandments": "诫律", "suspect": "嫌疑人",
+    "trick": "骗术", "triangle": "三角", "transformation": "转变", "stages": "阶段",
+    "response": "应对", "transmission": "传递", "counter": "反制", "intelligence": "情报",
+    "daily": "日常", "prevention": "防范", "emergency": "紧急", "methods": "方式",
+    "factors": "因素", "success": "成功", "live": "直播", "key": "关键",
+    "team": "团队", "teams": "队伍", "positions": "岗位", "dimension": "维度",
+    "rhythm": "节奏", "game": "游戏", "matches": "比赛", "victory": "胜利",
+    "league": "联赛", "early": "前期", "mid": "中期", "late": "后期",
+    "growth": "成长", "content": "内容", "function": "职能", "institution": "机构",
+    "building": "建设", "talent": "天赋", "core": "核心", "task": "任务",
+    "internal": "内部", "affairs": "事务", "domestic": "家庭", "life": "生活",
+    "management": "管理", "view": "观", "world": "世界", "conflict": "冲突",
+    "types": "类型", "alien": "外星", "social": "社会", "clauses": "条款",
+    "contracts": "契约", "duration": "期限", "reason": "原因", "rank": "品级",
+    "ranks": "品级", "status": "地位", "harem": "后宫", "secret": "秘术",
+    "open": "明面", "taboo": "禁忌", "red": "红线", "lines": "线", "defense": "防御",
+    "development": "发展", "ending": "结局", "features": "特点", "opponent": "对手",
+    "relation": "关系", "eighties": "八十年代", "nineties": "九十年代",
+    "sixties": "六十年代", "seventies": "七十年代", "elements": "要素",
+    "systems": "体系", "worldview": "世界观", "story": "故事", "opening": "开篇",
+    "structure": "结构", "conflicts": "冲突", "mechanics": "机制", "background": "背景",
+    "options": "选项", "family": "家族", "resource": "资源", "resources": "资源",
+    "title": "称号", "number": "数量", "identity": "身份", "contract": "契约",
+    "clause": "条款", "asset": "资产", "scale": "规模", "principles": "原则",
+    "patterns": "模式", "paths": "路径", "purpose": "目的", "limits": "限制",
+    "goals": "目标", "information": "信息", "manifestation": "显现", "suspense": "悬念",
+    "treatment": "处理", "society": "社会", "work": "工作", "agency": "机构",
+    "female": "女性", "male": "男性", "middle": "中期", "rarity": "稀有度",
+    "period": "时期", "bp": "扳选", "training": "训练", "importance": "重要性",
+    "income": "收入", "responsibility": "职责", "formula": "套路", "formulas": "套路",
+    "steps": "步骤", "dimensions": "维度", "expression": "表达", "solution": "方案",
+    "during": "直播中", "pre": "直播前", "strategy": "策略", "inheritance": "继承",
+    "probability": "概率", "quality": "资质", "changeable": "可变", "difficult": "困难",
+    "unchangeable": "不可变", "time": "时代", "white": "白", "moon": "月光",
+    "stand": "替", "in": "身", "ten": "十", "post": "直播后", "tournament": "锦标赛",
+    "tournaments": "锦标赛",
+}
+
+# 复合 key 分词词段 → 中文（用于 female_archetypes → 女性原型 等组合字段）
+_GENRE_WORD_SEGMENT_LABELS = {
+    "female": "女性", "male": "男性", "protagonist": "主角", "antagonist": "反派",
+    "villain": "反派", "supporting": "配角", "archetype": "原型", "archetypes": "原型",
+    "opponent": "对手", "ally": "盟友", "team": "团队", "role": "角色",
+    "relationship": "关系", "relation": "关系", "pattern": "模式", "patterns": "模式",
+    "type": "类型", "types": "类型", "category": "类别", "categories": "类别",
+    "ability": "能力", "abilities": "能力", "skill": "技能", "power": "实力",
+    "level": "等级", "levels": "等级", "realm": "境界", "grade": "品级", "rank": "品级",
+    "rule": "规则", "rules": "规则", "design": "设计", "principle": "原则", "principles": "原则",
+    "detail": "细节", "details": "细节", "depth": "深度", "authenticity": "真实性",
+    "scene": "场景", "character": "角色", "gray": "灰色", "dimension": "维度", "dimensions": "维度",
+    "emotion": "情感", "fate": "命运", "magic": "魔法", "school": "学派", "schools": "学派",
+    "social": "社会", "conflict": "冲突", "conflicts": "冲突", "source": "来源", "sources": "来源",
+    "attitude": "态度", "interaction": "互动", "development": "发展", "growth": "成长",
+    "ending": "结局", "opportunity": "机遇", "opportunities": "机遇", "success": "成功",
+    "factor": "因素", "factors": "因素", "economy": "经济", "marriage": "婚姻", "era": "时代",
+    "eras": "时代", "feature": "特点", "features": "特点", "element": "要素", "elements": "要素",
+    "technique": "技巧", "structure": "结构", "mechanism": "机制", "mechanisms": "机制",
+    "example": "示例", "cost": "代价", "costs": "代价", "threat": "威胁", "twist": "反转",
+    "clue": "线索", "clues": "线索", "layer": "层级", "layers": "层级", "question": "问题",
+    "layering": "分层", "reveal": "揭示", "requirement": "要求", "requirements": "要求",
+    "sanity": "理智", "truth": "真相", "nature": "本质", "information": "情报",
+    "acquisition": "获取", "physiology": "生理", "lifespan": "寿命", "combat": "战斗",
+    "martial": "武学", "arts": "技艺", "upgrade": "升级", "awakening": "觉醒",
+    "evolution": "进化", "material": "材料", "materials": "材料", "rarity": "稀有度",
+    "position": "岗位", "post": "岗位", "rhythm": "节奏", "victory": "胜利", "match": "比赛",
+    "league": "联赛", "traffic": "流量", "agriculture": "农业", "industry": "产业",
+    "commerce": "商贸", "military": "军事", "talent": "天赋", "institution": "机构",
+    "building": "建设", "domain": "领域", "tech": "科技", "cyber": "赛博", "body": "身体",
+    "field": "领域", "mechanic": "机制", "mechanics": "机制", "method": "方式",
+    "strategy": "策略", "cooldown": "冷却", "probability": "概率", "inheritance": "继承",
+    "affection": "情感", "background": "背景", "offspring": "后代", "quality": "资质",
+    "system": "体系", "panel": "面板", "panels": "面板", "core": "核心", "key": "关键",
+    "danger": "危险", "spirit": "灵异", "spirits": "灵异", "faction": "势力",
+    "factions": "势力", "level": "等级", "levels": "等级", "era": "时代",
+    "humanity": "人性", "spectrum": "光谱", "resource": "资源", "resources": "资源",
+    "recovery": "恢复", "limitation": "限制", "limitations": "限制", "usage": "运用",
+    "history": "历史", "intervention": "干预", "knowledge": "知识", "people": "人群",
+    "goal": "目标", "impact": "影响", "risk": "风险", "cost": "代价",
+    "obvious": "显性", "hidden": "隐性", "misleading": "误导", "percentage": "占比",
+    "motive": "动机", "reasoning": "推理", "elements": "要素", "identity": "身份",
+    "relationship": "关系", "role": "角色", "rules": "规则", "type": "类型",
+    "template": "模板", "core": "核心", "survival": "生存", "rate": "率",
+    "player": "玩家", "ecosystem": "生态", "difficulty": "难度", "resource": "资源",
+    "era": "时代", "feature": "特点", "features": "特点", "battle": "战斗",
+    "decision": "决策", "breakthrough": "突破", "win": "胜利", "lose": "败北",
+    "tactic": "战术", "loop": "循环", "feedback": "反馈", "node": "节点", "nodes": "节点",
+    "plot": "剧情", "scene": "场景", "setting": "设定", "settings": "设定",
+    "culture": "文化", "custom": "风俗", "customs": "风俗", "religion": "信仰",
+    "belief": "信仰", "ideology": "意识形态", "class": "阶层", "classes": "阶层",
+    "status": "地位", "rank": "品级", "family": "家族", "clan": "宗门", "clans": "宗门",
+    "sect": "宗门", "sects": "宗门", "realm": "境界", "realms": "境界", "tier": "层级",
+    "tiers": "层级", "level": "等级", "wave": "波次", "round": "回合", "turn": "回合",
+    "war": "战争", "battle": "战役", "campaign": "战役", "strategy": "战略",
+    "tactic": "战术", "scheme": "计谋", "schemes": "计谋", "intrigue": "权谋",
+    "conspiracy": "阴谋", "betrayal": "背叛", "ally": "盟友", "enemy": "敌人",
+    "king": "君主", "emperor": "皇帝", "court": "朝堂", "official": "官员",
+    "officials": "官员", "bureaucracy": "官僚", "govern": "治理", "governance": "治理",
+    "admin": "内政", "administration": "内政", "affairs": "事务", "affair": "事务",
+    "domestic": "家庭", "life": "生活", "world": "世界", "view": "观",
+    "management": "管理", "tasks": "任务", "task": "任务", "internal": "内部",
+    "external": "外部", "public": "公开", "secret": "隐秘", "open": "明面",
+    "taboo": "禁忌", "red": "红线", "line": "线", "lines": "线", "defense": "防御",
+    "offense": "进攻", "attack": "攻击", "counter": "反制", "resist": "抵抗",
+    "weakness": "弱点", "strength": "优势", "advantage": "优势", "disadvantage": "劣势",
+    "reward": "奖励", "punishment": "惩罚", "penalty": "惩罚", "bonus": "加成",
+    "attribute": "属性", "attributes": "属性", "stat": "数值", "stats": "数值",
+    "effect": "效果", "effects": "效果", "buff": "增益", "debuff": "减益",
+    "heal": "治疗", "damage": "伤害", "defense": "防御", "armor": "护甲",
+    "speed": "速度", "agility": "敏捷", "intelligence": "智力", "wisdom": "智慧",
+    "strength": "力量", "constitution": "体质", "luck": "幸运", "charm": "魅力",
+    "weight": "权重", "ratio": "比例", "rate": "比率", "count": "数量",
+    "number": "数量", "amount": "数量", "total": "总计", "max": "上限", "min": "下限",
+    "average": "平均", "sum": "总和", "first": "第一", "last": "最后",
+    "early": "前期", "mid": "中期", "late": "后期", "begin": "开始", "end": "结束",
+    "open": "开局", "middle": "中段", "final": "结局", "stage": "阶段", "stages": "阶段",
+    "progress": "进度", "process": "流程", "flow": "流程", "chain": "链路",
+    "route": "路线", "routes": "路线", "branch": "分支", "tree": "树", "trees": "树",
+    "module": "模块", "component": "组件", "part": "部分", "section": "部分",
+    "chapter": "章节", "chapters": "章节", "volume": "卷", "volumes": "卷",
+    "word": "字", "words": "字", "count": "数", "ratio": "比", "three": "三",
+    "second": "秒", "contrast": "对比", "chase": "追", "wife": "妻", "face": "打脸",
+    "slap": "打脸", "slapping": "打脸", "rebirth": "重生", "revenge": "复仇",
+    "story": "故事", "rising": "高潮", "face": "打脸", "setup": "铺垫",
+    # 补充段（复合 key 常用组成部分）
+    "with": "与", "past": "过去", "present": "当下", "cause": "成因", "effect": "影响",
+    "human": "人类", "framework": "框架", "frameworks": "框架", "ranks": "品级",
+    "relationships": "关系", "dilemmas": "困境", "mystery": "悬疑", "potential": "潜在",
+    "suspense": "悬念", "manifestation": "显现", "eighties": "八十年代", "nineties": "九十年代",
+    "sixties": "六十年代", "seventies": "七十年代", "middle": "中期", "options": "选项",
+    "settings": "设定", "rarity": "稀有度", "items": "物件", "situations": "处境",
+    "historical": "历史", "periods": "时期", "period": "时期", "training": "训练",
+    "esports": "电竞", "ecology": "生态", "formula": "套路", "formulas": "套路",
+    "points": "要点", "career": "职业", "dimensions": "维度", "issues": "议题",
+    "meaning": "含义", "emotional": "情感", "positions": "岗位", "during": "直播中",
+    "pre": "直播前", "post": "直播后", "rhythm": "节奏", "roles": "角色",
+    "templates": "模板", "openings": "开篇", "hooks": "钩子", "management": "管理",
+    "pillars": "支柱", "work": "工作", "agency": "机构", "agencies": "机构",
+    "society": "社会", "triangle": "三角", "transformation": "转变", "stages": "阶段",
+    "plot": "剧情", "scene": "场景", "function": "职能", "boss": "霸总",
+    "president": "总裁", "sweet": "甜宠", "pain": "虐点", "triggers": "触发",
+    "asset": "资产", "scale": "规模", "anomaly": "异常", "hierarchy": "层级",
+    "identities": "身份", "complexity": "复杂性", "origin": "起源", "trait": "特质",
+    "evolution": "进化", "promotion": "晋升", "workplace": "职场", "paths": "路径",
+    "family": "家族", "domestic": "家庭", "life": "生活", "worldview": "世界观",
+    "power": "实力", "management": "管理", "alien": "外星", "forms": "形态",
+    "suspect": "嫌疑人", "trick": "骗术", "core": "核心", "contract": "契约",
+    "clauses": "条款", "duration": "期限", "reason": "原因", "status": "地位",
+    "harem": "后宫", "secret": "秘术", "open": "明面", "taboo": "禁忌",
+    "red": "红线", "lines": "线", "defense": "防御", "methods": "方式",
+    "development": "发展", "ending": "结局", "features": "特点", "opponent": "对手",
+    "relation": "关系", "elements": "要素", "success": "成功", "factors": "因素",
+    "opportunities": "机遇", "economy": "经济", "politics": "政治", "marriage": "婚姻",
+    "era": "时代", "eras": "时代", "angle": "角度", "issue": "议题", "note": "说明",
+    "handling": "处理", "dilemma": "困境", "school": "学派", "energy": "能量",
+    "field": "领域", "means": "手段", "games": "博弈", "explicit": "显性",
+    "interaction": "互动", "attitude": "态度", "drive": "驱动力", "realm": "境界",
+    "usage": "运用", "acquisition": "获取", "domain": "领域", "agriculture": "农业",
+    "commerce": "商贸", "industry": "产业", "military": "军事", "atmosphere": "氛围",
+    "categories": "类别", "recovery": "恢复", "impact": "影响", "advancement": "晋升",
+    "characters": "角色", "scenes": "场景", "lifespan": "寿命", "nature": "本质",
+    "people": "人群", "affection": "情感羁绊", "cooldown": "冷却", "threat": "威胁",
+    "analysis": "分析", "collection": "收集", "emotion": "情感", "bond": "羁绊",
+    "race": "种族", "danger": "危险", "obvious": "显性", "hidden": "隐性",
+    "misleading": "误导", "percentage": "占比", "reveal": "揭示", "layer": "层级",
+    "intelligence": "情报", "daily": "日常", "prevention": "防范", "emergency": "紧急",
+    "response": "应对", "transmission": "传递", "counter": "反制", "key": "关键",
+    "team": "团队", "teams": "队伍", "dimension": "维度", "game": "游戏",
+    "matches": "比赛", "victory": "胜利", "league": "联赛", "early": "前期",
+    "mid": "中期", "late": "后期", "growth": "成长", "content": "内容",
+    "institution": "机构", "building": "建设", "talent": "天赋", "task": "任务",
+    "internal": "内部", "affairs": "事务", "view": "观", "world": "世界",
+    "conflicts": "冲突", "mechanics": "机制", "background": "背景",
+    "information": "信息", "manifestation": "显现", "suspense": "悬念", "treatment": "处理",
+    "society": "社会", "work": "工作", "agency": "机构", "female": "女性", "male": "男性",
+    "middle": "中期", "rarity": "稀有度", "period": "时期", "bp": "扳选",
+    "training": "训练", "importance": "重要性", "income": "收入", "responsibility": "职责",
+    "formula": "套路", "formulas": "套路", "steps": "步骤", "dimensions": "维度",
+    "expression": "表达", "solution": "方案", "during": "直播中", "pre": "直播前",
+    "strategy": "策略", "inheritance": "继承", "probability": "概率", "quality": "资质",
+    "changeable": "可变", "difficult": "困难", "unchangeable": "不可变",
+    "time": "时代", "white": "白", "moon": "月光", "stand": "替", "in": "身",
+    "ten": "十", "importance": "重要性", "income": "收入", "responsibility": "职责",
+}
+
+
+def _genre_compound_label(key: str) -> str:
+    """复合 key 分词翻译：female_archetypes → 女性原型；无法全段命中则返回原名。
+
+    词段先查分词表，再回落通用字段表（两表常用词有重叠，回落避免漏翻）。
+    """
+    segments = str(key).split("_")
+    if len(segments) < 2:
+        return str(key)
+    parts = []
+    for seg in segments:
+        zh = _GENRE_WORD_SEGMENT_LABELS.get(seg) or _GENRE_COMMON_FIELD_LABELS.get(seg)
+        if not zh:
+            return str(key)  # 任一段未命中即放弃（避免拼出错误语义）
+        parts.append(zh)
+    return "".join(parts)
+
+
+def _genre_field_label(part_name: str, key: str) -> str:
+    """取题材部分的字段中文标签：part 映射 → 通用映射 → 复合分词 → 原 key 兜底。"""
+    labels = _GENRE_PART_FIELD_LABELS.get(part_name) or {}
+    if key in labels:
+        return labels[key]
+    if key in _GENRE_COMMON_FIELD_LABELS:
+        return _GENRE_COMMON_FIELD_LABELS[key]
+    compound = _genre_compound_label(key)
+    return compound if compound != str(key) else str(key)
+
+
+def _genre_entry_label(part_name: str, key: str) -> str:
+    """取 list[dict] 条目内部字段的标签（先查条目级覆盖，再回落字段映射）。"""
+    entries = _GENRE_PART_ENTRY_LABELS.get(part_name) or {}
+    if key in entries:
+        return entries[key]
+    return _genre_field_label(part_name, key)
+
+
+def _genre_scalar_text(value) -> str:
+    """标量值 → 文本。"""
+    if isinstance(value, bool):
+        return "是" if value else "否"
+    return str(value)
+
+
+def _genre_list_text(part_name: str, items, prefix: str = "") -> str:
+    """list 渲染：全标量 → 顿号一行；含 dict → 每元素一行 '- 条目'。"""
+    if not items:
+        return ""
+    if all(not isinstance(it, (dict, list)) for it in items):
+        vals = [_genre_scalar_text(it) for it in items if it not in (None, "")]
+        return f"{prefix}{'、'.join(vals)}" if vals else ""
+    lines = []
+    for it in items:
+        if isinstance(it, dict):
+            parts = []
+            for k, v in it.items():
+                if v in (None, ""):
+                    continue
+                if isinstance(v, (dict, list)):
+                    continue  # 嵌套结构由子小节承接，条目内只放标量
+                parts.append(f"{_genre_entry_label(part_name, k)}：{_genre_scalar_text(v)}")
+            if parts:
+                lines.append(f"{prefix}- {' ｜ '.join(parts)}")
+        elif isinstance(it, list):
+            sub = _genre_list_text(part_name, it, prefix=f"{prefix}  ")
+            if sub:
+                lines.append(sub)
+        else:
+            if it not in (None, ""):
+                lines.append(f"{prefix}- {_genre_scalar_text(it)}")
+    return "\n".join(lines)
+
+
+def _genre_dict_text(part_name: str, d: dict, prefix: str = "") -> str:
+    """dict 渲染：标量值 → '标签：值'；list 值 → 子小节+条目；嵌套 dict → 递归。"""
+    lines = []
+    for k, v in d.items():
+        if v in (None, ""):
+            continue
+        label = _genre_field_label(part_name, k)
+        if isinstance(v, dict):
+            sub = _genre_dict_text(part_name, v, prefix=f"{prefix}  ")
+            if sub:
+                lines.append(f"{prefix}{label}：")
+                lines.append(sub)
+        elif isinstance(v, list):
+            if not v:
+                continue
+            if all(not isinstance(it, (dict, list)) for it in v):
+                vals = [_genre_scalar_text(it) for it in v if it not in (None, "")]
+                if vals:
+                    lines.append(f"{prefix}{label}：{'、'.join(vals)}")
+            else:
+                sub = _genre_list_text(part_name, v, prefix=f"{prefix}  ")
+                if sub:
+                    lines.append(f"{prefix}{label}：")
+                    lines.append(sub)
+        else:
+            lines.append(f"{prefix}{label}：{_genre_scalar_text(v)}")
+    return "\n".join(lines)
+
+
+def format_genre_part_text(part_name: str, part_data) -> str:
+    """将题材模板指定部分（dict/list/str）渲染为易读文本。
+
+    替代 json.dumps 直接注入：字段带中文标签、列表分条、去除 JSON 符号噪声。
+    空结构返回 ""（沿用"空区块不渲染"语义）。
+    """
+    if part_data is None:
+        return ""
+    if isinstance(part_data, str):
+        return part_data if part_data.strip() else ""
+    if isinstance(part_data, list):
+        return _genre_list_text(part_name, part_data)
+    if isinstance(part_data, dict):
+        return _genre_dict_text(part_name, part_data)
+    return str(part_data) if part_data else ""
+
+
 def _sanitize_value(value, default=""):
     """将LLM返回的值转换为SQLite支持的类型（str/int/float/None）。"""
     if value is None:
@@ -244,6 +681,18 @@ class InitExecutor(BaseExecutor):
             return json.dumps(part_data, ensure_ascii=False)
         else:
             return str(part_data) if part_data else ""
+
+    def _get_genre_template_part_text(
+        self, genre_template: Dict[str, Any], part_name: str,
+    ) -> str:
+        """获取题材模板指定部分，渲染为易读文本（替代 JSON 注入）。
+
+        用于世界观/力量体系/金手指参考/角色指南等知识性区块：
+        字段带中文标签、列表分条、去除 JSON 符号噪声，提升 LLM 参考效率。
+        """
+        if not genre_template:
+            return ""
+        return format_genre_part_text(part_name, genre_template.get(part_name))
 
     def _load_csv_knowledge_text(self, table_name: str, genre: str, header: str = "") -> str:
         """从 CSV 知识表按题材加载知识并格式化为直接注入文本。
@@ -455,11 +904,11 @@ class InitExecutor(BaseExecutor):
                 "worldview": DictObj({}),
                 "world": DictObj({}),
                 "genre_core_selling_points": self._get_genre_template_part(genre_json_template, "core_selling_points"),
-                "genre_worldview": self._get_genre_template_part(genre_json_template, "worldview"),
-                "genre_power_system": self._get_genre_template_part(genre_json_template, "power_system"),
+                "genre_worldview": self._get_genre_template_part_text(genre_json_template, "worldview"),
+                "genre_power_system": self._get_genre_template_part_text(genre_json_template, "power_system"),
                 "genre_outline_structure": self._get_genre_template_part(genre_json_template, "outline_structure"),
-                "genre_character_guidelines": self._get_genre_template_part(genre_json_template, "character_guidelines"),
-                "genre_golden_finger_guidelines": self._get_genre_template_part(genre_json_template, "golden_finger_guidelines"),
+                "genre_character_guidelines": self._get_genre_template_part_text(genre_json_template, "character_guidelines"),
+                "genre_golden_finger_guidelines": self._get_genre_template_part_text(genre_json_template, "golden_finger_guidelines"),
                 "genre_story_rules": self._get_genre_template_part(genre_json_template, "story_rules"),
                 "genre_subgenres": self._get_genre_template_part(genre_json_template, "subgenres"),
                 "genre_creative_constraints": self._get_genre_template_part(genre_json_template, "creative_constraints"),
