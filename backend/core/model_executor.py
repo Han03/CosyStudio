@@ -19,6 +19,16 @@ from utils.logger import log_manager
 
 _logger = log_manager.get_logger("model_executor")
 
+# 云端模型最大输出 token 上限（内置兜底；优先读能力配置 max_output_tokens）。
+# 依据实测：qwen-plus-2025-01-25 上限 8192（超限返回 200 但空流），
+# glm-5.1 第 1 章实测输出 12819 token 正常，给 12800 安全余量。
+_MODEL_MAX_OUTPUT_DEFAULTS = {
+    ("aliyun", "qwen-plus"): 8192,
+    ("aliyun", "qwen-plus-2025-01-25"): 8192,
+    ("zhipu", "glm-5.1"): 12800,
+    ("aliyun", "glm-5.1"): 12800,
+}
+
 
 def _probe_json_parse(raw: str) -> bool:
     """轻量探测输出是否为合法 JSON 对象（去 markdown 围栏后）。
@@ -710,6 +720,22 @@ class ModelExecutor:
                     _logger.error(f"HTTP请求网络错误，已重试{max_retries}次仍失败: {type(e).__name__}: {e}")
         raise last_error
 
+    def _resolve_max_output_limit(self, platform_code: str, model_code: str):
+        """解析模型最大输出 token 上限。
+
+        优先级：model_capabilities 中该能力配置的 max_output_tokens →
+        内置默认映射（按平台/模型）→ None（不限制）。
+        用于把调用方 max_tokens clamp 到模型真实上限，避免超限空流。
+        """
+        from core.config_manager import get_model_capabilities
+        caps = get_model_capabilities().get("text_predict", [])
+        for c in caps:
+            if (c.get("platform_code") == platform_code
+                    and c.get("model_code") == model_code
+                    and c.get("max_output_tokens")):
+                return int(c["max_output_tokens"])
+        return _MODEL_MAX_OUTPUT_DEFAULTS.get((platform_code, model_code))
+
     async def _call_cloud_text_predict(
         self,
         platform_code: str,
@@ -755,9 +781,12 @@ class ModelExecutor:
         # 🔴 流式请求必须显式要求返回 usage，否则 OpenAI 兼容 API 默认不在 SSE 中返回 token 统计
         if stream:
             payload["stream_options"] = {"include_usage": True}
-        # 🔴 调用方指定的 max_tokens 必须传递给云端 API，否则输出会被模型默认值截断
+        # 🔴 调用方指定的 max_tokens 必须传递给云端 API，否则输出会被模型默认值截断；
+        #    但不得超过该模型的最大输出上限（超限时部分 OpenAI 兼容 API 返回 200 但空流，
+        #    如 qwen-plus 上限 8192，曾导致草稿润色阶段空输出）
         if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
+            cap_max = self._resolve_max_output_limit(platform_code, model_code)
+            payload["max_tokens"] = min(max_tokens, cap_max) if cap_max else max_tokens
         
         # 带重试的HTTP连接（处理 getaddrinfo failed 等瞬时网络错误）
         client = httpx.AsyncClient(timeout=60.0)
