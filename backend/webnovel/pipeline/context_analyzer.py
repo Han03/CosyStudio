@@ -439,9 +439,9 @@ class ContextAnalyzer:
             if not chars:
                 return ""
             # 热点：仅主角+核心角色前 4（env 已按主角优先排序）；其他角色用查询
-            # id= 前缀显式标注引用键（= structured_refs.ids），与资源序号区分
+            # 主次结构：名字（类型）为主，id= 为引用键辅助，— 后为详情
             return "\n".join(
-                f"    id={c.get('id')} {c.get('name')}（{c.get('type')}）— {c.get('summary', '')[:40]}"
+                f"    - {c.get('name')}（{c.get('type')}）id={c.get('id')} — {c.get('summary', '')[:40]}"
                 for c in chars[:4]
             )
         if res_name == "foreshadow":
@@ -454,9 +454,9 @@ class ContextAnalyzer:
                 tier_rank.get(str(f.get("tier", "")), 9),
                 -(f.get("planted_chapter") or 0),
             ))
-            # id= 前缀显式标注引用键（= structured_refs.ids）
+            # 主次结构：tier 标签 + 内容为主，id= 为引用键辅助，埋设章为定位信息
             return "\n".join(
-                f"    id={f.get('id')} [{f.get('tier', '')}] {f.get('content', '')[:40]} "
+                f"    - [{f.get('tier', '')}] {f.get('content', '')[:40]} id={f.get('id')} "
                 f"（第{f.get('planted_chapter') or 0}章埋下）"
                 for f in loops[:4]
             )
@@ -491,7 +491,8 @@ class ContextAnalyzer:
             cg_members = cg.get('members_summary', '') or ''
             if not cg_name and not cg_goal and not cg_members:
                 return ""
-            return f"    - {cg_name}: 共同目标 {cg_goal[:30]} | 成员: {cg_members[:30]}"
+            head = f"{cg_name}: " if cg_name else ""
+            return f"    - {head}共同目标 {cg_goal[:30]} | 成员: {cg_members[:30]}"
         if res_name == "previous_chapter":
             chapters = inventory.get("previous_chapters", [])
             if not chapters:
@@ -500,7 +501,7 @@ class ContextAnalyzer:
             # 热点：仅最近 2 章（承接锚点）；更早章节用 chapter_index/查询
             window = chapters[-2:]
             lines = [
-                f"    第{ch.get('index')}章 — {str(ch.get('summary', '')).replace(chr(10), ' ')[:60]}"
+                f"    - 第{ch.get('index')}章 — {str(ch.get('summary', '')).replace(chr(10), ' ')[:60]}"
                 for ch in window
             ]
             if len(chapters) > len(window):
