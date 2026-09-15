@@ -14,6 +14,7 @@ structured_refs 选择，通过本注册表加载并渲染区块，统一组装 
 """
 
 import json
+import re
 from typing import Any, Dict, List, Optional
 
 from utils.logger import log_manager
@@ -355,6 +356,64 @@ def _build_card_enriched(card: dict, project_id: int, items_by_char: dict) -> di
     }
 
 
+def _keyword_tokens(keyword: str) -> List[str]:
+    """keyword 拆 token：英文/数字按空白与符号切分；中文整串 + 2-gram 滑窗。
+
+    让自然语言短语（如「青元宗选拔测试」）能拆出「测试」「选拔」等可命中词。
+    长 token 优先（更具体），返回去重列表。
+    """
+    tokens = set()
+    for part in re.split(r'[\s,，。;；:：、()（）!！?？/\\|]+', str(keyword)):
+        part = part.strip()
+        if not part:
+            continue
+        if re.search(r'[A-Za-z0-9]', part):
+            tokens.add(part)
+            tokens.add(part.lower())
+        else:
+            tokens.add(part)
+            if len(part) >= 2:
+                for i in range(len(part) - 1):
+                    tokens.add(part[i:i + 2])
+    return sorted(tokens, key=len, reverse=True)
+
+
+def _keyword_filter(rows: list, keyword, fields: List[str]) -> list:
+    """keyword 模糊过滤：整串命中任一字段优先；否则 token 任一命中任一字段，按命中数降序。
+
+    修复整串子串匹配对自然语言短语 miss 的问题（如「青元宗选拔测试」vs 剧情点「悟性测试」）。
+    list 字段（如 characters）自动 join 后参与匹配。
+    """
+    kw = str(keyword or "").strip()
+    if not kw:
+        return rows
+    fields = [f for f in fields if f]
+    if not fields:
+        return rows
+    text_of = {}
+    for r in rows:
+        parts = []
+        for f in fields:
+            v = r.get(f)
+            if isinstance(v, list):
+                v = ",".join(str(x) for x in v)
+            if v is not None:
+                parts.append(str(v))
+        text_of[id(r)] = " ".join(parts)
+    exact = [r for r in rows if kw in text_of[id(r)]]
+    if exact:
+        return exact
+    tokens = _keyword_tokens(kw)
+    scored = []
+    for r in rows:
+        t = text_of[id(r)]
+        hits = sum(1 for tok in tokens if tok in t)
+        if hits:
+            scored.append((hits, r))
+    scored.sort(key=lambda x: -x[0])
+    return [r for _, r in scored]
+
+
 def _query_character_cards(ref, env):
     """按 filters 检索角色卡：type（中文/英文）/keyword（name/identity/personality）/ids。"""
     filters = ref.get("filters") or {}
@@ -372,10 +431,10 @@ def _query_character_cards(ref, env):
         cards = [c for c in cards if str(c.get("id")) in id_set]
     keyword = filters.get("keyword")
     if keyword:
-        kw = str(keyword)
-        cards = [c for c in cards if kw in str(c.get("name", ""))
-                 or kw in str(c.get("identity", ""))
-                 or kw in str(c.get("core_personality", ""))]
+        cards = _keyword_filter(
+            cards, keyword,
+            ["name", "identity", "core_personality", "core_tags",
+             "protagonist_relation", "starting_state"])
     if not cards:
         return []
     try:
@@ -407,7 +466,9 @@ def _query_character_states(ref, env):
         states = [s for s in states if str(s.get("character_id")) == str(cid)]
     keyword = filters.get("keyword")
     if keyword:
-        states = [s for s in states if str(keyword) in str(s.get("state_summary", ""))]
+        states = _keyword_filter(
+            states, keyword,
+            ["character_name", "location", "state_summary", "emotion", "notes"])
     return states[:limit]
 
 
@@ -430,7 +491,7 @@ def _query_foreshadows(ref, env):
         loops = [l for l in loops if (l.get("planted_chapter") or 0) <= safe_int(chapter)]
     keyword = filters.get("keyword")
     if keyword:
-        loops = [l for l in loops if str(keyword) in str(l.get("content", ""))]
+        loops = _keyword_filter(loops, keyword, ["content", "tier"])
     return loops[:limit]
 
 
@@ -477,8 +538,7 @@ def _query_items(ref, env):
                 or str(char) in str(r.get("character_name", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in str(r.get("item_name", ""))
-                or str(keyword) in str(r.get("change_note", ""))]
+        rows = _keyword_filter(rows, keyword, ["item_name", "change_note", "source"])
     only_held = filters.get("only_held", True)
     if only_held:
         rows = [r for r in rows if r.get("status") != "lost"]
@@ -515,8 +575,8 @@ def _query_character_relationships(ref, env):
         rows = [r for r in rows if str(rel_type) in str(r.get("relation_type", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("target_name", "")) + str(r.get("description", "")))]
+        rows = _keyword_filter(
+            rows, keyword, ["target_name", "description", "relation_type"])
     for r in rows:
         r["character_name"] = name_by_id.get(r.get("character_id"), "")
     return rows[:limit]
@@ -541,8 +601,7 @@ def _query_character_growth(ref, env):
         rows = [r for r in rows if str(r.get("character_id")) == str(cid)]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("stage", "")) + str(r.get("description", "")))]
+        rows = _keyword_filter(rows, keyword, ["stage", "description"])
     rows.sort(key=lambda r: r.get("source_chapter") or 0)
     for r in rows:
         r["character_name"] = name_by_id.get(r.get("character_id"), "")
@@ -579,7 +638,8 @@ def _query_chapter_plots(ref, env):
         rows = [r for r in rows if str(emotion) in str(r.get("emotion", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in str(r.get("description", ""))]
+        rows = _keyword_filter(
+            rows, keyword, ["scene", "description", "characters", "emotion"])
     rows.sort(key=lambda r: (r.get("chapter_index") or 0, r.get("plot_order") or 0))
     return rows[:limit]
 
@@ -602,8 +662,9 @@ def _query_chapter_plans(ref, env):
         rows = [r for r in rows if (r.get("chapter_index") or 0) == safe_int(ch)]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("summary", "")) + str(r.get("key_events", "")))]
+        rows = _keyword_filter(
+            rows, keyword,
+            ["chapter_title", "summary", "key_events", "chapter_hook", "chapter_goal"])
     rows.sort(key=lambda r: r.get("chapter_index") or 0)
     return rows[:limit]
 
@@ -622,8 +683,9 @@ def _query_volume_outlines(ref, env):
         rows = [r for r in rows if (r.get("volume_number") or 0) == safe_int(vol)]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("core_conflict", "")) + str(r.get("volume_climax", "")))]
+        rows = _keyword_filter(
+            rows, keyword,
+            ["volume_name", "core_conflict", "volume_climax", "key_foreshadowing"])
     rows.sort(key=lambda r: r.get("volume_number") or 0)
     return rows[:limit]
 
@@ -639,9 +701,9 @@ def _query_chapter_metas(ref, env):
         rows = [r for r in rows if (r.get("chapter_number") or 0) == safe_int(ch)]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("hook_content", "")) + str(r.get("ending_emotion", ""))
-                 + str(r.get("ending_location", "")))]
+        rows = _keyword_filter(
+            rows, keyword,
+            ["hook_content", "ending_emotion", "ending_location", "opening_pattern"])
     rows.sort(key=lambda r: r.get("chapter_number") or 0)
     return rows[:limit]
 
@@ -660,7 +722,7 @@ def _query_cool_points(ref, env):
         rows = [r for r in rows if str(ctype) in str(r.get("cool_point_type", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in str(r.get("content", ""))]
+        rows = _keyword_filter(rows, keyword, ["content", "cool_point_type"])
     rows.sort(key=lambda r: r.get("chapter_number") or 0)
     return rows[:limit]
 
@@ -694,8 +756,8 @@ def _query_villains(ref, env):
             (n.get("chapter") or 0) == safe_int(ch) for n in get_villain_plot_nodes(v.get("id")))]
     keyword = filters.get("keyword")
     if keyword:
-        villains = [v for v in villains if str(keyword) in
-                    (str(v.get("name", "")) + str(v.get("core_desire", "")))]
+        villains = _keyword_filter(
+            villains, keyword, ["name", "identity", "core_desire", "core_fear", "power_level"])
     rows = []
     for v in villains[:limit]:
         rows.append({**v, "hierarchy": get_villain_hierarchy(v.get("id")) or [],
@@ -714,8 +776,7 @@ def _query_plot_threads(ref, env):
         rows = [r for r in rows if str(tt) in str(r.get("thread_type", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("content", "")) + str(r.get("status", "")))]
+        rows = _keyword_filter(rows, keyword, ["content", "status", "thread_type"])
     rows.sort(key=lambda r: (r.get("thread_type", "") == "主线", r.get("chapter") or 0))
     return rows[:limit]
 
@@ -734,7 +795,7 @@ def _query_worldview_history(ref, env):
         rows = [r for r in rows if str(era) in str(r.get("era", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in str(r.get("event", ""))]
+        rows = _keyword_filter(rows, keyword, ["event", "era"])
     rows.sort(key=lambda r: r.get("id") or 0)
     return rows[:limit]
 
@@ -753,8 +814,7 @@ def _query_worldview_settings(ref, env):
         rows = [r for r in rows if str(category) in str(r.get("category", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("name", "")) + str(r.get("content", "")))]
+        rows = _keyword_filter(rows, keyword, ["name", "content", "category"])
     rows.sort(key=lambda r: (r.get("chapter_number") or 0))
     return rows[:limit]
 
@@ -780,9 +840,8 @@ def _query_setting_changes(ref, env):
         rows = [r for r in rows if str(r.get("entity_id")) == str(eid)]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("before_data", "")) + str(r.get("after_data", ""))
-                 + str(r.get("change_type", "")))]
+        rows = _keyword_filter(
+            rows, keyword, ["before_data", "after_data", "change_type", "entity_type"])
     return rows[:limit]
 
 
@@ -803,9 +862,8 @@ def _query_timeline_chapters(ref, env):
         rows = [r for r in rows if (r.get("chapter_number") or 0) == safe_int(ch)]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("time_anchor", "")) + str(r.get("notes", ""))
-                 + str(r.get("countdown_status", "")))]
+        rows = _keyword_filter(
+            rows, keyword, ["time_anchor", "notes", "countdown_status"])
     rows.sort(key=lambda r: (r.get("chapter_number") or 0))
     return rows[:limit]
 
@@ -832,8 +890,7 @@ def _query_golden_finger_progress(ref, env):
                      "description": fb.get("description", "")})
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("title", "")) + str(r.get("description", "")))]
+        rows = _keyword_filter(rows, keyword, ["title", "description"])
     return rows[:limit]
 
 
@@ -851,8 +908,8 @@ def _query_power_levels(ref, env):
         rows = [r for r in rows if str(ln) in str(r.get("level_name", ""))]
     keyword = filters.get("keyword")
     if keyword:
-        rows = [r for r in rows if str(keyword) in
-                (str(r.get("core_abilities", "")) + str(r.get("breakthrough_method", "")))]
+        rows = _keyword_filter(
+            rows, keyword, ["level_name", "core_abilities", "breakthrough_method"])
     rows.sort(key=lambda r: r.get("level_order") or 0)
     return rows[:limit]
 
