@@ -255,11 +255,16 @@ async def answer_question(script_id: int, question: str) -> Dict[str, Any]:
         if not answer:
             return {"success": False, "answer": "", "error": "生成结果为空"}
 
-        # ④ 来源标注：rag 片段 + 结构化资源
+        # ④ 来源标注：rag 片段 + 结构化资源（同一类型+章节的 rag 片段去重）
         rag_results = step_ctx.get("rag_results") or []
         selection = step_ctx.get("_selection") or {}
         sources: List[Dict[str, Any]] = []
+        seen_sources = set()
         for c in rag_results:
+            key = ("rag", c.get("chunk_type", ""), c.get("chapter_number", 0))
+            if key in seen_sources:
+                continue
+            seen_sources.add(key)
             sources.append({
                 "type": "rag",
                 "chunk_type": c.get("chunk_type", ""),
@@ -268,9 +273,17 @@ async def answer_question(script_id: int, question: str) -> Dict[str, Any]:
             })
         for ref in (selection.get("structured_refs") or []):
             if isinstance(ref, dict) and ref.get("resource"):
+                key = ("state", ref["resource"], 0)
+                if key in seen_sources:
+                    continue
+                seen_sources.add(key)
                 sources.append({"type": "state", "resource": ref["resource"]})
         for q in (selection.get("structured_queries") or []):
             if isinstance(q, dict) and q.get("resource"):
+                key = ("state_query", q["resource"], 0)
+                if key in seen_sources:
+                    continue
+                seen_sources.add(key)
                 sources.append({"type": "state_query", "resource": q["resource"]})
 
         return {
