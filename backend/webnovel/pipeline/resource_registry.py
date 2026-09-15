@@ -24,11 +24,19 @@ from webnovel.repositories import (
     get_character_items_by_project,
     get_character_relationships,
     get_open_loops_by_project,
+    get_chapter_plots_by_project,
+    get_all_chapter_plans_for_project,
+    get_cool_points_by_project,
+    get_villains_by_project,
+    get_villain_hierarchy,
+    get_villain_plot_nodes,
     get_worldview_by_project, get_worldview_factions,
     get_power_system_by_project,
     get_golden_finger_by_project,
     get_character_group_by_project, get_character_group_members,
     get_timelines_by_project, get_timeline_chapters,
+    get_volume_outlines_by_project,
+    get_chapter_meta_list,
 )
 from repositories.base_repository import safe_int
 from webnovel.repositories.character_state_repository import (
@@ -365,7 +373,7 @@ def _query_character_cards(ref, env):
 
 
 def _query_character_states(ref, env):
-    """按 filters 检索角色状态：chapter（指定章）/name/keyword。"""
+    """按 filters 检索角色状态：character（角色名，主）/chapter/name（兼容）/keyword；character_id 辅助。"""
     filters = ref.get("filters") or {}
     limit = ref.get("limit", 5)
     project_id = env["project_id"]
@@ -375,7 +383,7 @@ def _query_character_states(ref, env):
     else:
         # 未指定章 → 最近一章状态（与写作侧"上章末状态"一致）
         states = get_character_states_before_chapter(project_id, 10 ** 9) or []
-    name = filters.get("name")
+    name = filters.get("character") or filters.get("name")
     if name:
         states = [s for s in states if str(name) in str(s.get("character_name", ""))]
     cid = filters.get("character_id")
@@ -434,7 +442,7 @@ def _query_timeline(ref, env):
 
 
 def _query_items(ref, env):
-    """按 filters 检索角色物品：character（角色名/id）/keyword（物品名/变更说明）。"""
+    """按 filters 检索角色物品：character（角色名，主）/keyword（物品名/变更说明）。"""
     filters = ref.get("filters") or {}
     limit = ref.get("limit", 10)
     project_id = env["project_id"]
@@ -459,6 +467,224 @@ def _query_items(ref, env):
     if only_held:
         rows = [r for r in rows if r.get("status") != "lost"]
     return rows[:limit]
+
+
+def _project_cards_map(project_id: int):
+    """项目角色卡 id↔name 映射（供无 project_id 的表按项目过滤）。"""
+    cards = get_character_cards_by_project(project_id) or []
+    return {c["id"] for c in cards}, {c["id"]: c.get("name", "") for c in cards}
+
+
+def _query_character_relationships(ref, env):
+    """角色事实关系：character（角色名，任一端，主）/relation_type/keyword；character_id 辅助。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    ids, name_by_id = _project_cards_map(project_id)
+    from repositories.base_repository import _get_conn
+    conn = _get_conn()
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM webnovel_character_relationship").fetchall()]
+    rows = [r for r in rows if r.get("character_id") in ids]  # 本项目角色
+    char = filters.get("character")
+    if char:
+        rows = [r for r in rows
+                if str(char) in name_by_id.get(r.get("character_id"), "")
+                or str(char) in str(r.get("target_name", ""))]
+    cid = filters.get("character_id")
+    if cid is not None:
+        rows = [r for r in rows if str(r.get("character_id")) == str(cid)]
+    rel_type = filters.get("relation_type")
+    if rel_type:
+        rows = [r for r in rows if str(rel_type) in str(r.get("relation_type", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("target_name", "")) + str(r.get("description", "")))]
+    for r in rows:
+        r["character_name"] = name_by_id.get(r.get("character_id"), "")
+    return rows[:limit]
+
+
+def _query_character_growth(ref, env):
+    """角色成长弧：character（角色名，主）/keyword（阶段·描述）；character_id 辅助。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    ids, name_by_id = _project_cards_map(project_id)
+    from repositories.base_repository import _get_conn
+    conn = _get_conn()
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM webnovel_character_growth").fetchall()]
+    rows = [r for r in rows if r.get("character_id") in ids]
+    char = filters.get("character")
+    if char:
+        rows = [r for r in rows if str(char) in name_by_id.get(r.get("character_id"), "")]
+    cid = filters.get("character_id")
+    if cid is not None:
+        rows = [r for r in rows if str(r.get("character_id")) == str(cid)]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("stage", "")) + str(r.get("description", "")))]
+    rows.sort(key=lambda r: r.get("source_chapter") or 0)
+    for r in rows:
+        r["character_name"] = name_by_id.get(r.get("character_id"), "")
+    return rows[:limit]
+
+
+def _query_chapter_plots(ref, env):
+    """历史剧情点：chapter/scene/characters/emotion/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 6)
+    project_id = env["project_id"]
+    ch_groups = get_chapter_plots_by_project(project_id) or []
+    # repo 返回按章嵌套：展平 [{chapter_index, plot_list}]
+    rows = []
+    for g in ch_groups:
+        ch = g.get("chapter_index") or 0
+        for p in g.get("plot_list") or []:
+            row = dict(p)
+            row["chapter_index"] = ch
+            row["plot_order"] = len(rows)
+            rows.append(row)
+    ch = filters.get("chapter")
+    if ch is not None:
+        rows = [r for r in rows if (r.get("chapter_index") or 0) == safe_int(ch)]
+    scene = filters.get("scene")
+    if scene:
+        rows = [r for r in rows if str(scene) in str(r.get("scene", ""))]
+    chars = filters.get("characters")
+    if chars:
+        rows = [r for r in rows if str(chars) in ",".join(
+            r.get("characters") if isinstance(r.get("characters"), list) else [str(r.get("characters", ""))])]
+    emotion = filters.get("emotion")
+    if emotion:
+        rows = [r for r in rows if str(emotion) in str(r.get("emotion", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in str(r.get("description", ""))]
+    rows.sort(key=lambda r: (r.get("chapter_index") or 0, r.get("plot_order") or 0))
+    return rows[:limit]
+
+
+def _query_chapter_plans(ref, env):
+    """历史章节规划：chapter/keyword（摘要·关键事件）。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    vol_rows = get_all_chapter_plans_for_project(project_id) or []
+    # repo 返回按卷嵌套：展平 [{volume_number, chapter_plans: [...]}]
+    rows = []
+    for vol in vol_rows:
+        for p in vol.get("chapter_plans") or []:
+            row = dict(p)
+            row["volume_number"] = vol.get("volume_number")
+            rows.append(row)
+    ch = filters.get("chapter")
+    if ch is not None:
+        rows = [r for r in rows if (r.get("chapter_index") or 0) == safe_int(ch)]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("summary", "")) + str(r.get("key_events", "")))]
+    rows.sort(key=lambda r: r.get("chapter_index") or 0)
+    return rows[:limit]
+
+
+def _query_volume_outlines(ref, env):
+    """历史卷纲：volume_name（卷名，主）/keyword；volume（卷号）辅助。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    rows = get_volume_outlines_by_project(project_id) or []
+    vname = filters.get("volume_name")
+    if vname:
+        rows = [r for r in rows if str(vname) in str(r.get("volume_name", ""))]
+    vol = filters.get("volume")
+    if vol is not None:
+        rows = [r for r in rows if (r.get("volume_number") or 0) == safe_int(vol)]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("core_conflict", "")) + str(r.get("volume_climax", "")))]
+    rows.sort(key=lambda r: r.get("volume_number") or 0)
+    return rows[:limit]
+
+
+def _query_chapter_metas(ref, env):
+    """章节结尾钩子：chapter/keyword（钩子·情绪·地点）。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    rows = get_chapter_meta_list(project_id) or []
+    ch = filters.get("chapter")
+    if ch is not None:
+        rows = [r for r in rows if (r.get("chapter_number") or 0) == safe_int(ch)]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("hook_content", "")) + str(r.get("ending_emotion", ""))
+                 + str(r.get("ending_location", "")))]
+    rows.sort(key=lambda r: r.get("chapter_number") or 0)
+    return rows[:limit]
+
+
+def _query_cool_points(ref, env):
+    """爽点记录：chapter/cool_point_type/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    rows = get_cool_points_by_project(project_id) or []
+    ch = filters.get("chapter")
+    if ch is not None:
+        rows = [r for r in rows if (r.get("chapter_number") or 0) == safe_int(ch)]
+    ctype = filters.get("cool_point_type")
+    if ctype:
+        rows = [r for r in rows if str(ctype) in str(r.get("cool_point_type", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in str(r.get("content", ""))]
+    rows.sort(key=lambda r: r.get("chapter_number") or 0)
+    return rows[:limit]
+
+
+def _query_villains(ref, env):
+    """反派（含层级/计划节点）：villain（反派名，主）/tier/chapter/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    villains = get_villains_by_project(project_id) or []
+    vname = filters.get("villain")
+    if vname:
+        villains = [v for v in villains if str(vname) in str(v.get("name", ""))]
+    tier = filters.get("tier")
+    if tier:
+        tier_matched = [v for v in villains if any(
+            str(tier) in str(h.get("tier", "")) for h in get_villain_hierarchy(v.get("id")))]
+        if tier_matched:
+            villains = tier_matched
+        elif vname:
+            # tier 是软标签：LLM 猜测值可能不匹配（如"高层"vs"大反派"），
+            # 有名字主条件时不因 tier 误猜废掉整个查询，忽略 tier 并保留名字过滤
+            logger = log_manager.get_logger("resource_registry")
+            logger.info(
+                f"[structured_query] villain tier 无匹配（{tier}），忽略 tier 仅按名字检索")
+        else:
+            villains = []
+    ch = filters.get("chapter")
+    if ch is not None:
+        villains = [v for v in villains if any(
+            (n.get("chapter") or 0) == safe_int(ch) for n in get_villain_plot_nodes(v.get("id")))]
+    keyword = filters.get("keyword")
+    if keyword:
+        villains = [v for v in villains if str(keyword) in
+                    (str(v.get("name", "")) + str(v.get("core_desire", "")))]
+    rows = []
+    for v in villains[:limit]:
+        rows.append({**v, "hierarchy": get_villain_hierarchy(v.get("id")) or [],
+                     "plot_nodes": get_villain_plot_nodes(v.get("id")) or []})
+    return rows
 
 
 # ── 格式化器：统一签名 formatter(data, depth) -> str（不含区块标题）──
@@ -629,6 +855,136 @@ def _fmt_character_items(items, depth="full"):
         note = (it.get("change_note", "") or it.get("source", "") or "")[:30]
         if note:
             line += f"（{note}）"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_character_relationships(rels, depth="full"):
+    """角色事实关系（结构化查询结果渲染）。"""
+    if not rels:
+        return ""
+    lines = []
+    for r in rels[:8]:
+        who = r.get("character_name") or f"角色#{r.get('character_id', '')}"
+        rel = r.get("relation_type", "")
+        target = r.get("target_name", "")
+        desc = (r.get("description", "") or "")[:30]
+        line = f"- {who}是{target}的{rel}"
+        if desc:
+            line += f"（{desc}）"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_character_growth(growths, depth="full"):
+    """角色成长弧（结构化查询结果渲染）。"""
+    if not growths:
+        return ""
+    lines = []
+    for g in growths[:8]:
+        name = g.get("character_name") or f"角色#{g.get('character_id', '')}"
+        stage = g.get("stage", "")
+        desc = (g.get("description", "") or "")[:50]
+        src = g.get("source_chapter") or 0
+        line = f"- {name} 第{src}章: {stage}"
+        if desc:
+            line += f" — {desc}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_chapter_plots(plots, depth="full"):
+    """历史剧情点（结构化查询结果渲染）。"""
+    if not plots:
+        return ""
+    lines = []
+    for p in plots[:6]:
+        ch = p.get("chapter_index") or 0
+        scene = p.get("scene", "")
+        desc = (p.get("description", "") or "")[:60]
+        chars = p.get("characters", "")
+        line = f"- 第{ch}章【{scene}】{desc}"
+        if chars:
+            line += f"（角色: {chars}）"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_chapter_plans(plans, depth="full"):
+    """历史章节规划（结构化查询结果渲染）。"""
+    if not plans:
+        return ""
+    lines = []
+    for p in plans[:5]:
+        ch = p.get("chapter_index") or 0
+        title = p.get("chapter_title", "") or ""
+        summary = (p.get("summary", "") or "")[:60]
+        line = f"- 第{ch}章「{title}」: {summary}" if title else f"- 第{ch}章: {summary}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_volume_outlines(vols, depth="full"):
+    """历史卷纲（结构化查询结果渲染）。"""
+    if not vols:
+        return ""
+    lines = []
+    for v in vols[:5]:
+        num = v.get("volume_number") or 0
+        name = v.get("volume_name", "")
+        conflict = (v.get("core_conflict", "") or "")[:50]
+        lines.append(f"- 第{num}卷「{name}」: {conflict}")
+    return "\n".join(lines)
+
+
+def _fmt_chapter_metas(metas, depth="full"):
+    """章节结尾钩子（结构化查询结果渲染）。"""
+    if not metas:
+        return ""
+    lines = []
+    for m in metas[:5]:
+        ch = m.get("chapter_number") or 0
+        hook = (m.get("hook_content", "") or "")[:40]
+        emo = m.get("ending_emotion", "") or ""
+        line = f"- 第{ch}章结尾: {hook}"
+        if emo:
+            line += f"（情绪 {emo}）"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_cool_points(points, depth="full"):
+    """爽点记录（结构化查询结果渲染）。"""
+    if not points:
+        return ""
+    lines = []
+    for p in points[:5]:
+        ch = p.get("chapter_number") or 0
+        ctype = p.get("cool_point_type", "")
+        content = (p.get("content", "") or "")[:50]
+        lines.append(f"- 第{ch}章[{ctype}] {content}")
+    return "\n".join(lines)
+
+
+def _fmt_villains(villains, depth="full"):
+    """反派（含层级/计划节点，结构化查询结果渲染）。"""
+    if not villains:
+        return ""
+    lines = []
+    for v in villains[:5]:
+        name = v.get("name", "")
+        desire = (v.get("core_desire", "") or "")[:40]
+        line = f"- {name}: {desire}"
+        tiers = "、".join(
+            f"{h.get('tier', '')} {h.get('villain_name', '') or name}"
+            for h in v.get("hierarchy", []))
+        if tiers:
+            line += f"（层级: {tiers}）"
+        nodes = v.get("plot_nodes", [])
+        if nodes:
+            node_str = "；".join(
+                f"第{n.get('chapter', 0)}章[{n.get('node_type', '')}]" for n in nodes[:3])
+            line += f" | 计划: {node_str}"
         lines.append(line)
     return "\n".join(lines)
 
@@ -918,7 +1274,7 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "loader": _load_character_states, "formatters": {"full": _fmt_character_states},
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_character_states,
-        "query_filters": ["chapter", "name", "character_id", "keyword"],
+        "query_filters": ["character", "chapter", "keyword", "character_id"],
     },
     "previous_hook": {
         "label": "上一章结尾状态", "header": "【上一章结尾】", "category": "structured",
@@ -939,6 +1295,62 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_items,
         "query_filters": ["character", "keyword", "only_held"],
+    },
+    "character_relationship": {
+        "label": "角色关系", "header": "【角色关系】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_character_relationships},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_character_relationships,
+        "query_filters": ["character", "relation_type", "keyword", "character_id"],
+    },
+    "character_growth": {
+        "label": "角色成长弧", "header": "【角色成长弧】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_character_growth},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_character_growth,
+        "query_filters": ["character", "keyword", "character_id"],
+    },
+    "chapter_plot": {
+        "label": "剧情点", "header": "【剧情点】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_chapter_plots},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_chapter_plots,
+        "query_filters": ["chapter", "scene", "characters", "emotion", "keyword"],
+    },
+    "chapter_plan": {
+        "label": "章节规划", "header": "【章节规划】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_chapter_plans},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_chapter_plans,
+        "query_filters": ["chapter", "keyword"],
+    },
+    "volume_outline": {
+        "label": "卷纲", "header": "【卷纲】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_volume_outlines},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_volume_outlines,
+        "query_filters": ["volume_name", "volume", "keyword"],
+    },
+    "chapter_meta": {
+        "label": "章节结尾钩子", "header": "【章节结尾】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_chapter_metas},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_chapter_metas,
+        "query_filters": ["chapter", "keyword"],
+    },
+    "cool_points": {
+        "label": "爽点", "header": "【爽点记录】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_cool_points},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_cool_points,
+        "query_filters": ["chapter", "cool_point_type", "keyword"],
+    },
+    "villain": {
+        "label": "反派", "header": "【反派设定】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_villains},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_villains,
+        "query_filters": ["villain", "tier", "chapter", "keyword"],
     },
     "character_group": {
         "label": "主角团", "header": "【主角团】", "category": "structured",
@@ -1034,8 +1446,10 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "worldview", "foreshadow", "timeline",
         ],
         "queryable": [
-            "character_card", "character_state", "foreshadow",
-            "timeline", "character_item",
+            "character_card", "character_state", "foreshadow", "timeline",
+            "character_item", "character_relationship", "character_growth",
+            "chapter_plot", "chapter_plan", "volume_outline", "chapter_meta",
+            "cool_points", "villain",
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
@@ -1050,6 +1464,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         ],
         "queryable": [
             "character_card", "foreshadow", "timeline",
+            "chapter_plan", "character_relationship", "chapter_plot", "villain",
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
@@ -1063,8 +1478,10 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "foreshadow", "timeline",
         ],
         "queryable": [
-            "character_card", "character_state", "foreshadow",
-            "timeline", "character_item",
+            "character_card", "character_state", "foreshadow", "timeline",
+            "character_item", "character_relationship", "character_growth",
+            "chapter_plot", "chapter_plan", "volume_outline", "chapter_meta",
+            "cool_points", "villain",
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
@@ -1080,6 +1497,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         ],
         "queryable": [
             "character_card", "character_state", "timeline",
+            "chapter_plot", "chapter_meta", "character_relationship",
         ],
         "auto_sections": [
             ("dimensions", None),
@@ -1108,8 +1526,10 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "volume_outline", "project",
         ],
         "queryable": [
-            "character_card", "character_state", "foreshadow",
-            "timeline", "character_item",
+            "character_card", "character_state", "foreshadow", "timeline",
+            "character_item", "character_relationship", "character_growth",
+            "chapter_plot", "chapter_plan", "volume_outline", "chapter_meta",
+            "cool_points", "villain",
         ],
         "auto_sections": [
             ("rag_results", "qa"),
