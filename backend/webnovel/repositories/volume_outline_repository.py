@@ -85,6 +85,18 @@ def get_volume_crises(volume_outline_id: int) -> List[dict]:
         return [dict(row) for row in cursor.fetchall()]
 
 
+def delete_volume_crises(volume_outline_id: int) -> bool:
+    """清空指定卷的危机链（幂等，供卷纲细节重写/覆盖用）。"""
+    with _lock:
+        conn = _get_conn()
+        conn.execute(
+            "DELETE FROM webnovel_volume_crisis WHERE volume_outline_id = ?",
+            (volume_outline_id,)
+        )
+        conn.commit()
+        return True
+
+
 def update_volume_outline(vo_id: int, **kwargs) -> bool:
     """更新卷纲。"""
     with _lock:
@@ -99,9 +111,10 @@ def update_volume_outline(vo_id: int, **kwargs) -> bool:
 
 
 def delete_volume_outline(vo_id: int) -> bool:
-    """删除卷纲。"""
+    """删除卷纲（级联删除其危机链）。"""
     with _lock:
         conn = _get_conn()
+        conn.execute("DELETE FROM webnovel_volume_crisis WHERE volume_outline_id = ?", (vo_id,))
         conn.execute("DELETE FROM webnovel_volume_outline WHERE id = ?", (vo_id,))
         conn.commit()
         return True

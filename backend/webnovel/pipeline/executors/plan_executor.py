@@ -24,7 +24,7 @@ from webnovel.repositories import (
     get_volume_outline, get_volume_outlines_by_project, get_golden_finger_by_project,
     get_power_system_by_project, get_worldview_by_project,
     get_villain_by_project, get_idea_bank_by_project,
-    add_volume_outline, add_volume_crisis, update_volume_outline,
+    add_volume_outline, add_volume_crisis, update_volume_outline, delete_volume_crises,
     add_chapter_plan, get_chapter_plans_by_volume,
     update_webnovel_state, get_webnovel_state_by_project,
     update_worldview, update_power_system, update_character_card,
@@ -184,6 +184,12 @@ class PlanExecutor(BaseExecutor):
                 _logger = log_manager.get_logger("plan_executor")
                 _logger.info(f"[plan_executor] regenerate_plans 模式：为第{volume_number}卷重新生成章节规划，vo_id={vo_id}")
 
+                # 重新规划前先补全卷纲细节（骨架+节拍+危机），保证下游章纲/时间轴 prompt 引用字段有值
+                existing_vo = await self._ensure_volume_detail(
+                    project, existing_vo, protagonist, golden_finger, power_system, worldview,
+                    volume_number, char_group=char_group, char_group_members=char_group_members
+                )
+
                 chapter_plans = await self._generate_chapter_plans(
                     project, existing_vo, protagonist, volume_number,
                     char_group=char_group, char_group_members=char_group_members
@@ -247,15 +253,9 @@ class PlanExecutor(BaseExecutor):
             vo_id = volume_outline["id"]
             result_data["volume_outline_id"] = vo_id
 
-            beat_sheet = await self._generate_beat_sheet(
-                project, volume_outline, protagonist, volume_number
-            )
-            if beat_sheet:
-                self._update_volume_with_beat_sheet(vo_id, beat_sheet)
-
             # 卷纲关键字段完整性校验：从 DB 重新读取并检测空值字段
             _critical_fields = ["catalyst_event", "protagonist_goal", "mid_reversal"]
-            _updated_vo = get_volume_outline(project["id"], vo_id) if beat_sheet else volume_outline
+            _updated_vo = get_volume_outline(project["id"], vo_id)
             _empty_fields = [f for f in _critical_fields if not (_updated_vo or {}).get(f)]
             if _empty_fields:
                 _logger.warning(
@@ -271,7 +271,7 @@ class PlanExecutor(BaseExecutor):
                 plan_count = self._save_chapter_plans(vo_id, chapter_plans)
                 result_data["chapter_plans_count"] = plan_count
 
-            self._writeback_settings(project_id, volume_outline, beat_sheet, chapter_plans)
+            self._writeback_settings(project_id, volume_outline, chapter_plans)
 
             self._writeback_master_outline(project_id, vo_id, volume_number, volume_outline)
 
@@ -318,12 +318,25 @@ class PlanExecutor(BaseExecutor):
             "realm": protagonist.get("current_power", "") or protagonist.get("power_level", "") or "未知"
         }
 
+        # 优先引用已存在的卷纲行（初始化骨架或历史规划产物），无则回退合成值
         master_volume = {
             "volume_name": f"第{volume_number}卷",
             "chapter_range": f"{start_chapter}-{end_chapter}",
             "core_conflict": project.get("core_conflict", "") or "主角成长与挑战",
             "volume_climax": ""
         }
+        try:
+            _existing = get_volume_outlines_by_project(project["id"])
+            _match = next((o for o in _existing if o.get("volume_number") == volume_number), None)
+            if _match:
+                master_volume = {
+                    "volume_name": _match.get("volume_name") or master_volume["volume_name"],
+                    "chapter_range": f"{_match.get('chapter_start', start_chapter)}-{_match.get('chapter_end', end_chapter)}",
+                    "core_conflict": _match.get("core_conflict") or master_volume["core_conflict"],
+                    "volume_climax": _match.get("volume_climax") or master_volume["volume_climax"],
+                }
+        except Exception:
+            pass
 
         # 将角色组成员列表预格式化为字符串，供 prompt 模板使用
         cg_members_str = self._format_char_group_members(char_group, char_group_members, project.get("id", 0))
@@ -394,68 +407,91 @@ class PlanExecutor(BaseExecutor):
                     result_change=crisis.get("result_change", "")
                 )
 
+        # 内存扩展 crises（供 _writeback_settings 等调用方使用，不写库）
+        _raw_crises = volume_data.get("crises", [])
+        volume_outline["crises"] = _raw_crises if isinstance(_raw_crises, list) else []
         return volume_outline
 
-    async def _generate_beat_sheet(
-        self, project: Dict, volume_outline: Dict, protagonist: Dict, volume_number: int
-    ) -> Optional[Dict]:
-        """生成卷节拍表。"""
-        context = {
-            "project": project,
-            "volume_outline": volume_outline,
-            "protagonist": protagonist,
-            "volume_number": volume_number
+    # 卷级节拍字段：缺失时需要在拆章/重新规划前补全
+    BEAT_FIELDS = [
+        "promise_description", "promise_types", "catalyst_event", "irreversible_change",
+        "protagonist_goal", "mid_reversal", "reversal_insight", "lowest_point_event",
+        "lowest_point_cost", "protagonist_choice", "payoff_items", "new_hook",
+        "unresolved_issues"
+    ]
+
+    async def _ensure_volume_detail(
+        self, project: Dict, volume_outline: Dict, protagonist: Dict,
+        golden_finger: Optional[Dict], power_system: Optional[Dict], worldview: Optional[Dict],
+        volume_number: int, char_group: Optional[Dict] = None,
+        char_group_members: Optional[list] = None
+    ) -> Dict:
+        """拆章/重新规划前补全卷纲细节（骨架+节拍+危机，一次 LLM 调用）。
+
+        已齐全则幂等跳过；缺失则调合并版卷纲生成并写库（update 卷纲 + 重写危机）。
+        """
+        missing = [f for f in self.BEAT_FIELDS if not volume_outline.get(f)]
+        if not missing:
+            return volume_outline
+
+        from utils.logger import log_manager
+        _logger = log_manager.get_logger("plan_executor")
+        _logger.info(
+            f"[plan_executor] 卷纲 vo_id={volume_outline.get('id')} 缺少字段 {missing}，"
+            f"生成完整卷纲细节（骨架+节拍+危机）..."
+        )
+
+        start_ch = int(volume_outline.get("chapter_start", 1))
+        end_ch = int(volume_outline.get("chapter_end", start_ch + 29))
+        detail = await self._generate_volume_outline(
+            project, protagonist, golden_finger, power_system, worldview,
+            volume_number, start_ch, end_ch, prev_volume=None,
+            char_group=char_group, char_group_members=char_group_members
+        )
+        if not detail or "error" in detail:
+            _logger.error(f"[plan_executor] 卷纲细节生成失败 vo_id={volume_outline.get('id')}")
+            return volume_outline
+
+        vo_id = volume_outline["id"]
+        updates = {
+            "volume_name": detail.get("volume_name", volume_outline.get("volume_name", "")),
+            "chapter_start": int(detail.get("chapter_start", start_ch)),
+            "chapter_end": int(detail.get("chapter_end", end_ch)),
+            "core_conflict": detail.get("core_conflict", ""),
+            "volume_climax": detail.get("volume_climax", ""),
+            "promise_description": detail.get("promise_description", ""),
+            "promise_types": json.dumps(detail.get("promise_types", []), ensure_ascii=False),
+            "catalyst_event": detail.get("catalyst_event", ""),
+            "irreversible_change": detail.get("irreversible_change", ""),
+            "protagonist_goal": detail.get("protagonist_goal", ""),
+            "mid_reversal": detail.get("mid_reversal", ""),
+            "reversal_insight": detail.get("reversal_insight", ""),
+            "lowest_point_event": detail.get("lowest_point_event", ""),
+            "lowest_point_cost": detail.get("lowest_point_cost", ""),
+            "protagonist_choice": detail.get("protagonist_choice", ""),
+            "payoff_items": json.dumps(detail.get("payoff_items", []), ensure_ascii=False),
+            "new_hook": detail.get("new_hook", ""),
+            "unresolved_issues": detail.get("unresolved_issues", ""),
         }
+        update_volume_outline(vo_id, **updates)
 
-        beat_data = await self._call_llm("plan_beat_sheet", context)
-        if not beat_data or "error" in beat_data:
-            return None
+        # 危机重写：清空旧记录（可能只有 crisis_event 的初始化遗留），写入完整危机链
+        delete_volume_crises(vo_id)
+        crises = detail.get("crises", [])
+        if isinstance(crises, list):
+            for i, crisis in enumerate(crises):
+                if isinstance(crisis, dict):
+                    add_volume_crisis(
+                        vo_id,
+                        crisis_order=crisis.get("crisis_order", i + 1),
+                        crisis_event=crisis.get("crisis_event", ""),
+                        cost_risk_upgrade=crisis.get("cost_risk_upgrade", ""),
+                        result_change=crisis.get("result_change", "")
+                    )
 
-        return beat_data
-
-    def _update_volume_with_beat_sheet(self, vo_id: int, beat_sheet: Dict):
-        """用节拍表更新卷纲。"""
-        updates = {}
-        if beat_sheet.get("promise_description"):
-            updates["promise_description"] = beat_sheet["promise_description"]
-        if beat_sheet.get("promise_types"):
-            updates["promise_types"] = json.dumps(beat_sheet["promise_types"], ensure_ascii=False)
-        if beat_sheet.get("catalyst_event"):
-            updates["catalyst_event"] = beat_sheet["catalyst_event"]
-        if beat_sheet.get("irreversible_change"):
-            updates["irreversible_change"] = beat_sheet["irreversible_change"]
-        if beat_sheet.get("protagonist_goal"):
-            updates["protagonist_goal"] = beat_sheet["protagonist_goal"]
-        if beat_sheet.get("mid_reversal"):
-            updates["mid_reversal"] = beat_sheet["mid_reversal"]
-        if beat_sheet.get("reversal_insight"):
-            updates["reversal_insight"] = beat_sheet["reversal_insight"]
-        if beat_sheet.get("lowest_point_event"):
-            updates["lowest_point_event"] = beat_sheet["lowest_point_event"]
-        if beat_sheet.get("lowest_point_cost"):
-            updates["lowest_point_cost"] = beat_sheet["lowest_point_cost"]
-        if beat_sheet.get("protagonist_choice"):
-            updates["protagonist_choice"] = beat_sheet["protagonist_choice"]
-        if beat_sheet.get("payoff_items"):
-            updates["payoff_items"] = json.dumps(beat_sheet["payoff_items"], ensure_ascii=False)
-        if beat_sheet.get("new_hook"):
-            updates["new_hook"] = beat_sheet["new_hook"]
-        if beat_sheet.get("unresolved_issues"):
-            updates["unresolved_issues"] = beat_sheet["unresolved_issues"]
-
-        if updates:
-            update_volume_outline(vo_id, **updates)
-
-        crises = beat_sheet.get("crises", [])
-        for crisis in crises:
-            if isinstance(crisis, dict):
-                add_volume_crisis(
-                    vo_id,
-                    crisis_order=crisis.get("crisis_order", 0),
-                    crisis_event=crisis.get("crisis_event", ""),
-                    cost_risk_upgrade=crisis.get("cost_risk_upgrade", ""),
-                    result_change=crisis.get("result_change", "")
-                )
+        _updated = get_volume_outline(project["id"], vo_id) or volume_outline
+        _logger.info(f"[plan_executor] 卷纲 vo_id={vo_id} 细节补全完成")
+        return _updated
 
     # 每批生成的章节数上限（参考 webnovel-writer SKILL.md Step 7 批次规则）
     CHAPTER_BATCH_SIZE = 10
@@ -765,7 +801,7 @@ class PlanExecutor(BaseExecutor):
             )
 
     def _writeback_settings(
-        self, project_id: int, volume_outline: Dict, beat_sheet: Dict, chapter_plans: Dict
+        self, project_id: int, volume_outline: Dict, chapter_plans: Dict
     ):
         """把新增设定写回现有设定集。"""
         worldview = get_worldview_by_project(project_id)
@@ -780,13 +816,12 @@ class PlanExecutor(BaseExecutor):
         new_characters = []
         new_powers = []
 
-        if beat_sheet:
-            crisis_events = beat_sheet.get("crises", [])
-            for crisis in crisis_events:
-                if isinstance(crisis, dict):
-                    event = crisis.get("crisis_event", "")
-                    if "势力" in event or "宗门" in event or "家族" in event:
-                        new_factions.append(event)
+        crisis_events = volume_outline.get("crises", [])
+        for crisis in crisis_events:
+            if isinstance(crisis, dict):
+                event = crisis.get("crisis_event", "")
+                if "势力" in event or "宗门" in event or "家族" in event:
+                    new_factions.append(event)
 
         if chapter_plans:
             plans = chapter_plans.get("chapter_plans", [])

@@ -48,7 +48,8 @@ from .worldview_repository import (
 )
 from .volume_outline_repository import (
     add_volume_outline, get_volume_outline, get_volume_outlines_by_project,
-    add_volume_crisis, get_volume_crises, update_volume_outline, delete_volume_outline
+    add_volume_crisis, get_volume_crises, update_volume_outline, delete_volume_outline,
+    delete_volume_crises
 )
 from .timeline_repository import (
     add_timeline, get_timeline, get_timelines_by_project, get_timeline_by_project,
