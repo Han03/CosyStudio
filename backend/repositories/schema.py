@@ -256,6 +256,7 @@ def _init_schema(conn: sqlite3.Connection):
             polished TEXT DEFAULT '',
             review_result TEXT DEFAULT '',
             facts_recorded TEXT DEFAULT '',
+            plot_list TEXT DEFAULT '',
             progress INTEGER DEFAULT 0,
             progress_message TEXT DEFAULT '',
             error_message TEXT DEFAULT '',
@@ -1361,6 +1362,16 @@ def _init_schema(conn: sqlite3.Connection):
         columns = [row[1] for row in cursor.fetchall()]
         if "source_chapter" not in columns:
             conn.execute("ALTER TABLE webnovel_character_growth ADD COLUMN source_chapter INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception:
+        pass
+
+    # 迁移：script_writing_tasks 增加 plot_list（创作任务暂存剧情列表，应用时覆写到 webnovel_chapter_plot）
+    try:
+        cursor = conn.execute("PRAGMA table_info(script_writing_tasks)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "plot_list" not in columns:
+            conn.execute("ALTER TABLE script_writing_tasks ADD COLUMN plot_list TEXT DEFAULT ''")
             conn.commit()
     except Exception:
         pass
