@@ -1313,6 +1313,21 @@ def _fmt_power_system(ps, depth="full"):
     lines = []
     if ps.get("system_type"):
         lines.append(f"- 体系类型: {ps['system_type']}")
+    if ps.get("typical_realm_chain"):
+        chain = ps["typical_realm_chain"]
+        if isinstance(chain, list):
+            chain_text = " → ".join(str(x) for x in chain)
+        else:
+            chain_text = str(chain)
+        lines.append(f"- 境界链: {chain_text}")
+    if ps.get("small_realm_divisions"):
+        divs = ps["small_realm_divisions"]
+        if isinstance(divs, dict):
+            div_text = "；".join(
+                f"{k}({'/'.join(str(x) for x in v)})" for k, v in list(divs.items())[:12]
+            )
+            if div_text:
+                lines.append(f"- 小境界划分: {div_text[:300]}")
     if ps.get("core_creed"):
         lines.append(f"- 核心理念: {str(ps['core_creed'])[:200]}")
     if ps.get("cost_rules"):

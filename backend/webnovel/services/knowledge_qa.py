@@ -18,6 +18,7 @@ from webnovel.repositories import (
     get_power_system_by_project,
     get_golden_finger_by_project,
     get_character_group_by_project,
+    get_character_group_members,
     get_chapter_meta_list,
     get_volume_outlines_by_project,
 )
@@ -77,9 +78,51 @@ def _build_qa_env(project: dict, script_id: int, project_id: int) -> Dict[str, A
         if f.get("status") in ("open", "active")
     ]
 
-    # 世界观
+    # 世界观（适配渲染契约：id/name/summary，与 context_builder 同构）
     worldview = get_worldview_by_project(project_id)
-    world_settings = [worldview] if worldview else []
+    world_settings = []
+    if worldview:
+        world_settings = [{
+            "id": worldview.get("id"),
+            "name": worldview.get("name", "") or (worldview.get("world_summary", "") or "")[:30],
+            "summary": (worldview.get("world_summary", "") or "")[:150],
+        }]
+
+    # 力量体系摘要（渲染契约：name/summary，字段对齐业务表）
+    ps_raw = get_power_system_by_project(project_id)
+    power_system = {}
+    if ps_raw:
+        power_system = {
+            "name": ps_raw.get("system_type", "") or "未命名",
+            "summary": f"体系类型:{ps_raw.get('system_type', '')}, 核心理念:{(ps_raw.get('core_creed', '') or '')[:60]}",
+        }
+
+    # 金手指摘要（渲染契约：name/summary，字段对齐业务表）
+    gf_raw = get_golden_finger_by_project(project_id)
+    golden_finger = {}
+    if gf_raw:
+        golden_finger = {
+            "name": gf_raw.get("main_role", "") or "未命名",
+            "summary": f"类型:{gf_raw.get('type', '')}, 核心能力:{(gf_raw.get('core_function', '') or '')[:60]}, 代价:{(gf_raw.get('irreversible_cost', '') or '')[:40]}",
+        }
+
+    # 主角团摘要（渲染契约：name/goal/members_summary）
+    char_group_raw = get_character_group_by_project(project_id)
+    char_group = None
+    if char_group_raw:
+        group_members = get_character_group_members(char_group_raw["id"]) or []
+        card_map = {c["id"]: c for c in cards if c.get("id")}
+        members_parts = []
+        for gm in group_members[:8]:
+            card = card_map.get(gm.get("character_id"))
+            nm = card.get("name", "") if card else f"成员{gm.get('id', '')}"
+            role = gm.get("role", "")
+            members_parts.append(f"{nm}({role})" if role else nm)
+        char_group = {
+            "name": char_group_raw.get("name", ""),
+            "goal": (char_group_raw.get("common_goal", "") or "")[:100],
+            "members_summary": "，".join(members_parts)[:100],
+        }
 
     # 前文章节摘要（与 context_builder 同源：RAG chapter_summary，回退占位）
     summaries_by_ch = {}
@@ -130,9 +173,9 @@ def _build_qa_env(project: dict, script_id: int, project_id: int) -> Dict[str, A
         ],
         "foreshadows": loops,
         "world_settings": world_settings,
-        "power_system": get_power_system_by_project(project_id),
-        "golden_finger": get_golden_finger_by_project(project_id),
-        "character_group": get_character_group_by_project(project_id),
+        "power_system": power_system,
+        "golden_finger": golden_finger,
+        "character_group": char_group,
         "previous_chapters": prev_chapters,
         "rag_candidates": [],
     }
