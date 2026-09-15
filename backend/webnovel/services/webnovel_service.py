@@ -1331,32 +1331,26 @@ class WebnovelService:
     async def _store_rag_chunk(self, project_id: int, chapter_index: int, content: str):
         """将章节结构化摘要存储为 RAG 片段，同时将章节原文做段落切片索引。
 
-        包含两种摘要：
+        只保留两类：
         1. LLM 生成的结构化摘要（chunk_type=chapter_summary）：包含概要、关键事件、角色变化
-        2. 机械截取摘要（chunk_type=chapter）：作为回退
+        2. 段落切片（chunk_type=chapter_paragraph）：正文细节检索
 
-        段落切片采用滑动窗口：每个 chunk 包含 [前一段, 当前段, 后一段]，
-        首段无前段、末段无后段，以此保证检索时上下文连贯。
+        不再写入 chunk_type=chapter（整章/机械截取）——正文量大，段落切片已能覆盖
+        原文细节检索，整章索引浪费向量存储与检索资源。
         """
         try:
             from services.vector_store import get_rag_service
             rag = get_rag_service()
 
             # 清理当前章节的旧数据（精确删除，不影响其他章节）
+            # 保留 chapter 类型的删除：存量整章索引逐步归零
             rag.delete_by_chapter_number(project_id, "chapter", chapter_index)
             rag.delete_by_chapter_number(project_id, "chapter_summary", chapter_index)
 
             # === 1. LLM 结构化摘要（chunk_type=chapter_summary）===
             structured_summary = await self._generate_chapter_summary(project_id, chapter_index, content)
 
-            # === 2. 机械截取摘要（chunk_type=chapter，作为回退）===
-            lines = [f"第{chapter_index}章"]
-            lines.append(f"内容概要: {content[:300]}...")
-            if len(content) > 500:
-                lines.append(f"章尾: {content[-200:]}")
-            mechanical_summary = "\n".join(lines)
-
-            # === 3. 章节原文段落切片（chunk_type=chapter_paragraph）===
+            # === 2. 章节原文段落切片（chunk_type=chapter_paragraph）===
             # 每个 chunk 只含单个段落（精准 embedding），查询时按需扩展上下文
             paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
             para_chunks_data = []
@@ -1368,13 +1362,8 @@ class WebnovelService:
                         "para_index": i,
                     })
 
-            # === 4. 构建 chunks 列表，批量计算 embedding 后一次写入 ===
-            all_chunks = [{
-                "content": mechanical_summary,
-                "chunk_type": "chapter",
-                "chapter_number": chapter_index,
-                "metadata": {"chapter_index": chapter_index, "word_count": len(content)},
-            }]
+            # === 3. 构建 chunks 列表，批量计算 embedding 后一次写入 ===
+            all_chunks = []
 
             # 添加 LLM 结构化摘要
             if structured_summary:
