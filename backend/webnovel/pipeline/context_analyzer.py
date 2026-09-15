@@ -741,6 +741,7 @@ class ContextAnalyzer:
 
         ctx: Dict[str, Any] = {}
         sections: Dict[str, str] = {}
+        injected_keys: Dict[str, set] = {}
 
         # 1. 结构化资源（按 structured_refs 加载；LLM 选中即注入，无过滤）
         refs = selection.get("structured_refs") or []
@@ -786,10 +787,26 @@ class ContextAnalyzer:
                 ctx[_RESOURCE_CTX_FIELD[res_name]] = (
                     data_list if len(data_list) > 1 else data_list
                 )
+            # 去重键收集：记录已注入条目的 dedup_key 值，
+            # 供结构化查询结果渲染前过滤重合条目（P1：避免同一信息重复注入）
+            dk = res.get("dedup_key")
+            if dk:
+                keys = set()
+                for item in data_list:
+                    if isinstance(item, dict) and item.get(dk) is not None:
+                        keys.add(str(item.get(dk)))
+                    elif isinstance(item, list):
+                        for sub in item:
+                            if isinstance(sub, dict) and sub.get(dk) is not None:
+                                keys.add(str(sub.get(dk)))
+                if keys:
+                    injected_keys[res_name] = keys
 
         # 1.5 结构化主动查询（structured_queries：动态检索业务库全量数据）
         # 结果渲染为独立区块【资源名·查询】，追加在 selectable 区块之后、auto 之前；
         # 查询失败抛错；空结果跳过区块（合法查询无命中不报错）。
+        # 去重：查询命中条目若与已注入 selectable 资源重合（dedup_key 相同）则过滤，
+        # 避免同一信息在资源块与查询块重复出现。
         query_blocks: List[str] = []
         query_results: Dict[str, List[Dict[str, Any]]] = {}
         queries = selection.get("structured_queries") or []
@@ -809,6 +826,15 @@ class ContextAnalyzer:
             except Exception as e:
                 raise ContextAnalysisError(
                     f"结构化查询 {res_name} 失败: {e}")
+            dk = res.get("dedup_key")
+            if dk:
+                prior = injected_keys.get(res_name) or set()
+                if prior:
+                    data = [
+                        d for d in data
+                        if not (isinstance(d, dict) and d.get(dk) is not None
+                                and str(d.get(dk)) in prior)
+                    ]
             query_results[res_name] = data or []
             if not data:
                 continue
