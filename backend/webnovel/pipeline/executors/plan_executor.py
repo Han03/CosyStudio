@@ -374,11 +374,12 @@ class PlanExecutor(BaseExecutor):
 
         vo_data = {
             "volume_number": volume_data.get("volume_number", volume_number),
-            "volume_name": volume_data.get("volume_name", f"第{volume_number}卷"),
+            # 骨架字段：LLM 已不再输出（由【卷纲约束】继承），代码以 master_volume 兜底
+            "volume_name": volume_data.get("volume_name") or master_volume["volume_name"],
             "chapter_start": volume_data.get("chapter_start", start_chapter),
             "chapter_end": volume_data.get("chapter_end", end_chapter),
-            "core_conflict": volume_data.get("core_conflict", ""),
-            "volume_climax": volume_data.get("volume_climax", ""),
+            "core_conflict": volume_data.get("core_conflict") or master_volume["core_conflict"],
+            "volume_climax": volume_data.get("volume_climax") or master_volume["volume_climax"],
             "promise_description": volume_data.get("promise_description", ""),
             "promise_types": json.dumps(volume_data.get("promise_types", []), ensure_ascii=False),
             "catalyst_event": volume_data.get("catalyst_event", ""),
@@ -432,7 +433,10 @@ class PlanExecutor(BaseExecutor):
         """
         missing = [f for f in self.BEAT_FIELDS if not volume_outline.get(f)]
         if not missing:
-            return volume_outline
+            # 节拍字段齐全且已有危机链才幂等跳过；crises 为空仍需补全（初始化已不再生成危机占位）
+            from webnovel.repositories import get_volume_crises
+            if get_volume_crises(volume_outline.get("id", 0)):
+                return volume_outline
 
         from utils.logger import log_manager
         _logger = log_manager.get_logger("plan_executor")
@@ -457,8 +461,9 @@ class PlanExecutor(BaseExecutor):
             "volume_name": detail.get("volume_name", volume_outline.get("volume_name", "")),
             "chapter_start": int(detail.get("chapter_start", start_ch)),
             "chapter_end": int(detail.get("chapter_end", end_ch)),
-            "core_conflict": detail.get("core_conflict", ""),
-            "volume_climax": detail.get("volume_climax", ""),
+            # 骨架字段（总纲定义）：LLM 不再输出，以卷纲行原值兜底
+            "core_conflict": detail.get("core_conflict") or volume_outline.get("core_conflict", ""),
+            "volume_climax": detail.get("volume_climax") or volume_outline.get("volume_climax", ""),
             "promise_description": detail.get("promise_description", ""),
             "promise_types": json.dumps(detail.get("promise_types", []), ensure_ascii=False),
             "catalyst_event": detail.get("catalyst_event", ""),

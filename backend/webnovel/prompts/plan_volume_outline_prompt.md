@@ -41,15 +41,11 @@ user_prompt: |
   - 危机链至少3次递增，代价与风险逐次升级
   - 卷末新钩子必须能落到最后一章的章末未闭合问题
   - 所有节拍字段须与卷纲约束中的核心冲突、卷末高潮保持一致，不得偏离
+  - 卷名、章节范围、核心冲突、卷末高潮由【卷纲约束】提供，不得重复设计，直接沿用；仅当【卷纲约束】中某字段缺失（如新卷无卷末高潮）时才自行设计
 
-  【输出格式】JSON格式，包含以下字段：
+  【输出格式】JSON格式，包含以下字段（骨架字段已由卷纲约束提供，无需输出）：
   {{
     "volume_number": {volume_number},
-    "volume_name": "卷名",
-    "chapter_start": 起始章,
-    "chapter_end": 结束章,
-    "core_conflict": "核心冲突",
-    "volume_climax": "卷末高潮",
     "promise_description": "开卷承诺",
     "promise_types": ["兑现类型1", "兑现类型2"],
     "catalyst_event": "催化事件",

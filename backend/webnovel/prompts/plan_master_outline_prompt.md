@@ -15,8 +15,8 @@ user_prompt: |
   
   【主角信息】
   姓名：{protagonist.name}
-  欲望：{protagonist.desire}
-  缺陷：{protagonist.flaw}
+  欲望：{protagonist.true_desire}
+  缺陷：{protagonist.personality_flaw}
   原型：{protagonist.archetype}
   
   【金手指信息】
