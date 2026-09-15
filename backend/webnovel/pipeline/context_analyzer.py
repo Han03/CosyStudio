@@ -410,6 +410,9 @@ class ContextAnalyzer:
             header = res["header"].strip("【】")
             label = res["label"]
             title = f"【{header}】" + (f" {label}" if label and label != header else "")
+            # 可查询资源：目录仅列热点，全量/筛选用 structured_queries
+            if res_name in (assembly.get("queryable") or []):
+                title += "（更多用查询）"
             depths = list(res["formatters"].keys())
             depth_hint = " / ".join(
                 f"{d}={depth_desc.get(d, d)}" for d in depths if d in depth_desc
@@ -420,12 +423,10 @@ class ContextAnalyzer:
             lines.append(line)
             for cl in candidate_text.split("\n"):
                 lines.append(cl)
-        # 目录仅列代表性条目；支持查询的节点提示用 structured_queries 获取全量
+        # 目录定位 = 重要/热点锚点；全量数据一律走 structured_queries
         if lines and assembly.get("queryable"):
-            q_labels = "、".join(
-                RESOURCE_REGISTRY.get(r, {}).get("label", r)
-                for r in assembly["queryable"])
-            lines.append(f"（目录仅列代表性条目；{q_labels}等更多数据可用 structured_queries 按条件查询）")
+            lines.append(
+                "（目录仅显示重要/热点信息；未列出的角色、历史章节、伏笔等全量数据请用 structured_queries 按条件查询）")
         return "\n".join(lines) if lines else "（无可用资源）"
 
     def _format_resource_candidates(self, res_name: str, env: Dict[str, Any]) -> str:
@@ -437,20 +438,26 @@ class ContextAnalyzer:
             chars = inventory.get("characters", [])
             if not chars:
                 return ""
-            # 条目编号 = character id = structured_refs.ids 引用键
+            # 热点：仅主角+核心角色前 4（env 已按主角优先排序）；其他角色用查询
             return "\n".join(
-                f"    {c.get('id')}. {c.get('name')}（{c.get('type')}）— {c.get('summary', '')[:20]}"
-                for c in chars[:8]
+                f"    {c.get('id')}. {c.get('name')}（{c.get('type')}）— {c.get('summary', '')[:40]}"
+                for c in chars[:4]
             )
         if res_name == "foreshadow":
             loops = inventory.get("foreshadows", [])
             if not loops:
                 return ""
+            # 热点排序：核心 tier 优先，同 tier 最近埋设靠前；仅列前 4
+            tier_rank = {"核心": 0, "重要": 1, "支线": 2}
+            loops = sorted(loops, key=lambda f: (
+                tier_rank.get(str(f.get("tier", "")), 9),
+                -(f.get("planted_chapter") or 0),
+            ))
             # 条目编号 = 伏笔 id = structured_refs.ids 引用键
             return "\n".join(
-                f"    {f.get('id')}. [{f.get('tier', '')}] {f.get('content', '')[:30]} "
+                f"    {f.get('id')}. [{f.get('tier', '')}] {f.get('content', '')[:40]} "
                 f"（第{f.get('planted_chapter') or 0}章埋下）"
-                for f in loops[:8]
+                for f in loops[:4]
             )
         if res_name == "worldview":
             worlds = inventory.get("world_settings", [])
@@ -489,15 +496,15 @@ class ContextAnalyzer:
             if not chapters:
                 return ""
             chapters = sorted(chapters, key=lambda c: c.get("index") or 0)
-            # 目录固定窗口：最近 5 章（防随章节数线性膨胀）；更早章节用 chapter_index/查询
-            window = chapters[-5:]
+            # 热点：仅最近 2 章（承接锚点）；更早章节用 chapter_index/查询
+            window = chapters[-2:]
             lines = [
-                f"    第{ch.get('index')}章 — {str(ch.get('summary', '')).replace(chr(10), ' ')[:40]}"
+                f"    第{ch.get('index')}章 — {str(ch.get('summary', '')).replace(chr(10), ' ')[:60]}"
                 for ch in window
             ]
             if len(chapters) > len(window):
                 lines.append(
-                    f"（仅列最近 {len(window)} 章；更早章节可指定 chapter_index 获取）")
+                    f"（仅列最近 {len(window)} 章；更早章节用 structured_queries 或指定 chapter_index 获取）")
             return "\n".join(lines)
         if res_name == "chapter_plan":
             plan = structural.get("current_chapter_plan") or {}
@@ -531,15 +538,23 @@ class ContextAnalyzer:
             timelines = get_timelines_by_project(env["project_id"])
             if not timelines:
                 return ""
+            # 热点：仅当前创作卷的时间线（写作锚点）；其他卷用查询
+            cur_vol = (structural.get("current_volume") or {}).get("volume_number")
+            target = None
+            for tl in timelines:
+                if tl.get("volume_number") == cur_vol:
+                    target = tl
+                    break
+            if target is None:
+                target = timelines[-1]
             lines = []
-            for tl in timelines[:2]:
-                chapters = get_timeline_chapters(tl["id"]) or []
-                recent = chapters[-1] if chapters else {}
-                anchor = (recent.get("time_anchor", "") or "")[:20]
-                lines.append(
-                    f"    - 第{tl.get('volume_number', '?')}卷: 基准 {str(tl.get('time_base', ''))[:30]}"
-                    f" | {len(chapters)}章 | 最近锚点 {anchor}"
-                )
+            chapters = get_timeline_chapters(target["id"]) or []
+            recent = chapters[-1] if chapters else {}
+            anchor = (recent.get("time_anchor", "") or "")[:20]
+            lines.append(
+                f"    - 第{target.get('volume_number', '?')}卷: 基准 {str(target.get('time_base', ''))[:30]}"
+                f" | {len(chapters)}章 | 最近锚点 {anchor}"
+            )
             return "\n".join(lines)
         return ""
 

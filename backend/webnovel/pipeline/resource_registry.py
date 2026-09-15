@@ -507,7 +507,7 @@ def _query_character_relationships(ref, env):
 
 
 def _query_character_growth(ref, env):
-    """角色成长弧：character（角色名，主）/keyword（阶段·描述）；character_id 辅助。"""
+    """角色成长弧线：character（角色名，主）/keyword（阶段·描述）；character_id 辅助。"""
     filters = ref.get("filters") or {}
     limit = ref.get("limit", 5)
     project_id = env["project_id"]
@@ -877,7 +877,7 @@ def _fmt_character_relationships(rels, depth="full"):
 
 
 def _fmt_character_growth(growths, depth="full"):
-    """角色成长弧（结构化查询结果渲染）。"""
+    """角色成长弧线（结构化查询结果渲染）。"""
     if not growths:
         return ""
     lines = []
@@ -1304,7 +1304,7 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "query_filters": ["character", "relation_type", "keyword", "character_id"],
     },
     "character_growth": {
-        "label": "角色成长弧", "header": "【角色成长弧】", "category": "structured",
+        "label": "角色成长弧线", "header": "【角色成长弧线】", "category": "structured",
         "loader": None, "formatters": {"full": _fmt_character_growth},
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_character_growth,
