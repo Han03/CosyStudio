@@ -839,8 +839,10 @@ def find_qwen_reranker_model():
     from core.config_manager import get_config
     config = get_config()
     model_path = config.get("models", {}).get("qwen_reranker", {}).get("model_path", "")
-    if model_path and os.path.exists(model_path):
-        return model_path
+    if model_path:
+        resolved = resolve_project_path(model_path)
+        if os.path.exists(resolved):
+            return resolved
     return None
 
 
