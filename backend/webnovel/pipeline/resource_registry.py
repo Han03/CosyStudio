@@ -234,7 +234,12 @@ def _load_previous_chapter(ref, env):
                 if not summary:
                     raise ContextAnalysisError(f"第{chapter_index}章摘要为空")
                 return {"chapter_index": chapter_index, "content": summary, "is_summary": True}
-        raise ContextAnalysisError(f"第{chapter_index}章不在前文清单中")
+        # env 仅保留窗口（最近 5 章）；更早章节按章从 RAG 查摘要，不依赖 env
+        summary = _fetch_chapter_summary(env.get("project_id"), chapter_index)
+        if not summary:
+            raise ContextAnalysisError(
+                f"第{chapter_index}章不在前文清单中（env 无摘要且 RAG 未命中）")
+        return {"chapter_index": chapter_index, "content": summary, "is_summary": True}
     # full / tail：加载全文
     content = _read_chapter_content(env["script_id"], chapter_index)
     if not content:
@@ -256,6 +261,21 @@ def _read_chapter_content(script_id: int, chapter_index: int) -> Optional[str]:
     lines = get_script_lines(script_id, chapter_index)
     if lines:
         return "\n".join(line["content"] for line in lines)
+    return None
+
+
+def _fetch_chapter_summary(project_id: Optional[int], chapter_index: int) -> Optional[str]:
+    """按章号从 RAG 取章节摘要（chapter_summary 类型，全量可查）。"""
+    if not project_id:
+        return None
+    try:
+        from services.vector_store import get_rag_service
+        for doc in get_rag_service().get_chunks(project_id, "chapter_summary"):
+            if doc.get("chapter_number") == chapter_index:
+                content = doc.get("content", "")
+                return content if content else None
+    except Exception:
+        pass
     return None
 
 

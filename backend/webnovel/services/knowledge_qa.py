@@ -91,7 +91,8 @@ def _build_qa_env(project: dict, script_id: int, project_id: int) -> Dict[str, A
     except Exception:
         pass
     prev_chapters = []
-    for i in range(max(1, latest_chapter - 9), latest_chapter + 1):
+    # 前文窗口：最近 5 章（与写作侧一致，防随章节数膨胀；更早章节按章从 RAG 查摘要）
+    for i in range(max(1, latest_chapter - 4), latest_chapter + 1):
         summary = summaries_by_ch.get(i, "")
         prev_chapters.append({
             "index": i,

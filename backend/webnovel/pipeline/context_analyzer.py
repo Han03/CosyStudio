@@ -261,6 +261,16 @@ class ContextAnalyzer:
                         raise ContextAnalysisError(
                             f"步骤 {step_name} structured_queries 资源 {q['resource']} "
                             f"不支持 filters 字段 {fk}（允许: {'/'.join(sorted(allowed))}）")
+                limit = q.get("limit")
+                if limit is not None:
+                    try:
+                        limit = int(limit)
+                    except (TypeError, ValueError):
+                        raise ContextAnalysisError(
+                            f"步骤 {step_name} structured_queries limit 非法: {limit}")
+                    if not (1 <= limit <= 10):
+                        raise ContextAnalysisError(
+                            f"步骤 {step_name} structured_queries limit {limit} 超出 1~10")
 
             self._logger.info(
                 f"[ContextAnalyzer] {step_name} 分析完成："
@@ -478,11 +488,17 @@ class ContextAnalyzer:
             chapters = inventory.get("previous_chapters", [])
             if not chapters:
                 return ""
-            # 第N章 = structured_refs.chapter_index 引用键；摘要换行替换为空格保持单行
-            return "\n".join(
+            chapters = sorted(chapters, key=lambda c: c.get("index") or 0)
+            # 目录固定窗口：最近 5 章（防随章节数线性膨胀）；更早章节用 chapter_index/查询
+            window = chapters[-5:]
+            lines = [
                 f"    第{ch.get('index')}章 — {str(ch.get('summary', '')).replace(chr(10), ' ')[:40]}"
-                for ch in chapters
-            )
+                for ch in window
+            ]
+            if len(chapters) > len(window):
+                lines.append(
+                    f"（仅列最近 {len(window)} 章；更早章节可指定 chapter_index 获取）")
+            return "\n".join(lines)
         if res_name == "chapter_plan":
             plan = structural.get("current_chapter_plan") or {}
             summary = plan.get("summary", "")[:50] if plan else ""
@@ -708,6 +724,18 @@ class ContextAnalyzer:
             res = RESOURCE_REGISTRY.get(res_name)
             if not res:
                 raise ContextAnalysisError(f"未知资源 {res_name}")
+            # previous_chapter 深度规约：full 仅限最近 2 章，更早章节强制 tail
+            # （防注入膨胀：旧章全文进创作 prompt）。规约须在 loader 执行前修改 ref。
+            if res_name == "previous_chapter" and env.get("chapter_index"):
+                cur_ch = int(env["chapter_index"])
+                for ref in ref_list:
+                    rch = ref.get("chapter_index")
+                    if (rch is not None and int(rch) < cur_ch - 2
+                            and ref.get("depth") == "full"):
+                        self._logger.info(
+                            f"[ContextAnalyzer] 第{rch}章 previous_chapter depth=full "
+                            f"规约为 tail（仅最近 2 章可全文注入）")
+                        ref["depth"] = "tail"
             data_list = []
             for ref in ref_list:
                 try:
@@ -917,7 +945,11 @@ class ContextAnalyzer:
                 chunk_types = [t for t in raw_types if t in allowed]
                 if not chunk_types:
                     continue  # 查询类型全部不在白名单内，跳过该查询
-                limit = query.get("limit", 5)
+                # limit 硬上限 8（防注入膨胀），非法 limit 用默认 5
+                try:
+                    limit = max(1, min(int(query.get("limit", 5)), 8))
+                except (TypeError, ValueError):
+                    limit = 5
                 results = rag_svc.search(
                     project_id, emb,
                     limit=limit,
