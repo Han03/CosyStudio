@@ -249,7 +249,7 @@ async function submitQuery() {
 
 function renderQueryResults(chunks, reranked = false) {
     const typeLabels = {
-        'chapter': '章节', 'chapter_summary': '章节摘要', 'chapter_paragraph': '章节原文',
+        'chapter_summary': '章节摘要', 'chapter_paragraph': '章节原文',
         'csv_plot': '剧情模板', 'csv_pacing': '节奏技巧', 'csv_verdict': '裁决规则',
         'csv_scene': '场景模式', 'csv_writing': '写作技巧', 'csv_naming': '命名规则',
         'csv_character_knowledge': '角色知识', 'csv_golden_finger_knowledge': '金手指知识',
@@ -316,7 +316,7 @@ function renderQueryAnswer(data) {
     const answer = data.answer || '';
     const sources = data.sources || [];
     const typeLabels = {
-        'chapter': '章节', 'chapter_summary': '章节摘要', 'chapter_paragraph': '章节原文',
+        'chapter_summary': '章节摘要', 'chapter_paragraph': '章节原文',
         'csv_plot': '剧情模板', 'csv_pacing': '节奏技巧', 'csv_verdict': '裁决规则',
         'csv_scene': '场景模式', 'csv_writing': '写作技巧', 'csv_naming': '命名规则',
         'csv_character_knowledge': '角色知识', 'csv_golden_finger_knowledge': '金手指知识',
@@ -324,14 +324,20 @@ function renderQueryAnswer(data) {
     };
 
     document.getElementById('queryAnswerText').textContent = answer;
-    const badges = sources.map(s => {
+    // 来源标签去重：同一 (类型, 章节) 只显示一个徽章
+    const seen = new Set();
+    const badges = [];
+    for (const s of sources) {
+        const key = `${s.type}:${s.chunk_type || s.resource || ''}:${s.chapter_number || 0}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         const label = typeLabels[s.chunk_type] || s.chunk_type || 'RAG';
         const ch = s.chapter_number ? ` · 第${s.chapter_number}章` : '';
-        return `<span class="query-source-badge"><i class="fas fa-book"></i> ${escapeHtml(label)}${ch}</span>`;
-    }).join('');
+        badges.push(`<span class="query-source-badge"><i class="fas fa-book"></i> ${escapeHtml(label)}${ch}</span>`);
+    }
     const srcEl = document.getElementById('querySourceList');
-    srcEl.innerHTML = badges
-        ? `<span class="query-source-label">来源：</span>` + badges
+    srcEl.innerHTML = badges.length
+        ? `<span class="query-source-label">来源：</span>` + badges.join('')
         : '';
     document.getElementById('queryAnswerBlock').style.display = '';
 }
