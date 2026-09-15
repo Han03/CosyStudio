@@ -21,6 +21,7 @@ from utils.logger import log_manager
 from webnovel.repositories import (
     get_character_card,
     get_character_items_by_project,
+    get_character_relationships,
     get_worldview_by_project, get_worldview_factions,
     get_power_system_by_project,
     get_golden_finger_by_project,
@@ -123,6 +124,17 @@ def _load_character_cards(ref, env):
         if not card:
             continue
         raw_type = card.get("character_type", "")
+        # 角色事实关系（webnovel_character_relationship）
+        rels = []
+        try:
+            rels = [
+                {"target": r.get("target_name", ""), "type": r.get("relation_type", ""),
+                 "desc": (r.get("description") or "")[:40]}
+                for r in get_character_relationships(cid)
+                if r.get("target_name") and r.get("relation_type")
+            ]
+        except Exception:
+            rels = []
         characters.append({
             "role": _CHAR_TYPE_LABELS.get(raw_type, raw_type),
             "character_name": card.get("name", ""),
@@ -133,6 +145,7 @@ def _load_character_cards(ref, env):
             "flaw": card.get("personality_flaw", ""),
             "goals": card.get("true_desire", "") or card.get("long_term_goal", ""),
             "abilities": card.get("ability_limit", ""),
+            "relationships": rels,
             "items": [
                 {"name": it.get("item_name", ""),
                  "quantity": it.get("quantity", 1) or 1,
@@ -388,6 +401,12 @@ def _fmt_character_full(characters, depth="full"):
             line += f" | 能力: {str(c['abilities'])[:100]}"
         if c.get("goals"):
             line += f" | 目标: {str(c['goals'])[:60]}"
+        rels = c.get("relationships", []) or []
+        if rels:
+            rel_str = "；".join(
+                f"与{r.get('target', '')}（{r.get('type', '')}）" for r in rels[:4]
+            )
+            line += f" | 关系: {rel_str}"
         items = c.get("items", []) or []
         item_names = [it.get("name", "") for it in items if isinstance(it, dict) and it.get("name")]
         if item_names:
@@ -645,6 +664,25 @@ def _fmt_rag_results(rag_results, depth="full", limit=3):
     return "\n".join(parts)
 
 
+def _fmt_rag_results_qa(rag_results, depth="qa"):
+    """RAG 结果（问答模式）：全文注入 + 来源标注，供回答 LLM 作为证据。"""
+    if not rag_results:
+        return ""
+    parts = []
+    for i, r in enumerate(rag_results[:10], 1):
+        if isinstance(r, str):
+            parts.append(f"[片段{i}] {r}")
+            continue
+        content = (r.get("content", "") or "").strip()
+        if not content:
+            continue
+        chunk_type = r.get("chunk_type", "")
+        ch_num = r.get("chapter_number", 0)
+        src = f"类型={chunk_type} 章节={ch_num}" if ch_num else f"类型={chunk_type}"
+        parts.append(f"[片段{i}][{src}]\n{content}")
+    return "\n\n".join(parts)
+
+
 def _fmt_consistency_notes(notes, depth="full"):
     if not notes:
         return ""
@@ -756,7 +794,8 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     "rag_results": {
         "label": "历史参考 RAG", "header": "【历史参考 RAG】", "category": "rag",
-        "loader": None, "formatters": {"full": _fmt_rag_results},
+        "loader": None,
+        "formatters": {"full": _fmt_rag_results, "qa": _fmt_rag_results_qa},
         "default_depth": "full", "task_input": False,
     },
     "consistency_notes": {
@@ -841,6 +880,21 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         "auto_sections": [
             ("review_result", "full"),
             ("consistency_notes", None),
+        ],
+    },
+    # 知识问答（/query 状态查询）：与写作节点共用同一分析器引擎。
+    # selectable = 全部结构化资源（比单节点宽），由 LLM 按用户问题选择；
+    # auto_sections 只挂 RAG 检索（qa 深度：全文注入 + 来源标注）。
+    # 不注入创作约束（undisclosed/consistency_notes/dimensions）。
+    "qa_answer": {
+        "selectable": [
+            "character_state", "character_card", "character_group",
+            "worldview", "power_system", "golden_finger", "foreshadow",
+            "timeline", "previous_chapter", "previous_hook",
+            "volume_outline", "project",
+        ],
+        "auto_sections": [
+            ("rag_results", "qa"),
         ],
     },
 }

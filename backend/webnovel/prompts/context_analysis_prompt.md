@@ -1,7 +1,7 @@
 ---
 system_prompt: 你是一位小说创作的上下文管理专家。你的任务是为当前创作步骤选择最相关的参考信息。输出严格的JSON格式。
 user_prompt: |
-  你正在为第{chapter_index}章的【{step_name}】步骤选择参考上下文。
+  {task_context_line}
 
   【步骤任务】
   {step_description}
@@ -16,12 +16,7 @@ user_prompt: |
 
   {prev_step_selections_text}
 
-  【选择约束】（按优先级）
-  1. 必选：章节规划、卷纲、角色状态、上一章结尾衔接等核心资源——以【资源目录】实际列出为准；目录未列出的说明当前无内容，无需选择
-  2. 建议：前序步骤已选择的条目——至少保留，除非确实不相关
-  3. 可选：其他与本章剧情直接相关的条目——宁少勿滥
-  4. 深度：前文承接用 tail，文风参照用 style；角色核对细节用 full，概要用 summary；设定类用 summary
-  5. 参数：structured_refs 的 resource 只能取【资源目录】中列出的资源名；previous_chapter 必填 chapter_index；character_card/foreshadow 必填 ids（清单中条目编号）
+  {selection_constraints_text}
 
   {dimension_checklist_text}
 
