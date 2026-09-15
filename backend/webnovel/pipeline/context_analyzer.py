@@ -111,11 +111,8 @@ _RESOURCE_CTX_FIELD = {
     "dimensions": "dimensions",
 }
 
-# 任务输入资源：由编排器/上游写入 task_inputs，不经 LLM 选择
-_TASK_INPUT_RESOURCES = ("plot_list", "review_result")
-
-# 数据型约束：由装配器从 structural_data 自动生成，不经 LLM 选择
-_CONSTRAINT_RESOURCES = ("undisclosed_foreshadows", "dimensions", "consistency_notes")
+# 任务输入/约束/RAG 区块已并入 STEP_ASSEMBLY[step]["auto_sections"]，
+# 由装配器统一挂载，不经 LLM 选择（详见 resource_registry.STEP_ASSEMBLY）。
 
 
 class ContextAnalyzer:
@@ -302,21 +299,28 @@ class ContextAnalyzer:
             return ""
 
     def _build_resource_catalog(self, step_name: str, env: Dict[str, Any]) -> str:
-        """按节点白名单构建资源目录文本（候选清单 + 可选深度）。"""
+        """按节点可选白名单构建资源目录文本（候选清单 + 可选深度）。
+
+        只列出当前有实际内容的资源：候选为空（空态/无数据）的资源整条跳过，
+        保证目录 = 可选项 = 注入内容，避免 LLM 误选空资源。
+        """
         assembly = STEP_ASSEMBLY.get(step_name)
         if not assembly:
             return "（无可用资源）"
         lines = []
-        for res_name in assembly["selectable"]:
+        for item in assembly.get("selectable", []):
+            res_name = item[0] if isinstance(item, (list, tuple)) else item
             res = RESOURCE_REGISTRY.get(res_name)
             if not res:
+                continue
+            candidate_text = self._format_resource_candidates(res_name, env)
+            if not candidate_text.strip():
+                # 空资源不列目录
                 continue
             label = res["label"]
             header = res["header"].strip("【】")
             lines.append(f"  {header}（{label}）：")
-            candidate_text = self._format_resource_candidates(res_name, env)
-            if candidate_text:
-                lines.append(candidate_text)
+            lines.append(candidate_text)
             # 深度说明
             depths = list(res["formatters"].keys())
             depth_desc = {
@@ -337,7 +341,7 @@ class ContextAnalyzer:
         if res_name == "character_card":
             chars = inventory.get("characters", [])
             if not chars:
-                return "    （无角色）"
+                return ""
             return "\n".join(
                 f"    [{c.get('id')}] {c.get('name')}({c.get('type')}): {c.get('summary', '')[:20]}"
                 for c in chars[:20]
@@ -345,7 +349,7 @@ class ContextAnalyzer:
         if res_name == "foreshadow":
             loops = inventory.get("foreshadows", [])
             if not loops:
-                return "    （无活跃伏笔）"
+                return ""
             return "\n".join(
                 f"    [{f.get('id')}] [{f.get('tier', '')}] {f.get('content', '')[:30]} "
                 f"(第{f.get('planted_chapter') or 0}章)"
@@ -354,7 +358,7 @@ class ContextAnalyzer:
         if res_name == "worldview":
             worlds = inventory.get("world_settings", [])
             if not worlds:
-                return "    （无世界观设定）"
+                return ""
             return "\n".join(
                 f"    [{w.get('id')}] {w.get('name', '')}: {w.get('summary', '')[:40]}"
                 for w in worlds[:5]
@@ -362,22 +366,22 @@ class ContextAnalyzer:
         if res_name == "power_system":
             ps = inventory.get("power_system")
             if not ps:
-                return "    （未设定力量体系）"
+                return ""
             return f"    {ps.get('name', '')}: {ps.get('summary', '')[:50]}"
         if res_name == "golden_finger":
             gf = inventory.get("golden_finger")
             if not gf:
-                return "    （未设定金手指）"
+                return ""
             return f"    {gf.get('name', '')}: {gf.get('summary', '')[:50]}"
         if res_name == "character_group":
             cg = inventory.get("character_group")
             if not cg:
-                return "    （未设定主角团）"
+                return ""
             return f"    {cg.get('name', '')}: 共同目标 {cg.get('goal', '')[:30]} | 成员: {cg.get('members_summary', '')[:30]}"
         if res_name == "previous_chapter":
             chapters = inventory.get("previous_chapters", [])
             if not chapters:
-                return "    （无前文）"
+                return ""
             return "\n".join(
                 f"    第{ch.get('index')}章: {ch.get('summary', '')[:40]}"
                 for ch in chapters
@@ -385,16 +389,16 @@ class ContextAnalyzer:
         if res_name == "chapter_plan":
             plan = structural.get("current_chapter_plan") or {}
             summary = plan.get("summary", "")[:50] if plan else ""
-            return f"    本章规划概要: {summary or '（无）'}"
+            return "" if not summary else f"    本章规划概要: {summary}"
         if res_name == "volume_outline":
             vol = structural.get("current_volume")
             if not vol:
-                return "    （无当前卷）"
+                return ""
             return f"    卷: {vol.get('volume_name', '')} | 核心冲突: {str(vol.get('core_conflict', ''))[:30]}"
         if res_name == "character_state":
             states = structural.get("last_character_states") or []
             if not states:
-                return "    （无状态记录）"
+                return ""
             return "\n".join(
                 f"    {st.get('character_name') or st.get('name', '?')}: "
                 f"位置 {str(st.get('location', ''))[:20]} | "
@@ -404,7 +408,7 @@ class ContextAnalyzer:
         if res_name == "previous_hook":
             hook = structural.get("previous_hook") or {}
             if not hook.get("hook_content"):
-                return "    （无钩子）"
+                return ""
             return f"    {hook.get('hook_content', '')[:40]}"
         if res_name == "project":
             proj = structural.get("project") or {}
@@ -413,7 +417,7 @@ class ContextAnalyzer:
             from webnovel.repositories import get_timelines_by_project, get_timeline_chapters
             timelines = get_timelines_by_project(env["project_id"])
             if not timelines:
-                return "    （项目暂无时间轴数据）"
+                return ""
             lines = []
             for tl in timelines[:3]:
                 chapters = get_timeline_chapters(tl["id"]) or []
@@ -534,15 +538,29 @@ class ContextAnalyzer:
         selection: Dict[str, Any],
         env: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """按选择指令加载资源、渲染区块、组装 assembled_context。失败抛错。"""
+        """按选择指令加载资源、渲染区块、组装 assembled_context。失败抛错。
+
+        selectable 单源控制：LLM 选中的结构化资源（refs ∈ selectable）100% 注入，
+        按 selectable 顺序组装；auto_sections（任务输入/约束/RAG）固定挂载追加在后。
+        """
         assembly = STEP_ASSEMBLY.get(step_name)
         if not assembly:
             raise ContextAnalysisError(f"未知步骤 {step_name}，无装配配置")
 
+        # 解析 selectable：元素为 "name" 或 ("name", 节点默认深度)
+        selectable_items: List[Tuple[str, Optional[str]]] = []
+        for item in assembly.get("selectable", []):
+            if isinstance(item, (list, tuple)):
+                selectable_items.append((item[0], item[1] if len(item) > 1 else None))
+            else:
+                selectable_items.append((item, None))
+        selectable_names = {name for name, _ in selectable_items}
+        auto_items = assembly.get("auto_sections", [])
+
         ctx: Dict[str, Any] = {}
         sections: Dict[str, str] = {}
 
-        # 1. 结构化资源（按 structured_refs 加载）
+        # 1. 结构化资源（按 structured_refs 加载；LLM 选中即注入，无过滤）
         refs = selection.get("structured_refs") or []
         grouped: Dict[str, List[Dict[str, Any]]] = {}
         for ref in refs:
@@ -561,7 +579,10 @@ class ContextAnalyzer:
                     raise ContextAnalysisError(
                         f"资源 {res_name} 加载失败: {e}")
                 data_list.append(data)
-            depth = ref_list[0].get("depth") or res["default_depth"]
+            # 深度：LLM 显式 depth → 节点默认深度（selectable tuple）→ 资源默认深度
+            depth = ref_list[0].get("depth") or ""
+            if depth not in res["formatters"]:
+                depth = dict(selectable_items).get(res_name) or res["default_depth"]
             sections[res_name] = self._render_resource(res, res_name, data_list, depth)
             # 原始数据保留到 step_ctx（合并列表）
             merged = data_list[0] if len(data_list) == 1 else data_list
@@ -572,72 +593,72 @@ class ContextAnalyzer:
                     data_list if len(data_list) > 1 else data_list
                 )
 
-        # 2. 任务输入资源（不经 LLM 选择，由编排器/上游提供）
-        for res_name in _TASK_INPUT_RESOURCES:
-            if any(s[0] == res_name for s in assembly["sections"]):
-                res = RESOURCE_REGISTRY[res_name]
+        # 2. auto_sections 固定挂载（任务输入/约束/RAG，按配置顺序）
+        for sec_name, sec_depth in auto_items:
+            res = RESOURCE_REGISTRY.get(sec_name)
+            if not res:
+                raise ContextAnalysisError(f"未知资源 {sec_name}（auto_sections）")
+            if res.get("task_input"):
+                # 任务输入资源：由编排器/上游写入，不经 LLM 选择
                 try:
-                    data = res["loader"]({"depth": res["default_depth"]}, env)
+                    data = res["loader"]({"depth": sec_depth or res["default_depth"]}, env)
                 except Exception as e:
                     if isinstance(e, ContextAnalysisError):
                         raise
-                    raise ContextAnalysisError(f"任务输入资源 {res_name} 加载失败: {e}")
-                depth = res["default_depth"]
-                # 节点可能要求特定渲染深度（如剧情审查用 json）
-                for sec_name, sec_depth in assembly["sections"]:
-                    if sec_name == res_name and sec_depth:
-                        depth = sec_depth
-                sections[res_name] = self._render_resource(res, res_name, [data], depth)
-                ctx[_RESOURCE_CTX_FIELD[res_name]] = data
+                    raise ContextAnalysisError(f"任务输入资源 {sec_name} 加载失败: {e}")
+                sections[sec_name] = self._render_resource(
+                    res, sec_name, [data], sec_depth or res["default_depth"])
+                ctx[_RESOURCE_CTX_FIELD[sec_name]] = data
+            elif sec_name == "undisclosed_foreshadows":
+                # 数据型约束
+                undisclosed = env["structural_data"].get("undisclosed_foreshadows") or []
+                sections[sec_name] = res["formatters"]["full"](undisclosed)
+                ctx[sec_name] = undisclosed
+            elif sec_name == "dimensions":
+                # 静态约束（审查维度）
+                sections[sec_name] = res["formatters"]["full"](step_name)
+                ctx[sec_name] = sections[sec_name]
+            elif sec_name == "consistency_notes":
+                # 动态约束（custom_notes 回注）
+                notes = selection.get("custom_notes") or []
+                if not isinstance(notes, list):
+                    notes = [str(notes)]
+                ctx[sec_name] = notes
+                sections[sec_name] = res["formatters"]["full"](notes)
+            elif sec_name == "rag_results":
+                # RAG 检索结果（rag_queries 产物）
+                rag_queries = selection.get("rag_queries") or []
+                if not isinstance(rag_queries, list):
+                    rag_queries = []
+                rag_results = await self._execute_rag_queries(rag_queries, env["project_id"])
+                ctx[sec_name] = rag_results
+                sections[sec_name] = res["formatters"]["full"](rag_results)
+            else:
+                raise ContextAnalysisError(
+                    f"未知 auto_sections 区块类型: {sec_name}")
 
-        # 3. 数据型约束（undisclosed_foreshadows）
-        if any(s[0] == "undisclosed_foreshadows" for s in assembly["sections"]):
-            undisclosed = env["structural_data"].get("undisclosed_foreshadows") or []
-            sections["undisclosed_foreshadows"] = (
-                RESOURCE_REGISTRY["undisclosed_foreshadows"]["formatters"]["full"](undisclosed))
-            ctx["undisclosed_foreshadows"] = undisclosed
-
-        # 4. 静态约束（审查维度）
-        if any(s[0] == "dimensions" for s in assembly["sections"]):
-            sections["dimensions"] = (
-                RESOURCE_REGISTRY["dimensions"]["formatters"]["full"](step_name))
-            ctx["dimensions"] = sections["dimensions"]
-
-        # 5. 动态约束（consistency_notes）
-        notes = selection.get("custom_notes") or []
-        if not isinstance(notes, list):
-            notes = [str(notes)]
-        ctx["consistency_notes"] = notes
-        if any(s[0] == "consistency_notes" for s in assembly["sections"]):
-            sections["consistency_notes"] = (
-                RESOURCE_REGISTRY["consistency_notes"]["formatters"]["full"](notes))
-
-        # 6. RAG 检索结果
-        rag_queries = selection.get("rag_queries") or []
-        if not isinstance(rag_queries, list):
-            rag_queries = []
-        rag_results = await self._execute_rag_queries(rag_queries, env["project_id"])
-        ctx["rag_results"] = rag_results
-        if any(s[0] == "rag_results" for s in assembly["sections"]):
-            sections["rag_results"] = (
-                RESOURCE_REGISTRY["rag_results"]["formatters"]["full"](rag_results))
-
-        # 7. 按节点区块顺序组装 assembled_context（每区块归一化，JSON 块保留缩进）
+        # 3. 组装 assembled_context：selectable 命中项（按 selectable 顺序）+ auto 项（按配置顺序）
         from utils.prompt_normalizer import normalize_text_block
         _JSON_SECTIONS = {"plot_list", "review_result"}
         ordered = []
-        for sec_name, _ in assembly["sections"]:
+        for sec_name, _ in selectable_items:
             if sec_name in sections:
-                header = RESOURCE_REGISTRY[sec_name]["header"]
-                body = sections[sec_name]
-                if sec_name not in _JSON_SECTIONS:
-                    body = normalize_text_block(body, mode="preserve_md_list")
-                if not body or not body.strip():
-                    # 空区块整体跳过，不保留空标题
-                    continue
-                ordered.append(f"{header}\n{body}")
+                ordered.append(sec_name)
+        for sec_name, _ in auto_items:
+            if sec_name in sections:
+                ordered.append(sec_name)
+        ordered_parts = []
+        for sec_name in ordered:
+            header = RESOURCE_REGISTRY[sec_name]["header"]
+            body = sections[sec_name]
+            if sec_name not in _JSON_SECTIONS:
+                body = normalize_text_block(body, mode="preserve_md_list")
+            if not body or not body.strip():
+                # 空区块整体跳过，不保留空标题
+                continue
+            ordered_parts.append(f"{header}\n{body}")
         ctx["assembled_context"] = normalize_text_block(
-            "\n\n".join(ordered), mode="preserve_md_list")
+            "\n\n".join(ordered_parts), mode="preserve_md_list")
         ctx["sections"] = sections
         return ctx
 

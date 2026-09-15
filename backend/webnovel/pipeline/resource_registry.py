@@ -782,87 +782,65 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
 # 任务输入/约束/RAG 由装配器或 rag_queries 注入。
 
 STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
+    # 每节点两清单，均按注入顺序排列：
+    #   selectable   —— LLM 可选资源（分析阶段资源目录展示同一清单）。
+    #                  元素为 "name" 或 ("name", 节点默认深度)。
+    #                  LLM 显式 depth 优先 → 节点默认深度 → res.default_depth。
+    #                  LLM 选中即注入，所见即所得，不再有"选中不注入"。
+    #   auto_sections —— 非 LLM 选择区块（任务输入/约束/RAG），固定挂载，按序追加。
     "chapter_plot_generator": {
-        "sections": [
-            ("chapter_plan", "full"),
-            ("volume_outline", "full"),
-            ("previous_chapter", "full"),
-            ("previous_hook", "full"),
-            ("character_state", "full"),
+        "selectable": [
+            "chapter_plan", "volume_outline", "project", "previous_chapter",
+            "character_state", "previous_hook", "character_card",
+            "character_group", "golden_finger", "power_system",
+            "worldview", "foreshadow", "timeline",
+        ],
+        "auto_sections": [
             ("undisclosed_foreshadows", None),
-            ("character_card", "full"),
-            ("character_group", "full"),
-            ("golden_finger", "full"),
-            ("power_system", "full"),
-            ("worldview", "full"),
-            ("foreshadow", "full"),
             ("rag_results", "full"),
             ("consistency_notes", None),
         ],
-        "selectable": [
-            "chapter_plan", "volume_outline", "project", "character_state",
-            "previous_hook", "character_card", "character_group",
-            "golden_finger", "power_system", "worldview", "foreshadow",
-            "previous_chapter", "timeline",
-        ],
     },
     "chapter_plot_reviewer": {
-        "sections": [
-            ("chapter_plan", "full"),
-            ("volume_outline", "full"),
-            ("character_card", "full"),
-            ("golden_finger", "full"),
-            ("worldview", "full"),
-            ("foreshadow", "full"),
-            ("undisclosed_foreshadows", None),
-            ("dimensions", None),
-        ],
         "selectable": [
             "chapter_plan", "volume_outline", "character_card",
             "golden_finger", "worldview", "foreshadow", "timeline",
         ],
+        "auto_sections": [
+            ("undisclosed_foreshadows", None),
+            ("dimensions", None),
+        ],
     },
     "draft_generator": {
-        "sections": [
-            ("character_card", "summary"),
-            ("previous_chapter", "full"),
-            ("character_state", "full"),
+        "selectable": [
+            ("character_card", "summary"), "previous_chapter", "character_state",
+            "character_group", "worldview", "power_system", "golden_finger",
+            "foreshadow", "timeline",
+        ],
+        "auto_sections": [
             ("undisclosed_foreshadows", None),
             ("plot_list", "list"),
             ("rag_results", "full"),
             ("consistency_notes", None),
         ],
-        "selectable": [
-            "character_card", "previous_chapter", "character_state",
-            "character_group", "worldview", "power_system", "golden_finger",
-            "foreshadow", "timeline",
-        ],
     },
     "draft_reviewer": {
-        "sections": [
-            ("chapter_plan", "full"),
-            ("previous_chapter", "tail"),
-            ("character_state", "full"),
-            ("worldview", "full"),
-            ("character_card", "full"),
+        "selectable": [
+            "chapter_plan", ("previous_chapter", "tail"), "character_state",
+            "worldview", "character_card", "timeline",
+        ],
+        "auto_sections": [
             ("dimensions", None),
             ("consistency_notes", None),
         ],
-        "selectable": [
-            "chapter_plan", "character_state", "worldview",
-            "character_card", "previous_chapter", "timeline",
-        ],
     },
     "draft_polisher": {
-        "sections": [
-            ("review_result", "full"),
-            ("previous_chapter", "style"),
-            ("worldview", "full"),
-            ("power_system", "full"),
-            ("consistency_notes", None),
-        ],
         "selectable": [
-            "worldview", "power_system", "previous_chapter",
+            "worldview", "power_system", ("previous_chapter", "style"),
+        ],
+        "auto_sections": [
+            ("review_result", "full"),
+            ("consistency_notes", None),
         ],
     },
 }
