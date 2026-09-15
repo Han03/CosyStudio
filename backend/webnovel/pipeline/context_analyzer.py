@@ -630,10 +630,14 @@ class ContextAnalyzer:
                     "volume_name": "卷名", "scene": "场景名", "characters": "角色名",
                     "emotion": "情绪", "relation_type": "关系类型", "cool_point_type": "爽点类型",
                     "villain": "反派名", "only_held": "仅持有中",
+                    "thread_type": "主线/支线", "era": "时代", "name": "设定名",
+                    "category": "类别", "entity_type": "变更对象类型",
+                    "entity_id": "对象id（辅助）", "level_name": "境界名",
                 }
                 f_desc = "、".join(
                     f"{f}={filter_desc.get(f, f)}" + ("（优先）" if f in (
-                        "character", "volume_name", "villain", "keyword") else "")
+                        "character", "volume_name", "villain", "keyword",
+                        "name", "era", "level_name") else "")
                     for f in filters)
                 query_res_lines.append(f"    - {label}（{r}）: {f_desc}")
             query_res_text = "\n".join(query_res_lines)
