@@ -1612,7 +1612,7 @@
                 <div class="rag-search-box">
                     <div class="rag-search-inner">
                         <i class="fas fa-search rag-search-icon"></i>
-                        <input type="text" id="queryQuestion" placeholder="输入查询内容，例如：主角当前的修为境界" onkeydown="if(event.key==='Enter')submitQuery()" oninput="toggleQueryClearBtn()">
+                        <input type="text" id="queryQuestion" placeholder="输入问题，例如：主角现在有什么物品？" onkeydown="if(event.key==='Enter')submitQuery()" oninput="toggleQueryClearBtn()">
                         <button class="query-clear-btn" id="queryClearBtn" style="display:none;" onclick="clearQuerySearch()" title="清空搜索">
                             <i class="fas fa-times"></i>
                         </button>
@@ -1623,10 +1623,25 @@
                 </div>
                 <!-- 查询结果区（搜索后显示） -->
                 <div id="queryLoading" style="display:none; text-align:center; padding:20px; color:var(--neu-text-muted);">
-                    <i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>检索中...
+                    <i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>检索并分析中...
                 </div>
                 <div id="queryResult" style="display:none; margin-top:12px;">
-                    <div id="queryResultContent"></div>
+                    <!-- 智能回答（LLM 生成，含来源标注） -->
+                    <div id="queryAnswerBlock" style="display:none;">
+                        <div class="query-answer-card">
+                            <div class="query-answer-header"><i class="fas fa-robot"></i> 智能回答</div>
+                            <div class="query-answer-text" id="queryAnswerText"></div>
+                            <div class="query-source-list" id="querySourceList"></div>
+                        </div>
+                    </div>
+                    <!-- 参考片段（可折叠核对） -->
+                    <div id="queryRefBlock" style="display:none;">
+                        <div class="query-ref-toggle" onclick="toggleQueryRef()">
+                            <i class="fas fa-chevron-right" id="queryRefChevron"></i>
+                            <span id="queryRefTitle">参考片段</span>
+                        </div>
+                        <div id="queryRefContent" style="display:none;"></div>
+                    </div>
                 </div>
                 <div id="queryEmpty" style="display:none; text-align:center; padding:30px; color:var(--neu-text-muted);">
                     <i class="fas fa-inbox" style="font-size:24px; margin-bottom:8px; display:block;"></i>
@@ -1637,15 +1652,18 @@
                     <div class="rag-browse-toolbar">
                         <div class="rag-browse-filters" id="ragBrowseFilters">
                             <span class="rag-browse-filter active" data-type="" onclick="filterRagBrowse('')">全部</span>
-                            <span class="rag-browse-filter" data-type="character" onclick="filterRagBrowse('character')">角色</span>
-                            <span class="rag-browse-filter" data-type="worldview" onclick="filterRagBrowse('worldview')">世界观</span>
-                            <span class="rag-browse-filter" data-type="power_system" onclick="filterRagBrowse('power_system')">力量体系</span>
-                            <span class="rag-browse-filter" data-type="golden_finger" onclick="filterRagBrowse('golden_finger')">金手指</span>
-                            <span class="rag-browse-filter" data-type="volume_outline" onclick="filterRagBrowse('volume_outline')">卷纲</span>
-                            <span class="rag-browse-filter" data-type="foreshadow" onclick="filterRagBrowse('foreshadow')">伏笔</span>
                             <span class="rag-browse-filter" data-type="chapter" onclick="filterRagBrowse('chapter')">章节</span>
                             <span class="rag-browse-filter" data-type="chapter_summary" onclick="filterRagBrowse('chapter_summary')">章节摘要</span>
                             <span class="rag-browse-filter" data-type="chapter_paragraph" onclick="filterRagBrowse('chapter_paragraph')">章节原文</span>
+                            <span class="rag-browse-filter" data-type="csv_plot" onclick="filterRagBrowse('csv_plot')">剧情模板</span>
+                            <span class="rag-browse-filter" data-type="csv_pacing" onclick="filterRagBrowse('csv_pacing')">节奏技巧</span>
+                            <span class="rag-browse-filter" data-type="csv_verdict" onclick="filterRagBrowse('csv_verdict')">裁决规则</span>
+                            <span class="rag-browse-filter" data-type="csv_scene" onclick="filterRagBrowse('csv_scene')">场景模式</span>
+                            <span class="rag-browse-filter" data-type="csv_writing" onclick="filterRagBrowse('csv_writing')">写作技巧</span>
+                            <span class="rag-browse-filter" data-type="csv_naming" onclick="filterRagBrowse('csv_naming')">命名规则</span>
+                            <span class="rag-browse-filter" data-type="csv_character_knowledge" onclick="filterRagBrowse('csv_character_knowledge')">角色知识</span>
+                            <span class="rag-browse-filter" data-type="csv_golden_finger_knowledge" onclick="filterRagBrowse('csv_golden_finger_knowledge')">金手指知识</span>
+                            <span class="rag-browse-filter" data-type="csv_genre_tone" onclick="filterRagBrowse('csv_genre_tone')">题材基调</span>
                         </div>
                         <div class="rag-browse-stats" id="ragBrowseStats"></div>
                     </div>
@@ -1660,7 +1678,7 @@
             </div>
             <div class="modal-footer" style="justify-content: space-between;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <button class="btn btn-secondary" id="reindexRagBtn" onclick="startReindexRag()" title="清空旧向量数据并重新索引项目设定和所有章节内容">
+                    <button class="btn btn-secondary" id="reindexRagBtn" onclick="startReindexRag()" title="清空旧向量数据并重新索引创作知识与所有章节内容">
                         <i class="fas fa-sync-alt"></i> 重建RAG索引
                     </button>
                     <span id="reindexProgressText" style="font-size:12px; color:var(--neu-text-muted); display:none;"></span>

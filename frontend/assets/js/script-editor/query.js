@@ -110,10 +110,11 @@ async function loadRagBrowse() {
 
 function renderRagBrowseItems(items, container) {
     const typeLabels = {
-        'character': '角色', 'worldview': '世界观', 'power_system': '力量体系',
-        'golden_finger': '金手指', 'volume_outline': '卷纲', 'foreshadow': '伏笔',
-        'villain': '反派', 'chapter': '章节', 'chapter_summary': '章节摘要',
-        'chapter_paragraph': '章节原文',
+        'chapter': '章节', 'chapter_summary': '章节摘要', 'chapter_paragraph': '章节原文',
+        'csv_plot': '剧情模板', 'csv_pacing': '节奏技巧', 'csv_verdict': '裁决规则',
+        'csv_scene': '场景模式', 'csv_writing': '写作技巧', 'csv_naming': '命名规则',
+        'csv_character_knowledge': '角色知识', 'csv_golden_finger_knowledge': '金手指知识',
+        'csv_genre_tone': '题材基调',
     };
 
     let html = '';
@@ -219,9 +220,19 @@ async function submitQuery() {
         document.getElementById('queryLoading').style.display = 'none';
 
         if (data.success) {
+            const answer = data.answer || '';
             const chunks = data.chunks || [];
-            if (chunks.length > 0) {
-                renderQueryResults(chunks, !!data.reranked);
+            if (answer || chunks.length > 0) {
+                if (answer) {
+                    renderQueryAnswer(data);
+                } else {
+                    document.getElementById('queryAnswerBlock').style.display = 'none';
+                }
+                if (chunks.length > 0) {
+                    renderQueryRef(chunks, !!data.reranked);
+                } else {
+                    document.getElementById('queryRefBlock').style.display = 'none';
+                }
                 document.getElementById('queryResult').style.display = 'block';
             } else {
                 document.getElementById('queryEmpty').style.display = 'block';
@@ -238,10 +249,11 @@ async function submitQuery() {
 
 function renderQueryResults(chunks, reranked = false) {
     const typeLabels = {
-        'character': '角色', 'worldview': '世界观', 'power_system': '力量体系',
-        'golden_finger': '金手指', 'volume_outline': '卷纲', 'foreshadow': '伏笔',
-        'villain': '反派', 'chapter': '章节', 'chapter_summary': '章节摘要',
-        'chapter_paragraph': '章节原文',
+        'chapter': '章节', 'chapter_summary': '章节摘要', 'chapter_paragraph': '章节原文',
+        'csv_plot': '剧情模板', 'csv_pacing': '节奏技巧', 'csv_verdict': '裁决规则',
+        'csv_scene': '场景模式', 'csv_writing': '写作技巧', 'csv_naming': '命名规则',
+        'csv_character_knowledge': '角色知识', 'csv_golden_finger_knowledge': '金手指知识',
+        'csv_genre_tone': '题材基调',
     };
 
     // 按 chunk_type 分组，保持后端返回的顺序（分类已按首条分数降序排列）
@@ -256,11 +268,8 @@ function renderQueryResults(chunks, reranked = false) {
         grouped[cat].push(chunk);
     }
 
-    const container = document.getElementById('queryResultContent');
-    // 重排序提示：结果已经过片段重排序模型二次精排，按相关性降序排列
-    let html = reranked
-        ? `<div class="query-rerank-hint"><i class="fas fa-magic"></i> 结果已经片段重排序模型精排，按相关性降序排列</div>`
-        : '';
+    const container = document.getElementById('queryRefContent');
+    let html = '';
     for (const cat of categoryOrder) {
         const items = grouped[cat];
         const typeLabel = typeLabels[cat] || cat || '未知';
@@ -299,6 +308,53 @@ function renderQueryResults(chunks, reranked = false) {
         html += `</div>`;
     }
     container.innerHTML = html;
+}
+
+// ========== 智能回答渲染 ==========
+
+function renderQueryAnswer(data) {
+    const answer = data.answer || '';
+    const sources = data.sources || [];
+    const typeLabels = {
+        'chapter': '章节', 'chapter_summary': '章节摘要', 'chapter_paragraph': '章节原文',
+        'csv_plot': '剧情模板', 'csv_pacing': '节奏技巧', 'csv_verdict': '裁决规则',
+        'csv_scene': '场景模式', 'csv_writing': '写作技巧', 'csv_naming': '命名规则',
+        'csv_character_knowledge': '角色知识', 'csv_golden_finger_knowledge': '金手指知识',
+        'csv_genre_tone': '题材基调',
+    };
+
+    document.getElementById('queryAnswerText').textContent = answer;
+    const badges = sources.map(s => {
+        const label = typeLabels[s.chunk_type] || s.chunk_type || 'RAG';
+        const ch = s.chapter_number ? ` · 第${s.chapter_number}章` : '';
+        return `<span class="query-source-badge"><i class="fas fa-book"></i> ${escapeHtml(label)}${ch}</span>`;
+    }).join('');
+    const srcEl = document.getElementById('querySourceList');
+    srcEl.innerHTML = badges
+        ? `<span class="query-source-label">来源：</span>` + badges
+        : '';
+    document.getElementById('queryAnswerBlock').style.display = '';
+}
+
+function renderQueryRef(chunks, reranked) {
+    const block = document.getElementById('queryRefBlock');
+    document.getElementById('queryRefTitle').textContent = `参考片段（${chunks.length}）`;
+    renderQueryResults(chunks, reranked);
+    document.getElementById('queryRefContent').style.display = 'none';
+    document.getElementById('queryRefChevron').className = 'fas fa-chevron-right';
+    block.style.display = '';
+}
+
+function toggleQueryRef() {
+    const contentEl = document.getElementById('queryRefContent');
+    const chevron = document.getElementById('queryRefChevron');
+    if (contentEl.style.display === 'none') {
+        contentEl.style.display = '';
+        chevron.className = 'fas fa-chevron-down';
+    } else {
+        contentEl.style.display = 'none';
+        chevron.className = 'fas fa-chevron-right';
+    }
 }
 
 // ========== RAG 重建索引 ==========
@@ -340,7 +396,7 @@ async function startReindexRag() {
 
     // 二次确认
     const confirmed = confirm(
-        '将清空项目所有 RAG 向量数据，然后重新索引项目设定和已有章节内容。\n\n' +
+        '将清空项目所有 RAG 向量数据，然后重新索引创作知识与已有章节内容。\n\n' +
         '注意：重建过程需要计算 embedding，耗时取决于章节数量。\n' +
         '重建完成前请勿关闭页面。'
     );
