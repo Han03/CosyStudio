@@ -8,7 +8,7 @@ user_prompt: |
   重点关注：{focus}
 
   【资源目录】
-  以下仅列出本步骤的重要/热点参考信息（写作锚点）。条目中 `id=` 后的数字即引用键：structured_refs 的 ids 直接使用该数字；previous_chapter 使用目录中的第N章章节号。目录未列出的数据（其他角色、历史章节、历史伏笔、角色关系、成长弧、剧情点、卷纲等）可通过 structured_queries 按条件查询获取：
+  以下仅列出本步骤的重要/热点参考信息。可通过 structured_queries 按条件查询获取：
   {resource_catalog}
 
   【RAG候选】

@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Optional
 
 from utils.logger import log_manager
 from utils.llm_json_parser import parse_llm_json
+from repositories.base_repository import safe_int
 
 from webnovel.pipeline.resource_registry import (
     RESOURCE_REGISTRY, STEP_ASSEMBLY, ContextAnalysisError,
@@ -409,7 +410,7 @@ class ContextAnalyzer:
             idx += 1
             header = res["header"].strip("【】")
             label = res["label"]
-            title = f"【{header}】" + (f" {label}" if label and label != header else "")
+            title = f"{header}" + (f" {label}" if label and label != header else "")
             # 可查询资源：目录仅列热点，全量/筛选用 structured_queries
             if res_name in (assembly.get("queryable") or []):
                 title += "（更多用查询）"
@@ -753,10 +754,10 @@ class ContextAnalyzer:
             # previous_chapter 深度规约：full 仅限最近 2 章，更早章节强制 tail
             # （防注入膨胀：旧章全文进创作 prompt）。规约须在 loader 执行前修改 ref。
             if res_name == "previous_chapter" and env.get("chapter_index"):
-                cur_ch = int(env["chapter_index"])
+                cur_ch = safe_int(env["chapter_index"])
                 for ref in ref_list:
-                    rch = ref.get("chapter_index")
-                    if (rch is not None and int(rch) < cur_ch - 2
+                    rch = safe_int(ref.get("chapter_index"))
+                    if (rch > 0 and rch < cur_ch - 2
                             and ref.get("depth") == "full"):
                         self._logger.info(
                             f"[ContextAnalyzer] 第{rch}章 previous_chapter depth=full "
