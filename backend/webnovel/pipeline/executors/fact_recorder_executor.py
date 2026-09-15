@@ -477,6 +477,32 @@ class FactRecorderExecutor(BaseExecutor):
                 result.append(cp)
         return result
 
+    def _format_existing_chars_text(self, existing_chars: list) -> str:
+        """将已有角色列表渲染为易读文本（替代 JSON 注入）。
+
+        每角色一行：姓名/曾用名/身份/类型 带中文标签，`｜` 分隔；
+        曾用名为空显示 "-"（明确表示无别名，避免 LLM 误判重复）；
+        无角色时返回占位提示。
+        """
+        if not existing_chars:
+            return "（暂无已有角色）"
+        lines = []
+        for c in existing_chars:
+            name = c.get("name", "") or c.get("character_name", "")
+            if not name:
+                continue
+            alias = (c.get("alias") or "").strip()
+            identity = (c.get("identity") or "").strip()
+            ctype = (c.get("character_type") or "").strip()
+            parts = [f"姓名：{name}"]
+            parts.append(f"曾用名：{alias}" if alias else "曾用名：-")
+            if identity:
+                parts.append(f"身份：{identity}")
+            if ctype:
+                parts.append(f"类型：{ctype}")
+            lines.append("- " + " ｜ ".join(parts))
+        return "\n".join(lines) if lines else "（暂无已有角色）"
+
     async def _create_new_characters(
         self, script_id: int, draft_content: str, inventory: Dict[str, Any]
     ):
@@ -500,14 +526,8 @@ class FactRecorderExecutor(BaseExecutor):
                         existing_aliases.add(a.strip())
 
             # 构建已有角色列表文本（包含身份和曾用名信息，帮助 LLM 判断是否为同一角色）
-            existing_chars_text = json.dumps(
-                [{"name": c.get("name", "") or c.get("character_name", ""),
-                  "alias": c.get("alias", ""),
-                  "identity": c.get("identity", ""),
-                  "type": c.get("character_type", "")}
-                 for c in existing_chars if (c.get("name", "") or c.get("character_name", ""))],
-                ensure_ascii=False
-            ) if existing_chars else "[]"
+            # 用易读文本而非 JSON：每角色一行，姓名/曾用名/身份/类型带中文标签，便于 LLM 对照防重复
+            existing_chars_text = self._format_existing_chars_text(existing_chars)
 
             # 正文截断策略：首尾各取一半，确保覆盖全章角色
             if len(draft_content) > 6000:
