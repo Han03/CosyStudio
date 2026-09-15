@@ -927,6 +927,7 @@ class InitExecutor(BaseExecutor):
                 "personality_flaw": project_data.get("protagonist_flaw", ""),
                 "flaw": project_data.get("protagonist_flaw", ""),
                 "desire": project_data.get("protagonist_desire", ""),
+                "true_desire": project_data.get("protagonist_desire", ""),
                 "archetype": project_data.get("protagonist_archetype", ""),
                 "structure": project_data.get("protagonist_structure", "单主角"),
             })
@@ -1330,14 +1331,6 @@ class InitExecutor(BaseExecutor):
                     # 不能放在 **vo_data 中，否则会报 "got multiple values for argument 'volume_number'"
                     vo_num = _parse_chapter_num(volume.get("volume_number", 0), 0)
                     vo = add_volume_outline(project_id, vo_num, **vo_data)
-                    vo_id = vo["id"]
-
-                    crises = volume.get("key_foreshadowing", [])[:3]
-                    if not isinstance(crises, list):
-                        crises = []
-                    for i, crisis in enumerate(crises):
-                        crisis_text = _safe_str(crisis) if not isinstance(crisis, str) else crisis
-                        add_volume_crisis(vo_id, crisis_order=i + 1, crisis_event=crisis_text)
 
                 for thread in _safe_items(plot_threads):
                     # 将LLM返回的丰富字段映射到DB的精简结构(thread_type/content/status/chapter)
