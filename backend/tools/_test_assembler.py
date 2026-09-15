@@ -204,7 +204,8 @@ async def main():
         [],
     )
 
-    # 草稿生成：任务输入 plot_list + 设定类资源（世界/力量/金手指/主角团）均须注入
+    # 草稿生成：任务输入 plot_list + 设定类资源（世界/力量/金手指/主角团）均须注入；
+    # character_card 以 ("character_card", "summary") tuple 形式配置，选中须合法注入
     await test_gather_step(
         "draft_generator",
         [
@@ -214,6 +215,7 @@ async def main():
             {"resource": "power_system", "depth": "full"},
             {"resource": "golden_finger", "depth": "full"},
             {"resource": "character_group", "depth": "full"},
+            {"resource": "character_card", "depth": "summary"},
         ],
         ["[物品] 铜钱: 已交给李承言保管"],
         task_inputs={"plot_list": [{"scene": "客栈", "description": "对话", "characters": ["李承言"], "emotion": "平静", "conflict": ""}]},

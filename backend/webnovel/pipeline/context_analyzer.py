@@ -197,9 +197,12 @@ class ContextAnalyzer:
             if not selection or not isinstance(selection, dict):
                 raise ContextAnalysisError(f"步骤 {step_name} 上下文分析返回非 JSON")
 
-            # 校验结构化引用：只允许本节点可选的资源
+            # 校验结构化引用：只允许本节点可选的资源（selectable 元素为
+            # "name" 或 ("name", 节点默认深度)，统一解析为资源名）
             assembly = STEP_ASSEMBLY.get(step_name)
-            selectable = set(assembly["selectable"]) if assembly else set()
+            selectable = set()
+            for item in (assembly["selectable"] if assembly else []):
+                selectable.add(item[0] if isinstance(item, (list, tuple)) else item)
             refs = selection.get("structured_refs") or []
             if not isinstance(refs, list):
                 raise ContextAnalysisError(f"步骤 {step_name} structured_refs 格式非法")
@@ -462,7 +465,8 @@ class ContextAnalyzer:
         }
         # 前文按承接需求引导 depth：剧情承接用 tail，文风参照用 style
         _PREV_CH_DEPTH_RECOMMEND = {"previous_chapter": "tail"}
-        for r in selectable:
+        for item in selectable:
+            r = item[0] if isinstance(item, (list, tuple)) else item
             label = res_labels.get(r, r)
             res = RESOURCE_REGISTRY.get(r, {})
             depths = list(res.get("formatters", {}).keys())
