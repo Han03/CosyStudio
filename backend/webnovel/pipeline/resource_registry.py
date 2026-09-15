@@ -31,12 +31,20 @@ from webnovel.repositories import (
     get_villain_hierarchy,
     get_villain_plot_nodes,
     get_worldview_by_project, get_worldview_factions,
+    get_worldview_history,
     get_power_system_by_project,
+    get_power_levels,
     get_golden_finger_by_project,
+    get_golden_finger_upgrades,
+    get_golden_finger_payoffs,
+    get_golden_finger_feedbacks,
     get_character_group_by_project, get_character_group_members,
     get_timelines_by_project, get_timeline_chapters,
     get_volume_outlines_by_project,
     get_chapter_meta_list,
+    get_plot_threads,
+    get_worldview_settings_by_project,
+    get_review_records,
 )
 from repositories.base_repository import safe_int
 from webnovel.repositories.character_state_repository import (
@@ -687,6 +695,160 @@ def _query_villains(ref, env):
     return rows
 
 
+def _query_plot_threads(ref, env):
+    """剧情线：thread_type（主线/支线）/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    rows = get_plot_threads(project_id) or []
+    tt = filters.get("thread_type")
+    if tt:
+        rows = [r for r in rows if str(tt) in str(r.get("thread_type", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("content", "")) + str(r.get("status", "")))]
+    rows.sort(key=lambda r: (r.get("thread_type", "") == "主线", r.get("chapter") or 0))
+    return rows[:limit]
+
+
+def _query_worldview_history(ref, env):
+    """世界观历史：era（时代，主）/keyword（事件）。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    wv = get_worldview_by_project(project_id)
+    if not wv:
+        return []
+    rows = get_worldview_history(wv.get("id")) or []
+    era = filters.get("era")
+    if era:
+        rows = [r for r in rows if str(era) in str(r.get("era", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in str(r.get("event", ""))]
+    rows.sort(key=lambda r: r.get("id") or 0)
+    return rows[:limit]
+
+
+def _query_worldview_settings(ref, env):
+    """世界观设定：name（设定名，主）/category/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    rows = get_worldview_settings_by_project(project_id) or []
+    name = filters.get("name")
+    if name:
+        rows = [r for r in rows if str(name) in str(r.get("name", ""))]
+    category = filters.get("category")
+    if category:
+        rows = [r for r in rows if str(category) in str(r.get("category", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("name", "")) + str(r.get("content", "")))]
+    rows.sort(key=lambda r: (r.get("chapter_number") or 0))
+    return rows[:limit]
+
+
+def _query_setting_changes(ref, env):
+    """基础设定变更记录：entity_type/chapter/entity_id（辅助）/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    from repositories.base_repository import _get_conn
+    conn = _get_conn()
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM webnovel_setting_change WHERE project_id = ? ORDER BY id",
+        (project_id,)).fetchall()]
+    et = filters.get("entity_type")
+    if et:
+        rows = [r for r in rows if str(et) in str(r.get("entity_type", ""))]
+    ch = filters.get("chapter")
+    if ch is not None:
+        rows = [r for r in rows if (r.get("chapter_number") or 0) == safe_int(ch)]
+    eid = filters.get("entity_id")
+    if eid is not None:
+        rows = [r for r in rows if str(r.get("entity_id")) == str(eid)]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("before_data", "")) + str(r.get("after_data", ""))
+                 + str(r.get("change_type", "")))]
+    return rows[:limit]
+
+
+def _query_timeline_chapters(ref, env):
+    """章节时间轴：chapter/keyword（锚点/时长/倒计时说明）。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 8)
+    project_id = env["project_id"]
+    timelines = get_timelines_by_project(project_id) or []
+    rows = []
+    for tl in timelines:
+        for c in (get_timeline_chapters(tl.get("id")) or []):
+            row = dict(c)
+            row["volume_number"] = tl.get("volume_number")
+            rows.append(row)
+    ch = filters.get("chapter")
+    if ch is not None:
+        rows = [r for r in rows if (r.get("chapter_number") or 0) == safe_int(ch)]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("time_anchor", "")) + str(r.get("notes", ""))
+                 + str(r.get("countdown_status", "")))]
+    rows.sort(key=lambda r: (r.get("chapter_number") or 0))
+    return rows[:limit]
+
+
+def _query_golden_finger_progress(ref, env):
+    """金手指动态（升级/兑现/代价）：keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 8)
+    project_id = env["project_id"]
+    gf = get_golden_finger_by_project(project_id)
+    if not gf:
+        return []
+    rows = []
+    for u in (get_golden_finger_upgrades(gf.get("id")) or []):
+        rows.append({"kind": "升级", "title": u.get("stage", ""),
+                     "description": u.get("description", "")})
+    for p in (get_golden_finger_payoffs(gf.get("id")) or []):
+        rows.append({"kind": "兑现", "title": p.get("type", ""),
+                     "description": p.get("description", "")})
+    for fb in (get_golden_finger_feedbacks(gf.get("id")) or []):
+        interval = fb.get("chapter_interval") or ""
+        rows.append({"kind": "代价", "title": f"{fb.get('type', '')}"
+                     + (f"（约每{interval}章）" if interval else ""),
+                     "description": fb.get("description", "")})
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("title", "")) + str(r.get("description", "")))]
+    return rows[:limit]
+
+
+def _query_power_levels(ref, env):
+    """境界明细：level_name（境界名，主）/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 8)
+    project_id = env["project_id"]
+    ps = get_power_system_by_project(project_id)
+    if not ps:
+        return []
+    rows = get_power_levels(ps.get("id")) or []
+    ln = filters.get("level_name")
+    if ln:
+        rows = [r for r in rows if str(ln) in str(r.get("level_name", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in
+                (str(r.get("core_abilities", "")) + str(r.get("breakthrough_method", "")))]
+    rows.sort(key=lambda r: r.get("level_order") or 0)
+    return rows[:limit]
+
+
 # ── 格式化器：统一签名 formatter(data, depth) -> str（不含区块标题）──
 
 def _fmt_chapter_plan(plan, depth="full"):
@@ -911,9 +1073,11 @@ def _fmt_chapter_plots(plots, depth="full"):
 
 
 def _fmt_chapter_plans(plans, depth="full"):
-    """历史章节规划（结构化查询结果渲染）。"""
+    """历史章节规划（结构化查询结果渲染；兼容单条 dict → 复用丰富版）。"""
     if not plans:
         return ""
+    if isinstance(plans, dict):
+        return _fmt_chapter_plan(plans, depth)
     lines = []
     for p in plans[:5]:
         ch = p.get("chapter_index") or 0
@@ -925,9 +1089,11 @@ def _fmt_chapter_plans(plans, depth="full"):
 
 
 def _fmt_volume_outlines(vols, depth="full"):
-    """历史卷纲（结构化查询结果渲染）。"""
+    """历史卷纲（结构化查询结果渲染；兼容单条 dict → 复用丰富版）。"""
     if not vols:
         return ""
+    if isinstance(vols, dict):
+        return _fmt_volume_outline(vols, depth)
     lines = []
     for v in vols[:5]:
         num = v.get("volume_number") or 0
@@ -985,6 +1151,105 @@ def _fmt_villains(villains, depth="full"):
             node_str = "；".join(
                 f"第{n.get('chapter', 0)}章[{n.get('node_type', '')}]" for n in nodes[:3])
             line += f" | 计划: {node_str}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_plot_threads(threads, depth="full"):
+    """剧情线（结构化查询结果渲染）。"""
+    if not threads:
+        return ""
+    lines = []
+    for t in threads[:5]:
+        content = (t.get("content", "") or "").replace("\n", " ")[:80]
+        status = (t.get("status", "") or "").replace("\n", " ")[:30]
+        line = f"- [{t.get('thread_type', '')}] {content}"
+        if status:
+            line += f" | 现状: {status}"
+        if t.get("chapter"):
+            line += f"（当前至第{t.get('chapter')}章）"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_worldview_history(histories, depth="full"):
+    """世界观历史（结构化查询结果渲染）。"""
+    if not histories:
+        return ""
+    lines = []
+    for h in histories[:5]:
+        lines.append(f"- {h.get('era', '')}: {(h.get('event', '') or '')[:70]}")
+    return "\n".join(lines)
+
+
+def _fmt_worldview_settings(settings, depth="full"):
+    """世界观设定（结构化查询结果渲染）。"""
+    if not settings:
+        return ""
+    lines = []
+    for s in settings[:5]:
+        cat = s.get("category", "")
+        lines.append(f"- {s.get('name', '')}"
+                     + (f"（{cat}）" if cat else "")
+                     + f": {(s.get('content', '') or '')[:60]}")
+    return "\n".join(lines)
+
+
+def _fmt_setting_changes(changes, depth="full"):
+    """基础设定变更记录（结构化查询结果渲染）。"""
+    if not changes:
+        return ""
+    lines = []
+    for c in changes[:5]:
+        after = (c.get("after_data", "") or "").replace("\n", " ")[:60]
+        lines.append(
+            f"- 第{c.get('chapter_number', '?')}章 [{c.get('entity_type', '')}"
+            f"#{c.get('entity_id', '')}] {c.get('change_type', '')}: {after}")
+    return "\n".join(lines)
+
+
+def _fmt_timeline_chapters(chapters, depth="full"):
+    """章节时间轴（结构化查询结果渲染）。"""
+    if not chapters:
+        return ""
+    lines = []
+    for c in chapters[:8]:
+        parts = [f"第{c.get('chapter_number', '?')}章",
+                 f"锚点 {c.get('time_anchor', '') or '未知'}",
+                 f"时长 {c.get('chapter_duration', '') or '?'}"]
+        if c.get("interval_from_prev"):
+            parts.append(f"距上章 {c.get('interval_from_prev')}")
+        if c.get("countdown_status") and str(c.get("countdown_status")) not in ("无", ""):
+            parts.append(f"倒计时 {c.get('countdown_status')}")
+        line = " | ".join(parts)
+        if c.get("notes"):
+            line += f"（{(c.get('notes') or '')[:30]}）"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _fmt_golden_finger_progress(rows, depth="full"):
+    """金手指动态（升级/兑现/代价，结构化查询结果渲染）。"""
+    if not rows:
+        return ""
+    lines = []
+    for r in rows[:8]:
+        lines.append(f"- [{r.get('kind', '')}] {r.get('title', '')}: "
+                     f"{(r.get('description', '') or '')[:60]}")
+    return "\n".join(lines)
+
+
+def _fmt_power_levels(levels, depth="full"):
+    """境界明细（结构化查询结果渲染）。"""
+    if not levels:
+        return ""
+    lines = []
+    for lv in levels[:6]:
+        line = f"- {lv.get('level_name', '')}: {(lv.get('core_abilities', '') or '')[:50]}"
+        if lv.get("breakthrough_method"):
+            line += f" | 突破: {(lv.get('breakthrough_method') or '')[:30]}"
+        if lv.get("failure_cost"):
+            line += f" | 代价: {(lv.get('failure_cost') or '')[:20]}"
         lines.append(line)
     return "\n".join(lines)
 
@@ -1254,16 +1519,6 @@ def _fmt_dimensions(step_name, depth="full"):
 # ── 资源注册表 ────────────────────────────────────────────────
 
 RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
-    "chapter_plan": {
-        "label": "章节规划", "header": "【章节规划】", "category": "structured",
-        "loader": _load_chapter_plan, "formatters": {"full": _fmt_chapter_plan},
-        "default_depth": "full", "task_input": False,
-    },
-    "volume_outline": {
-        "label": "当前卷纲", "header": "【当前卷纲】", "category": "structured",
-        "loader": _load_volume_outline, "formatters": {"full": _fmt_volume_outline},
-        "default_depth": "full", "task_input": False,
-    },
     "project": {
         "label": "项目信息", "header": "【项目信息】", "category": "structured",
         "loader": _load_project, "formatters": {"full": _fmt_project},
@@ -1319,14 +1574,14 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     "chapter_plan": {
         "label": "章节规划", "header": "【章节规划】", "category": "structured",
-        "loader": None, "formatters": {"full": _fmt_chapter_plans},
+        "loader": _load_chapter_plan, "formatters": {"full": _fmt_chapter_plans},
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_chapter_plans,
         "query_filters": ["chapter", "keyword"],
     },
     "volume_outline": {
         "label": "卷纲", "header": "【卷纲】", "category": "structured",
-        "loader": None, "formatters": {"full": _fmt_volume_outlines},
+        "loader": _load_volume_outline, "formatters": {"full": _fmt_volume_outlines},
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_volume_outlines,
         "query_filters": ["volume_name", "volume", "keyword"],
@@ -1351,6 +1606,55 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_depth": "full", "task_input": False,
         "queryable": True, "query_loader": _query_villains,
         "query_filters": ["villain", "tier", "chapter", "keyword"],
+    },
+    "plot_thread": {
+        "label": "剧情线", "header": "【剧情线】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_plot_threads},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_plot_threads,
+        "query_filters": ["thread_type", "keyword"],
+    },
+    "worldview_history": {
+        "label": "世界观历史", "header": "【世界观历史】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_worldview_history},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_worldview_history,
+        "query_filters": ["era", "keyword"],
+    },
+    "worldview_setting": {
+        "label": "世界观设定", "header": "【世界观设定】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_worldview_settings},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_worldview_settings,
+        "query_filters": ["name", "category", "keyword"],
+    },
+    "setting_change": {
+        "label": "设定变更记录", "header": "【设定变更】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_setting_changes},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_setting_changes,
+        "query_filters": ["entity_type", "chapter", "entity_id", "keyword"],
+    },
+    "timeline_chapter": {
+        "label": "章节时间轴", "header": "【章节时间轴明细】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_timeline_chapters},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_timeline_chapters,
+        "query_filters": ["chapter", "keyword"],
+    },
+    "golden_finger_progress": {
+        "label": "金手指动态", "header": "【金手指动态】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_golden_finger_progress},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_golden_finger_progress,
+        "query_filters": ["keyword"],
+    },
+    "power_level": {
+        "label": "境界明细", "header": "【境界明细】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_power_levels},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_power_levels,
+        "query_filters": ["level_name", "keyword"],
     },
     "character_group": {
         "label": "主角团", "header": "【主角团】", "category": "structured",
@@ -1450,6 +1754,9 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "character_item", "character_relationship", "character_growth",
             "chapter_plot", "chapter_plan", "volume_outline", "chapter_meta",
             "cool_points", "villain",
+            "plot_thread", "worldview_history", "worldview_setting",
+            "setting_change", "timeline_chapter", "golden_finger_progress",
+            "power_level",
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
@@ -1465,6 +1772,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         "queryable": [
             "character_card", "foreshadow", "timeline",
             "chapter_plan", "character_relationship", "chapter_plot", "villain",
+            "plot_thread", "timeline_chapter", "worldview_history",
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
@@ -1482,6 +1790,9 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "character_item", "character_relationship", "character_growth",
             "chapter_plot", "chapter_plan", "volume_outline", "chapter_meta",
             "cool_points", "villain",
+            "plot_thread", "worldview_history", "worldview_setting",
+            "setting_change", "timeline_chapter", "golden_finger_progress",
+            "power_level",
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
@@ -1498,6 +1809,8 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         "queryable": [
             "character_card", "character_state", "timeline",
             "chapter_plot", "chapter_meta", "character_relationship",
+            "worldview_setting", "setting_change", "power_level",
+            "timeline_chapter", "plot_thread",
         ],
         "auto_sections": [
             ("dimensions", None),
@@ -1530,6 +1843,9 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "character_item", "character_relationship", "character_growth",
             "chapter_plot", "chapter_plan", "volume_outline", "chapter_meta",
             "cool_points", "villain",
+            "plot_thread", "worldview_history", "worldview_setting",
+            "setting_change", "timeline_chapter", "golden_finger_progress",
+            "power_level",
         ],
         "auto_sections": [
             ("rag_results", "qa"),
