@@ -100,7 +100,7 @@ from .csv_pack_repository import (
     get_all_csv_packs, get_csv_packs_by_genre, get_csv_packs_by_category_group,
     update_csv_pack, delete_csv_pack, clear_all_csv_packs,
     get_csv_pack_count, get_unique_categories, get_unique_category_groups,
-    format_pack_for_prompt
+    format_pack_for_prompt, filter_packs_by_template
 )
 from .csv_knowledge_repository import (
     query_csv_knowledge, format_csv_knowledge_for_prompt, build_csv_knowledge_chunk_text
