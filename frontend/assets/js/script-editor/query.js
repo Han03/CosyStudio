@@ -322,16 +322,33 @@ function renderQueryAnswer(data) {
         'csv_character_knowledge': '角色知识', 'csv_golden_finger_knowledge': '金手指知识',
         'csv_genre_tone': '题材基调',
     };
+    const resourceLabels = {
+        'project': '项目信息', 'character_state': '角色状态', 'character_card': '角色设定',
+        'character_group': '主角团', 'character_item': '角色物品', 'character_relationship': '角色关系',
+        'character_growth': '角色成长', 'chapter_plot': '剧情点', 'chapter_plan': '章节规划',
+        'volume_outline': '卷纲', 'chapter_meta': '结尾钩子', 'cool_points': '爽点',
+        'villain': '反派', 'plot_thread': '剧情线', 'worldview': '世界观',
+        'worldview_history': '世界观历史', 'worldview_setting': '世界观设定',
+        'setting_change': '设定变更', 'power_system': '力量体系', 'power_level': '境界明细',
+        'golden_finger': '金手指', 'golden_finger_progress': '金手指动态',
+        'foreshadow': '活跃伏笔', 'timeline': '章节时间轴', 'timeline_chapter': '章节时间轴',
+        'previous_chapter': '前文章节', 'previous_hook': '上章结尾',
+    };
 
     document.getElementById('queryAnswerText').textContent = answer;
-    // 来源标签去重：同一 (类型, 章节) 只显示一个徽章
+    // 来源标签去重：同一 (类型, 资源/片段类型, 章节) 只显示一个徽章
     const seen = new Set();
     const badges = [];
     for (const s of sources) {
         const key = `${s.type}:${s.chunk_type || s.resource || ''}:${s.chapter_number || 0}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const label = typeLabels[s.chunk_type] || s.chunk_type || 'RAG';
+        let label;
+        if (s.type === 'state' || s.type === 'state_query') {
+            label = resourceLabels[s.resource] || s.resource || '业务数据';
+        } else {
+            label = typeLabels[s.chunk_type] || s.chunk_type || 'RAG';
+        }
         const ch = s.chapter_number ? ` · 第${s.chapter_number}章` : '';
         badges.push(`<span class="query-source-badge"><i class="fas fa-book"></i> ${escapeHtml(label)}${ch}</span>`);
     }
