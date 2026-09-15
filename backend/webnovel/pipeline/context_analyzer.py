@@ -348,15 +348,23 @@ class ContextAnalyzer:
             return ""
 
     def _build_resource_catalog(self, step_name: str, env: Dict[str, Any]) -> str:
-        """按节点可选白名单构建资源目录文本（候选清单 + 可选深度）。
+        """按节点可选白名单构建资源目录文本（资源编号 + 候选清单 + 深度）。
 
         只列出当前有实际内容的资源：候选为空（空态/无数据）的资源整条跳过，
         保证目录 = 可选项 = 注入内容，避免 LLM 误选空资源。
+
+        编号即引用键：character_card/foreshadow 的条目编号 = structured_refs 的 ids；
+        previous_chapter 的"第N章" = chapter_index。输出 schema 与目录一一对应。
         """
         assembly = STEP_ASSEMBLY.get(step_name)
         if not assembly:
             return "（无可用资源）"
+        depth_desc = {
+            "full": "完整", "summary": "摘要", "tail": "结尾片段",
+            "style": "文风片段", "list": "列表", "json": "JSON",
+        }
         lines = []
+        idx = 0
         for item in assembly.get("selectable", []):
             res_name = item[0] if isinstance(item, (list, tuple)) else item
             res = RESOURCE_REGISTRY.get(res_name)
@@ -366,21 +374,21 @@ class ContextAnalyzer:
             if not candidate_text.strip():
                 # 空资源不列目录
                 continue
-            label = res["label"]
+            idx += 1
             header = res["header"].strip("【】")
-            lines.append(f"  {header}（{label}）：")
-            lines.append(candidate_text)
-            # 深度说明
+            label = res["label"]
+            title = f"【{header}】" + (f" {label}" if label and label != header else "")
             depths = list(res["formatters"].keys())
-            depth_desc = {
-                "full": "完整", "summary": "摘要", "tail": "结尾片段",
-                "style": "文风片段", "list": "列表", "json": "JSON",
-            }
-            depth_hint = "，".join(
+            depth_hint = " / ".join(
                 f"{d}={depth_desc.get(d, d)}" for d in depths if d in depth_desc
-            ) or "，".join(depths)
-            lines.append(f"    可选深度: {depth_hint}")
-        return "\n".join(lines)
+            ) or " / ".join(depths)
+            line = f"{idx}. {title}"
+            if depth_hint:
+                line += f" | 深度: {depth_hint}"
+            lines.append(line)
+            for cl in candidate_text.split("\n"):
+                lines.append(cl)
+        return "\n".join(lines) if lines else "（无可用资源）"
 
     def _format_resource_candidates(self, res_name: str, env: Dict[str, Any]) -> str:
         """渲染单个资源的候选清单。"""
@@ -391,65 +399,77 @@ class ContextAnalyzer:
             chars = inventory.get("characters", [])
             if not chars:
                 return ""
+            # 条目编号 = character id = structured_refs.ids 引用键
             return "\n".join(
-                f"    [{c.get('id')}] {c.get('name')}({c.get('type')}): {c.get('summary', '')[:20]}"
+                f"    {c.get('id')}. {c.get('name')}（{c.get('type')}）— {c.get('summary', '')[:20]}"
                 for c in chars[:20]
             )
         if res_name == "foreshadow":
             loops = inventory.get("foreshadows", [])
             if not loops:
                 return ""
+            # 条目编号 = 伏笔 id = structured_refs.ids 引用键
             return "\n".join(
-                f"    [{f.get('id')}] [{f.get('tier', '')}] {f.get('content', '')[:30]} "
-                f"(第{f.get('planted_chapter') or 0}章)"
+                f"    {f.get('id')}. [{f.get('tier', '')}] {f.get('content', '')[:30]} "
+                f"（第{f.get('planted_chapter') or 0}章埋下）"
                 for f in loops[:15]
             )
         if res_name == "worldview":
             worlds = inventory.get("world_settings", [])
             if not worlds:
                 return ""
-            return "\n".join(
-                f"    [{w.get('id')}] {w.get('name', '')}: {w.get('summary', '')[:40]}"
-                for w in worlds[:5]
-            )
+            lines = []
+            for w in worlds[:5]:
+                w_name = w.get('name', '') or ''
+                w_summary = w.get('summary', '') or ''
+                if not w_name and not w_summary:
+                    continue
+                lines.append(f"    - {w_name} — {w_summary[:40]}")
+            return "\n".join(lines)
         if res_name == "power_system":
             ps = inventory.get("power_system")
-            if not ps:
+            if not ps or not (ps.get('name') or ps.get('summary')):
                 return ""
-            return f"    {ps.get('name', '')}: {ps.get('summary', '')[:50]}"
+            return f"    - {ps.get('name', '')} — {ps.get('summary', '')[:50]}"
         if res_name == "golden_finger":
             gf = inventory.get("golden_finger")
-            if not gf:
+            if not gf or not (gf.get('name') or gf.get('summary')):
                 return ""
-            return f"    {gf.get('name', '')}: {gf.get('summary', '')[:50]}"
+            return f"    - {gf.get('name', '')} — {gf.get('summary', '')[:50]}"
         if res_name == "character_group":
             cg = inventory.get("character_group")
             if not cg:
                 return ""
-            return f"    {cg.get('name', '')}: 共同目标 {cg.get('goal', '')[:30]} | 成员: {cg.get('members_summary', '')[:30]}"
+            cg_name = cg.get('name', '') or ''
+            cg_goal = cg.get('goal', '') or ''
+            cg_members = cg.get('members_summary', '') or ''
+            if not cg_name and not cg_goal and not cg_members:
+                return ""
+            return f"    - {cg_name}: 共同目标 {cg_goal[:30]} | 成员: {cg_members[:30]}"
         if res_name == "previous_chapter":
             chapters = inventory.get("previous_chapters", [])
             if not chapters:
                 return ""
+            # 第N章 = structured_refs.chapter_index 引用键；摘要换行替换为空格保持单行
             return "\n".join(
-                f"    第{ch.get('index')}章: {ch.get('summary', '')[:40]}"
+                f"    第{ch.get('index')}章 — {str(ch.get('summary', '')).replace(chr(10), ' ')[:40]}"
                 for ch in chapters
             )
         if res_name == "chapter_plan":
             plan = structural.get("current_chapter_plan") or {}
             summary = plan.get("summary", "")[:50] if plan else ""
-            return "" if not summary else f"    本章规划概要: {summary}"
+            return "" if not summary else f"    - 本章规划概要: {summary}"
         if res_name == "volume_outline":
             vol = structural.get("current_volume")
             if not vol:
                 return ""
-            return f"    卷: {vol.get('volume_name', '')} | 核心冲突: {str(vol.get('core_conflict', ''))[:30]}"
+            return f"    - 卷: {vol.get('volume_name', '')} | 核心冲突: {str(vol.get('core_conflict', ''))[:30]}"
         if res_name == "character_state":
             states = structural.get("last_character_states") or []
             if not states:
                 return ""
             return "\n".join(
-                f"    {st.get('character_name') or st.get('name', '?')}: "
+                f"    - {st.get('character_name') or st.get('name', '?')} — "
                 f"位置 {str(st.get('location', ''))[:20]} | "
                 f"状态 {(str(st.get('state_summary') or st.get('state', '')))[:40]}"
                 for st in states[:10]
@@ -458,10 +478,10 @@ class ContextAnalyzer:
             hook = structural.get("previous_hook") or {}
             if not hook.get("hook_content"):
                 return ""
-            return f"    {hook.get('hook_content', '')[:40]}"
+            return f"    - {hook.get('hook_content', '')[:40]}"
         if res_name == "project":
             proj = structural.get("project") or {}
-            return f"    {proj.get('title', '')} | {proj.get('genre', '')}"
+            return f"    - {proj.get('title', '')} | {proj.get('genre', '')}"
         if res_name == "timeline":
             from webnovel.repositories import get_timelines_by_project, get_timeline_chapters
             timelines = get_timelines_by_project(env["project_id"])
@@ -473,7 +493,7 @@ class ContextAnalyzer:
                 recent = chapters[-1] if chapters else {}
                 anchor = (recent.get("time_anchor", "") or "")[:20]
                 lines.append(
-                    f"    第{tl.get('volume_number', '?')}卷: 基准 {str(tl.get('time_base', ''))[:30]}"
+                    f"    - 第{tl.get('volume_number', '?')}卷: 基准 {str(tl.get('time_base', ''))[:30]}"
                     f" | {len(chapters)}章 | 最近锚点 {anchor}"
                 )
             return "\n".join(lines)
@@ -535,8 +555,8 @@ class ContextAnalyzer:
             '  "custom_notes": ["[维度] 主体: 规则"]\n'
             "}\n"
             "字段说明：\n"
-            "- structured_refs 从【资源目录】选；character_card/foreshadow 必填 ids，previous_chapter 必填 chapter_index；"
-            "previous_chapter 建议 depth=tail(500字)或style(320字)。\n"
+            "- structured_refs 从【资源目录】选，条目编号即引用键：character_card/foreshadow 的 ids 直接使用目录中的条目编号；"
+            "previous_chapter 的 chapter_index 使用目录中的第N章章节号；previous_chapter 建议 depth=tail(500字)或style(320字)。\n"
             "- rag_queries：RAG 语义检索查询（含实体限定，禁止复制原文）；types：chapter/chapter_summary/foreshadow/character/worldview/power_system/golden_finger/villain/volume_outline。\n"
             "- custom_notes：一致性要点，格式「[维度名] 主体: 规则」，如「[角色状态] 苏瑶: 保持受伤未愈状态」，≤50字。\n"
         )

@@ -27,12 +27,34 @@ from webnovel.repositories.character_state_repository import (
 
 logger = logging.getLogger("webnovel_knowledge_qa")
 
-_QA_SYSTEM_PROMPT = """你是一位小说知识库问答助手。基于提供的【注入上下文】（由上下文分析器按用户问题选中的结构化资源与检索片段）回答用户问题。
+
+def _char_type_label(raw_type: str) -> str:
+    """character_type 英文 → 中文标签（与写作侧 resource_registry 一致）。"""
+    labels = {
+        'protagonist': '主角', 'co_protagonist': '主角团核心',
+        'heroine': '女主', 'villain': '反派',
+        'supporting': '配角', 'minor': '龙套',
+    }
+    return labels.get(raw_type, raw_type)
+
+
+def _char_summary(c: dict) -> str:
+    """角色一行摘要（与写作侧 context_builder 对齐）。"""
+    parts = []
+    if c.get("identity"):
+        parts.append(str(c["identity"])[:30])
+    if c.get("core_personality"):
+        parts.append(str(c["core_personality"])[:30])
+    if c.get("true_desire") or c.get("long_term_goal"):
+        parts.append(str(c.get("true_desire") or c.get("long_term_goal"))[:30])
+    return "，".join(parts) if parts else ""
+
+_QA_SYSTEM_PROMPT = """你是一位小说知识库问答助手。基于提供的信息回答用户问题。
 
 回答规则：
-1. 结构化事实（角色状态、持有物品、角色关系、未回收伏笔等）直接引用【注入上下文】中的对应区块回答
+1. 结构化事实（角色状态、持有物品、角色关系、未回收伏笔等）直接引用提供的信息中的对应区块回答
 2. 正文细节（具体场景、对话、行为原文）引用区块中标注的章节号/片段类型
-3. 【注入上下文】中没有依据时，明确说明"当前资料中未找到相关信息"，不得编造
+3. 提供的信息中没有依据时，明确说明"未找到相关信息"，不得编造
 4. 回答使用中文，简洁准确，直接给结论"""
 
 
@@ -100,8 +122,8 @@ def _build_qa_env(project: dict, script_id: int, project_id: int) -> Dict[str, A
         "characters": [
             {
                 "id": c.get("id"), "name": c.get("name"),
-                "type": c.get("character_type", ""),
-                "summary": (c.get("identity") or "")[:20],
+                "type": _char_type_label(c.get("character_type", "")),
+                "summary": _char_summary(c)[:80],
             }
             for c in cards[:20]
         ],
@@ -171,7 +193,7 @@ async def answer_question(script_id: int, question: str) -> Dict[str, Any]:
         # ③ 组装回答 prompt（只注入选中项）→ LLM 生成
         from core.model_executor import get_model_executor
         executor = get_model_executor()
-        user_prompt = f"问题：{question}\n\n【注入上下文】\n{assembled}"
+        user_prompt = f"问题：{question}\n\n{assembled}"
 
         result = await executor.execute_text_chat(
             user_prompt,
