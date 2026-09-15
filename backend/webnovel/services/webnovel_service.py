@@ -54,237 +54,6 @@ from infrastructure.websocket_broadcast import ws_broadcast_manager
 _APPLY_TASK_TIMEOUT = 600
 
 
-# character_type 存储为英文，须翻译为中文以匹配中文查询（与 init_executor._type_label 保持一致）
-_CHAR_TYPE_LABELS = {
-    'protagonist': '主角', 'co_protagonist': '主角团核心', 'heroine': '女主',
-    'villain': '反派', 'supporting': '配角', 'minor': '龙套',
-}
-
-
-def _normalize_field_value(val, enumerated: bool = False) -> str:
-    """将字段值统一转换为适合索引的自然语言文本。
-
-    字段值可能是列表、JSON 数组字符串或普通字符串；
-    枚举型字段（境界链、标签等）按常见分隔符拆分后用顿号连接以保留枚举结构，
-    其余字段原样使用，避免拆碎自然描述。
-    """
-    if val is None:
-        return ""
-    if isinstance(val, (list, tuple)):
-        return "、".join(str(x).strip() for x in val if str(x).strip())
-    if isinstance(val, str):
-        text = val.strip()
-        if text.startswith("["):
-            try:
-                parsed = json.loads(text)
-                if isinstance(parsed, list):
-                    return "、".join(str(x).strip() for x in parsed if str(x).strip())
-            except (ValueError, TypeError):
-                pass
-        if enumerated:
-            items = [s.strip() for s in re.split(r"[、，,;；\n]", text) if s.strip()]
-            return "、".join(items)
-        return text
-    return str(val).strip()
-
-
-def _join_field_sentences(field_specs: list, data: dict) -> str:
-    """按字段规格拼装自然语句，逐字段遍历确保非空字段不丢失。
-
-    field_specs: [(字段名, 语句模板, 是否枚举型字段)]，模板以 {v} 占位。
-    返回逗号连接的语句主体（不含句末句号）；无非空字段时返回空字符串。
-    """
-    clauses = []
-    for key, template, enumerated in field_specs:
-        val = _normalize_field_value(data.get(key, ''), enumerated)
-        if val:
-            clauses.append(template.format(v=val))
-    return "，".join(clauses)
-
-
-def _build_character_chunk_text(char: dict) -> str:
-    """将角色卡格式化为自然描述的 RAG 索引文本（全量索引与增量重建共用）。
-
-    采用自然陈述句并保留字段词（如"核心欲望是……"），以贴合自然语言查询；
-    字段名须与 webnovel_character_card 表 schema 一致。
-    """
-    if not char or not char.get('name', ''):
-        return ""
-    name = char.get('name', '')
-    raw_type = char.get('character_type', '')
-    type_label = _CHAR_TYPE_LABELS.get(raw_type, raw_type)
-    opener = f"{name}是本作的{type_label}。" if type_label else f"{name}是本作登场的角色。"
-    field_specs = [
-        ('identity', '其身份是{v}', False),
-        ('protagonist_relation', '与主角的关系是{v}', False),
-        ('core_personality', '性格{v}', False),
-        ('true_desire', '核心欲望是{v}', False),
-        ('personality_flaw', '性格缺陷是{v}', False),
-        ('alias', '曾用名是{v}', False),
-        ('age', '年龄为{v}岁', False),
-        ('age_stage', '年龄段为{v}', False),
-        ('long_term_goal', '长期目标是{v}', False),
-        ('first_impression', '给人的初印象是{v}', False),
-        ('core_tags', '核心标签包括{v}', True),
-        ('behavior_pattern', '行为模式是{v}', False),
-        ('ability_limit', '能力上限是{v}', False),
-        ('items_text', '随身携带的物品有{v}', False),
-    ]
-    # age=0 时无意义，置空避免生成“年龄为0岁”
-    char_for_text = dict(char)
-    if not char_for_text.get('age'):
-        char_for_text['age'] = ''
-    body = _join_field_sentences(field_specs, char_for_text)
-    if not body:
-        return opener
-    return opener + body + "。"
-
-
-def _build_char_items_text(project_id: int, char_id: int) -> str:
-    """构建单个角色的持有物品文本（顿号连接，无物品时返回空字符串）。"""
-    try:
-        from webnovel.repositories import get_character_items
-        names = [
-            it.get("item_name", "") for it in get_character_items(char_id)
-            if it.get("item_name")
-        ]
-        return "、".join(names)
-    except Exception:
-        return ""
-
-
-def _build_worldview_chunk_text(worldview: dict) -> str:
-    """将世界观设定格式化为自然描述的 RAG 索引文本。
-
-    字段名须与 webnovel_worldview 表 schema 一致。
-    """
-    if not worldview:
-        return ""
-    field_specs = [
-        ('world_summary', '世界整体概述为{v}', False),
-        ('core_regions', '核心区域包括{v}', True),
-        ('important_locations', '重要地点有{v}', True),
-        ('social_hierarchy', '社会阶层划分为{v}', False),
-        ('hard_constraints', '世界观硬约束是{v}', False),
-        ('energy_cycle', '能量循环方式为{v}', False),
-        ('technology_basis', '技术基础是{v}', False),
-        ('currency_system', '货币体系是{v}', False),
-        ('belief_ideology', '信仰意识形态是{v}', False),
-        ('resource_distribution', '资源分布是{v}', False),
-    ]
-    body = _join_field_sentences(field_specs, worldview)
-    if not body:
-        return ""
-    return "本作品的世界观设定如下。" + body + "。"
-
-
-def _build_power_system_chunk_text(power_system: dict) -> str:
-    """将力量体系格式化为自然描述的 RAG 索引文本。
-
-    字段名须与 webnovel_power_system 表 schema 一致；
-    境界链等枚举字段保留顿号枚举结构。
-    """
-    if not power_system:
-        return ""
-    system_type = str(power_system.get('system_type', '') or '').strip()
-    opener = f"本作品的力量体系类型为{system_type}。" if system_type else "本作品的力量体系设定如下。"
-    field_specs = [
-        ('typical_realm_chain', '境界体系自低到高依次为{v}', True),
-        ('core_creed', '核心信条是{v}', False),
-        ('energy_source', '能量来源是{v}', False),
-        ('cost_rules', '力量的代价规则是{v}', False),
-        ('fairness_principle', '公平原则是{v}', False),
-        ('battle_rhythm', '战斗节奏是{v}', False),
-        ('damage_defense_logic', '伤害防御逻辑是{v}', False),
-        ('counter_relations', '克制关系是{v}', False),
-    ]
-    body = _join_field_sentences(field_specs, power_system)
-    if not body:
-        return opener
-    return opener + body + "。"
-
-
-def _build_golden_finger_chunk_text(golden_finger: dict) -> str:
-    """将金手指设定格式化为自然描述的 RAG 索引文本。
-
-    字段名须与 webnovel_golden_finger 表 schema 一致。
-    """
-    if not golden_finger:
-        return ""
-    main_role = str(golden_finger.get('main_role', '') or '').strip() or "主角"
-    gf_type = str(golden_finger.get('type', '') or '').strip()
-    opener = f"{main_role}的金手指类型为{gf_type}。" if gf_type else f"{main_role}拥有一项金手指。"
-    field_specs = [
-        ('core_function', '其核心功能是{v}', False),
-        ('trigger_condition', '触发条件是{v}', False),
-        ('visibility', '可见度为{v}', False),
-        ('irreversible_cost', '不可逆代价是{v}', False),
-        ('cost_limitation', '代价限制是{v}', False),
-        ('cooldown_limit', '冷却限制是{v}', False),
-    ]
-    body = _join_field_sentences(field_specs, golden_finger)
-    if not body:
-        return opener
-    return opener + body + "。"
-
-
-def _build_volume_outline_chunk_text(vol: dict) -> str:
-    """将卷纲格式化为自然描述的 RAG 索引文本。
-
-    字段名须与 webnovel_volume_outline 表 schema 一致。
-    """
-    if not vol:
-        return ""
-    volume_number = vol.get('volume_number', '?')
-    volume_name = str(vol.get('volume_name', '') or '').strip()
-    if volume_name:
-        opener = f"第{volume_number}卷卷名为《{volume_name}》，本卷卷纲要点如下。"
-    else:
-        opener = f"第{volume_number}卷卷纲要点如下。"
-    field_specs = [
-        ('core_conflict', '本卷核心冲突是{v}', False),
-        ('protagonist_goal', '主角目标是{v}', False),
-        ('volume_climax', '本卷高潮事件是{v}', False),
-        ('catalyst_event', '催化事件是{v}', False),
-        ('new_hook', '新钩子是{v}', False),
-        ('unresolved_issues', '未解决问题有{v}', True),
-    ]
-    body = _join_field_sentences(field_specs, vol)
-    if not body:
-        return ""
-    return opener + body + "。"
-
-
-def _build_villain_chunk_text(v: dict) -> str:
-    """将反派信息格式化为自然描述的 RAG 索引文本。
-
-    字段名须与 webnovel_villain 表 schema 一致。
-    """
-    if not v:
-        return ""
-    name = str(v.get('name', '') or '').strip()
-    faction = str(v.get('identity_faction', '') or '').strip()
-    if name and faction:
-        opener = f"{name}是本作的反派，身份阵营是{faction}。"
-    elif name:
-        opener = f"{name}是本作的反派。"
-    else:
-        opener = "本作存在一名反派，其设定如下。"
-    field_specs = [
-        ('core_desire', '其核心欲望是{v}', False),
-        ('core_fear', '其核心恐惧是{v}', False),
-        ('shared_desire_flaw', '与主角的共同缺陷是{v}', False),
-        ('action_principle', '行动准则是{v}', False),
-        ('power_level', '实力层级是{v}', False),
-        ('key_abilities', '关键能力包括{v}', True),
-        ('counter_points', '反制要点是{v}', False),
-    ]
-    body = _join_field_sentences(field_specs, v)
-    if not body:
-        return opener
-    return opener + body + "。"
-
-
 class WebnovelService:
     """网文创作服务。"""
 
@@ -1643,61 +1412,20 @@ class WebnovelService:
         except Exception as e:
             self._logger.error(f"[WebnovelService] 存储 RAG 片段失败: {e}")
 
-    async def reindex_character_cards(self, project_id: int, char_ids) -> int:
-        """按 char_id 增量重建角色卡 RAG 片段（角色卡创建/改名/合并后调用）。
+    async def _index_csv_knowledge(self, project_id: int, force: bool = False):
+        """将 CSV 创作知识索引到 RAG 向量库（幂等）。
 
-        先删除对应 char_id 的旧片段，再重新构建文本并写入；
-        已删除的角色卡（查不到记录）仅清理旧片段。失败不阻断主流程。
-        """
-        try:
-            from services.vector_store import get_rag_service
-            rag = get_rag_service()
+        RAG 职责重定位后仅承载"无法结构化的信息"：
+        - 正文细节（章节摘要/段落切片）由 _store_rag_chunk 负责
+        - 创作知识（CSV 题材知识表）由本方法负责
+        设定类数据（角色/世界观/力量体系/金手指/卷纲/反派/伏笔）已由
+        selectable 结构化资源注入直接提供给 LLM，不再进入 RAG。
 
-            chunks = []
-            for char_id in char_ids:
-                rag.delete_by_char_id(project_id, char_id)
-                card = get_character_card(project_id, char_id)
-                if not card:
-                    continue
-                # 附加持有物品清单（事实记录阶段维护；无物品时不附加该字段）
-                items_text = _build_char_items_text(project_id, char_id)
-                if items_text:
-                    card["items_text"] = items_text
-                text = _build_character_chunk_text(card)
-                if not text:
-                    continue
-                chunks.append({
-                    "content": text,
-                    "chunk_type": "character",
-                    "chapter_number": 0,
-                    "metadata": {"source": "character_card", "char_id": char_id},
-                })
-
-            if not chunks:
-                return 0
-
-            all_texts = [c["content"] for c in chunks]
-            result = await self._model_executor.execute_text_to_vector(all_texts)
-            embeddings = result.get("embeddings", []) if result else []
-            if embeddings:
-                rag.add_chunks(project_id, chunks, embeddings)
-                self._logger.info(
-                    f"[WebnovelService] 角色卡 RAG 增量索引完成，char_ids={list(char_ids)}，"
-                    f"共 {len(chunks)} 个片段"
-                )
-            return len(chunks)
-        except Exception as e:
-            self._logger.error(f"[WebnovelService] 角色卡 RAG 增量索引失败: {e}")
-            return 0
-
-    async def _index_project_settings(self, project_id: int):
-        """将项目设定数据全量索引到 RAG 向量库。
-
-        在深度初始化完成后调用，将角色、世界观、力量体系、金手指、卷纲、伏笔、反派等
-        设定数据格式化为自然描述后写入 RAG 向量库并计算 embedding。
+        幂等：片段写入携带 source_key（csv:{表名}:{行code}），
+        RAGService.add_chunks 按 source_key 查重，重复调用不会重复写入。
+        force=True 时先清空 CSV 类型再重建（手动重索引场景）。
         """
         indexed_count = 0
-        # 收集所有待索引的文本，最后批量编码
         pending_items = []  # [(chunk_type, content, chapter_number, metadata)]
 
         def _collect_one(chunk_type: str, content: str, chapter_number: int = 0, metadata: str = ""):
@@ -1707,59 +1435,7 @@ class WebnovelService:
             pending_items.append((chunk_type, content, chapter_number, metadata))
 
         try:
-            # 1. 角色卡（文本格式与增量重建共用 _build_character_chunk_text）
-            characters = get_character_cards_by_project(project_id)
-            # 批量加载持有物品（事实记录阶段维护；失败时降级为空不阻断索引）
-            try:
-                _items_by_char = get_character_items_by_project(project_id)
-            except Exception:
-                _items_by_char = {}
-            for char in characters:
-                _item_strs = []
-                for it in _items_by_char.get(char.get("id"), []):
-                    _name = it.get("item_name", "")
-                    if not _name:
-                        continue
-                    _qty = it.get("quantity", 1) or 1
-                    _item_strs.append(f"{_name}x{_qty}" if _qty > 1 else _name)
-                if _item_strs:
-                    char["items_text"] = "、".join(_item_strs)
-                text = _build_character_chunk_text(char)
-                if text:
-                    _collect_one("character", text, metadata=json.dumps({"source": "character_card", "char_id": char.get("id")}))
-
-            # 2. 世界观（字段名须与 webnovel_worldview 表 schema 一致，见 _build_worldview_chunk_text）
-            worldview = get_worldview_by_project(project_id)
-            if worldview:
-                _collect_one("worldview", _build_worldview_chunk_text(worldview),
-                             metadata=json.dumps({"source": "worldview"}))
-
-            # 3. 力量体系（字段名须与 webnovel_power_system 表 schema 一致）
-            power_system = get_power_system_by_project(project_id)
-            if power_system:
-                _collect_one("power_system", _build_power_system_chunk_text(power_system),
-                             metadata=json.dumps({"source": "power_system"}))
-
-            # 4. 金手指（字段名须与 webnovel_golden_finger 表 schema 一致）
-            golden_finger = get_golden_finger_by_project(project_id)
-            if golden_finger:
-                _collect_one("golden_finger", _build_golden_finger_chunk_text(golden_finger),
-                             metadata=json.dumps({"source": "golden_finger"}))
-
-            # 5. 卷纲（字段名须与 webnovel_volume_outline 表 schema 一致）
-            volumes = get_volume_outlines_by_project(project_id)
-            for vol in volumes:
-                _collect_one("volume_outline", _build_volume_outline_chunk_text(vol),
-                             chapter_number=vol.get('volume_number', 0),
-                             metadata=json.dumps({"source": "volume_outline", "volume_id": vol.get("id")}))
-
-            # 7. 反派（字段名须与 webnovel_villain 表 schema 一致）
-            villains = get_villains_by_project(project_id)
-            for v in villains:
-                _collect_one("villain", _build_villain_chunk_text(v),
-                             metadata=json.dumps({"source": "villain", "villain_id": v.get("id")}))
-
-            # 8. CSV 知识表（按题材加载，入 RAG 供写文/审查时语义检索）
+            # CSV 知识表（按题材加载，入 RAG 供写文/审查时语义检索）
             try:
                 from webnovel.repositories.csv_knowledge_repository import (
                     query_csv_knowledge, build_csv_knowledge_chunk_text
@@ -1785,11 +1461,13 @@ class WebnovelService:
                         for row in rows:
                             text = build_csv_knowledge_chunk_text(table_name, row)
                             if text:
+                                _code = row.get("code", "")
                                 _meta = json.dumps({
                                     "source": table_name,
-                                    "code": row.get("code", ""),
+                                    "code": _code,
                                     "genre": _csv_genre,
                                     "keywords": row.get("keywords", ""),
+                                    "source_key": f"csv:{table_name}:{_code}",
                                 })
                                 _collect_one(chunk_type, text, metadata=_meta)
             except Exception as e:
@@ -1800,10 +1478,10 @@ class WebnovelService:
                 from services.vector_store import get_rag_service
                 rag = get_rag_service()
 
-                # 按类型清理旧数据
-                types_to_delete = set(item[0] for item in pending_items)
-                for ct in types_to_delete:
-                    rag.delete_by_type(project_id, ct)
+                # force 时先清理旧 CSV 类型，否则依赖 source_key 幂等跳过
+                if force:
+                    for ct in {item[0] for item in pending_items}:
+                        rag.delete_by_type(project_id, ct)
 
                 # 批量调用 ModelExecutor 编码
                 texts = [item[1] for item in pending_items]
@@ -1829,10 +1507,10 @@ class WebnovelService:
                     ids = rag.add_chunks(project_id, chunks_to_add, all_embeddings)
                     indexed_count = len([i for i in ids if i > 0])
 
-            self._logger.info(f"[WebnovelService] 项目设定索引完成，project_id={project_id}，共索引 {indexed_count} 条")
+            self._logger.info(f"[WebnovelService] CSV创作知识索引完成，project_id={project_id}，共索引 {indexed_count} 条")
 
         except Exception as e:
-            self._logger.error(f"[WebnovelService] 项目设定索引失败: {e}")
+            self._logger.error(f"[WebnovelService] CSV创作知识索引失败: {e}")
 
     async def get_task_status(self, script_id: int, task_id: int) -> Optional[Dict[str, Any]]:
         """获取写作任务状态。"""

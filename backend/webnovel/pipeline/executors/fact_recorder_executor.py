@@ -130,14 +130,6 @@ class FactRecorderExecutor(BaseExecutor):
                 rag_affected.update(await self._save_character_updates(
                     script_id, self.chapter_index, character_updates))
 
-            # 2.5 角色卡 RAG 增量重建（物品/身份/改名涉及的角色）
-            if rag_affected and project_id:
-                try:
-                    from webnovel.services.webnovel_service import WebnovelService
-                    await WebnovelService().reindex_character_cards(project_id, list(rag_affected))
-                except Exception:
-                    pass  # 索引失败不阻断主流程
-
             # 2. 爽点落库（含标签补充+去重）+ 3. 结尾钩子 + 4. 角色状态 + 5. 世界观设定
             if project_id:
                 await self._save_cool_points(project_id, self.chapter_index, cool_points, polished_content)
@@ -624,14 +616,6 @@ class FactRecorderExecutor(BaseExecutor):
                         )
                     except Exception:
                         pass
-
-            # 写作中自动创建的角色卡即时写入 RAG，无需等待全量重建索引
-            if created_ids:
-                try:
-                    from webnovel.services.webnovel_service import WebnovelService
-                    await WebnovelService().reindex_character_cards(project_id, created_ids)
-                except Exception:
-                    pass  # 索引失败不阻断主流程
 
             if created:
                 from utils.logger import log_manager

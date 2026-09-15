@@ -427,11 +427,12 @@ class ContextBuilderExecutor(BaseExecutor):
             if not embedding:
                 return []
 
-            # 宽泛检索（不限类型，取 15 条）
+            # 宽泛检索（RAG 职责重定位后仅限正文类 + CSV 创作知识，取 15 条；
+            # 设定类已由 selectable 结构化资源提供，不进入 RAG 候选池）
             results = rag_svc.search(
                 project_id, embedding,
                 limit=15,
-                chunk_types=None,
+                chunk_types=list(rag_svc.ALLOWED_QUERY_TYPES),
                 min_score=0,  # 不设阈值，让 LLM 判断相关性
             )
 

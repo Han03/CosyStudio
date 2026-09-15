@@ -136,7 +136,7 @@ async def _execute_init_workflow(task_id: int, script_id: int, project_data: dic
                 service = WebnovelService()
                 project = get_webnovel_project_by_script(script_id)
                 if project:
-                    await service._index_project_settings(project["id"])
+                    await service._index_csv_knowledge(project["id"])
             except Exception as e:
                 from utils.logger import log_manager
                 log_manager.get_logger("webnovel_init").warning(f"RAG索引失败: {e}")
@@ -216,13 +216,11 @@ async def _execute_plan_workflow(task_id: int, script_id: int, volume_number: in
 
 @router.post("/query")
 async def webnovel_query(script_id: int, data: QueryRequest):
-    """状态查询（基于RAG语义检索）。
+    """知识库问答：随时查询小说故事状态。
 
-    按分类返回相似度超过阈值的内容，每种分类最多返回5条。
-    阈值由 RAGService 分级阈值自动管理（按 chunk_type 差异化）。
-    若配置了片段重排序（text_rerank）能力，向量粗排后会对候选片段做二次精排，
-    结果按重排序分数降序排列；重排序不可用时回退到向量相似度顺序。
-    若检测到项目设定未索引到 RAG 向量库，自动触发索引重建。
+    完整流程：RAG 向量召回（正文细节 + CSV 创作知识）→ 结构化状态快照（业务表当前事实）
+    → Reranker 二次精排 → LLM 生成回答（含来源标注）。
+    若检测到 CSV 创作知识未索引，自动触发补索引。
     """
     script = get_script(script_id)
     if not script:
@@ -238,117 +236,20 @@ async def webnovel_query(script_id: int, data: QueryRequest):
 
     project_id = project["id"]
 
-    # 兜底：检查项目设定是否已索引到 RAG 向量库，若缺失则自动触发索引重建
+    # 兜底：CSV 创作知识未索引时自动补索引（幂等，重复触发不会重复写入）
     try:
         from services.vector_store import get_rag_service
-        if not get_rag_service().has_settings_chunks(project_id):
+        if not get_rag_service().has_csv_knowledge(project_id):
             from webnovel.services.webnovel_service import WebnovelService
             service = WebnovelService()
-            await service._index_project_settings(project_id)
+            await service._index_csv_knowledge(project_id)
     except Exception:
-        pass  # 索引重建失败不阻断查询，继续用已有数据检索
+        pass  # 索引失败不阻断查询，继续用已有数据检索
 
-    chunks = []
-    reranked = False
-    try:
-        from core.model_executor import get_model_executor
-        executor = get_model_executor()
-        # query 文本用 is_query=True 添加 instruction prefix
-        result = await executor.execute_text_to_vector([query], is_query=True)
-        embeddings = result.get("embeddings", [])
-        if embeddings:
-            from services.vector_store import get_rag_service
-            # 获取足够多的候选结果，以便按分类过滤后仍有充足数据
-            # min_score=0 禁用分级阈值过滤，避免细节查询被误杀
-            # （如"主角身上有哪些物品"等细节查询，段落 chunk 中语义被前后叙事稀释，
-            #   相似度可能低于分级阈值，但结果仍具参考价值）
-            # 每类最多返回 5 条，总量可控
-            all_results = get_rag_service().search(
-                project_id, embeddings[0], limit=50, min_score=0
-            )
+    from webnovel.services.knowledge_qa import answer_question
+    result = await answer_question(script_id, query)
+    return result
 
-            # Reranker 二次精排：向量相似度只反映语义距离，无法区分"话题相关"
-            # 与"真正回答问题"。对向量粗排的前 30 条候选调用片段重排序能力，
-            # 按 query-doc 相关性重新打分排序，提升命中片段的优先级。
-            # 未配置能力或调用失败时静默回退到向量相似度顺序，不阻断查询。
-            RERANK_CANDIDATES = 30
-            try:
-                candidates = all_results[:RERANK_CANDIDATES]
-                # 截断过长文档，控制重排序推理开销（tokenizer 侧也会按 max_length 截断）
-                documents = [(c.get("content") or "")[:512] for c in candidates]
-                if documents:
-                    rerank_result = await executor.execute_rerank(
-                        query, documents, top_k=len(documents)
-                    )
-                    if not rerank_result.get("error"):
-                        rerank_items = rerank_result.get("results", [])
-                        for item in rerank_items:
-                            idx = item.get("index", -1)
-                            if 0 <= idx < len(candidates):
-                                candidates[idx]["rerank_score"] = float(item.get("score", 0.0))
-                        if any("rerank_score" in c for c in candidates):
-                            # 有分数的片段按重排序分数降序在前，其余保持向量顺序在后
-                            candidates.sort(
-                                key=lambda c: c.get("rerank_score", -1.0), reverse=True
-                            )
-                            all_results = candidates + all_results[RERANK_CANDIDATES:]
-                            reranked = True
-            except Exception:
-                pass  # 重排序失败回退到向量相似度顺序
-
-            # 对 chapter_paragraph 结果扩展前后段落上下文
-            # 存储时每个 chunk 只含单段（精准 embedding），
-            # 查询时取回相邻段落供用户阅读，兼顾匹配精度与上下文完整性
-            rag_svc = get_rag_service()
-            for chunk in all_results:
-                if chunk.get("chunk_type") != "chapter_paragraph":
-                    continue
-                try:
-                    meta = json.loads(chunk["metadata"]) if chunk.get("metadata") else {}
-                    para_idx = meta.get("para_index")
-                    ch_num = chunk.get("chapter_number", 0)
-                    if para_idx is None or not ch_num:
-                        continue
-                    # get_paragraphs_context 返回 [(text, para_index), ...] 按序排列
-                    ctx_tuples = rag_svc.get_paragraphs_context(
-                        project_id, ch_num, para_idx, context_range=1,
-                    )
-                    ctx_before = []
-                    ctx_after = []
-                    for text, idx in ctx_tuples:
-                        if idx < para_idx:
-                            ctx_before.append(text)
-                        elif idx > para_idx:
-                            ctx_after.append(text)
-                    chunk["context_before"] = "\n".join(ctx_before)
-                    chunk["context_after"] = "\n".join(ctx_after)
-                except Exception:
-                    pass
-
-            # 按 chunk_type 分组，每组最多 5 条
-            MAX_PER_CATEGORY = 5
-            grouped: Dict[str, list] = {}
-            for chunk in all_results:
-                cat = chunk.get("chunk_type", "unknown")
-                if cat not in grouped:
-                    grouped[cat] = []
-                if len(grouped[cat]) < MAX_PER_CATEGORY:
-                    grouped[cat].append(chunk)
-
-            # 转为有序列表返回（按每组首条分数降序排列分类）
-            # 重排序后用相关性分数排序，否则沿用向量相似度分数（两者量纲不同，不可混用）
-            def _cat_score(c):
-                return c.get("rerank_score", 0.0) if reranked else c.get("score", 0.0)
-
-            chunks = []
-            for cat in sorted(grouped, key=lambda c: _cat_score(grouped[c][0]), reverse=True):
-                chunks.extend(grouped[cat])
-        else:
-            return {"success": False, "chunks": [], "error": "Embedding计算失败"}
-    except Exception as e:
-        return {"success": False, "chunks": [], "error": f"检索失败: {str(e)}"}
-
-    return {"success": True, "chunks": chunks, "reranked": reranked}
 
 
 @router.get("/rag-chunks")
@@ -425,7 +326,7 @@ async def _execute_reindex_workflow(task_id: int, script_id: int):
         await _broadcast("running", "重新索引项目设定...", 20)
         from webnovel.services.webnovel_service import WebnovelService
         service = WebnovelService()
-        await service._index_project_settings(project_id)
+        await service._index_csv_knowledge(project_id)
 
         # 3. 重新索引已有章节内容
         from repositories import get_script_chapters_all, get_writing_tasks, get_script_lines

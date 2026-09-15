@@ -605,7 +605,7 @@ async def _run_init_async(script_id: int, session_id: int):
                 service = WebnovelService()
                 project = get_webnovel_project_by_script(script_id)
                 if project:
-                    await service._index_project_settings(project["id"])
+                    await service._index_csv_knowledge(project["id"])
             except Exception as rag_exc:
                 _init_logger.warning(f"[深度初始化] RAG索引失败: {rag_exc}")
             await ws_broadcast_manager.broadcast_init_progress(
