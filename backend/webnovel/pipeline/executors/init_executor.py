@@ -608,14 +608,19 @@ class InitExecutor(BaseExecutor):
             if key in raw and raw[key]:
                 mapped[key] = raw[key]
 
-        # ── 解析 factions（换行分隔字符串 → dict 列表）──
+        # ── 解析 factions（换行分隔字符串 → dict 列表，行内支持顿号/逗号分隔多势力）──
         factions = []
         factions_raw = raw.get("factions", "")
         if isinstance(factions_raw, str) and factions_raw.strip():
             for line in factions_raw.strip().split("\n"):
                 line = line.strip().strip("-").strip("·").strip("•").strip()
-                if line:
-                    factions.append({"faction_name": line, "tier": "", "relation": "", "hierarchy": ""})
+                if not line:
+                    continue
+                # 一行内可能用顿号/逗号分隔多个势力（如"正道宗门、魔道宗派"）
+                for name in re.split(r"[、，,;；]", line):
+                    name = name.strip()
+                    if name:
+                        factions.append({"faction_name": name, "tier": "", "relation": "", "hierarchy": ""})
         elif isinstance(factions_raw, list):
             factions = [f for f in factions_raw if isinstance(f, dict)]
 
@@ -1041,6 +1046,10 @@ class InitExecutor(BaseExecutor):
                 llm_context["existing_factions_text"] = existing_factions_text or "（用户未提供势力数据，请全新设计）"
                 llm_context["existing_history_text"] = existing_history_text or "（用户未提供历史数据，请全新设计）"
 
+                # 关键：在势力/历史步骤前回写补全后的完整世界观，保证 init_worldview_factions
+                # 的【已有世界观】区块与 plan_master_outline 的【世界观核心设定】同源（完整数据）
+                llm_context["worldview"] = DictObj(wv_data)
+
                 # 势力/历史：用户数据优先，缺失部分由 LLM 补充
                 if not factions and not history_events:
                     # 用户未提供势力和历史，完全由 LLM 生成
@@ -1058,10 +1067,13 @@ class InitExecutor(BaseExecutor):
                     self._check_interrupted()
                     faction_history_data = await self._call_llm("init_worldview_factions", llm_context)
                     if faction_history_data and "error" not in faction_history_data:
-                        if not factions:
-                            factions = faction_history_data.get("factions", [])
-                            if isinstance(factions, str):
-                                factions = []
+                        # factions：若 LLM 返回完善结果则以 LLM 为准（prompt 已约束"在此基础上
+                        # 补充完善"，返回即为完整列表），避免用户原始合并文本/缺字段数据直接入库
+                        _llm_factions = faction_history_data.get("factions", [])
+                        if isinstance(_llm_factions, str):
+                            _llm_factions = []
+                        if _llm_factions:
+                            factions = _llm_factions
                         if not history_events:
                             history_events = faction_history_data.get("history_events", [])
                             if isinstance(history_events, str):
