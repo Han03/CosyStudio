@@ -16,6 +16,72 @@ from repositories.base_repository import _get_conn, _lock, safe_str
 # ──────────────────────────────────────────────────────────
 # 通用查询
 # ──────────────────────────────────────────────────────────
+# 题材别名归一化：genres_json 题材模板体系 ↔ CSV 知识表题材标签体系 的映射。
+# CSV 表题材标签全集：仙侠/玄幻/都市/悬疑/奇幻/科幻/历史/古言/现言/幻言/种田/
+# 快穿/年代/游戏/衍生/全部（applicable_genre 或 genre 列，| 分隔多题材）。
+# 项目 genre 来自题材模板（如「修仙」），先归一化再匹配，避免命名错位导致 0 命中。
+_GENRE_ALIASES = {
+    # 修仙/修真 体系 → 仙侠
+    "修仙": "仙侠", "修真": "仙侠", "凡人流": "仙侠", "修仙门派": "仙侠",
+    "玄幻修仙": "玄幻", "都市修真": "都市", "高武": "都市",
+    # 悬疑 体系
+    "悬疑灵异": "悬疑", "灵异": "悬疑", "恐怖": "悬疑", "规则怪谈": "悬疑",
+    "女频悬疑": "悬疑", "悬疑脑洞": "悬疑",
+    # 言情 体系
+    "古代言情": "古言", "宫斗宅斗": "古言", "民国言情": "古言",
+    "现代言情": "现言", "职场婚恋": "现言", "豪门总裁": "现言",
+    "青春甜宠": "现言", "狗血言情": "现言", "替身文": "现言",
+    "幻想言情": "幻言", "多子多福": "幻言",
+    # 奇幻/科幻/历史 体系
+    "西方玄幻": "西幻", "西幻": "西幻", "奇幻": "奇幻",
+    "科幻末世": "科幻", "末世": "科幻", "无限流": "科幻",
+    "历史脑洞": "历史", "抗战谍战": "历史", "年代": "年代",
+    "快穿": "快穿", "游戏体育": "游戏", "电竞": "游戏", "直播文": "游戏",
+    "种田": "种田", "衍生": "衍生", "现实题材": "都市",
+    "都市异能": "都市", "都市日常": "都市", "都市脑洞": "都市",
+    "系统流": "玄幻", "克苏鲁": "悬疑", "黑暗题材": "悬疑", "知乎短篇": "现言",
+}
+
+
+
+def normalize_genre(genre: str) -> str:
+    """题材归一化：去空格 + 别名映射，返回可匹配的题材词。"""
+    if not genre:
+        return ""
+    g = (genre or "").strip()
+    return _GENRE_ALIASES.get(g, g)
+
+
+def _csv_genre_rows(table_name: str, order_by: str) -> List[Dict]:
+    """读取 CSV 表全量行（含题材列与空题材行）。"""
+    with _lock:
+        conn = _get_conn()
+        cursor = conn.execute(f"SELECT * FROM {table_name} ORDER BY {order_by}")
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def _match_genre_row(row: Dict, genre_column: str, norm_genre: str) -> bool:
+    """判断一行是否匹配归一化题材。
+
+    匹配规则（按优先级）：
+    1. 题材列为空 → 兜底命中（全局知识行）
+    2. 题材列按 | 拆分 token，任一 token 与归一化题材相等 → 命中
+    3. 任一 token 包含归一化题材（或反向包含，如"玄幻修仙"含"修仙"）→ 命中
+    """
+    raw = (row.get(genre_column) or "").strip()
+    if not raw:
+        return True
+    tokens = [t.strip() for t in raw.split("|") if t.strip()]
+    for t in tokens:
+        tn = normalize_genre(t)
+        if not tn:
+            continue
+        if tn == norm_genre:
+            return True
+        if norm_genre and (norm_genre in tn or tn in norm_genre):
+            return True
+    return False
+
 
 def query_csv_knowledge(
     table_name: str,
@@ -27,7 +93,7 @@ def query_csv_knowledge(
 
     Args:
         table_name: 表名（如 'webnovel_csv_golden_finger'），仅允许 csv_* 表
-        genre: 按题材过滤（LIKE 模糊匹配）；空字符串不过滤
+        genre: 按题材过滤（归一化 + token 匹配）；空字符串不过滤（返回全量）
         genre_column: 题材列名，多数表为 applicable_genre，verdict_rules 为 genre
         order_by: 排序列
 
@@ -44,18 +110,12 @@ def query_csv_knowledge(
     if table_name not in allowed:
         return []
 
-    with _lock:
-        conn = _get_conn()
-        query = f"SELECT * FROM {table_name} WHERE 1=1"
-        params: list = []
+    rows = _csv_genre_rows(table_name, order_by)
+    if not genre:
+        return rows
 
-        if genre:
-            query += f" AND ({genre_column} LIKE ? OR {genre_column} = '')"
-            params.append(f"%{genre}%")
-
-        query += f" ORDER BY {order_by}"
-        cursor = conn.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+    norm_genre = normalize_genre(genre)
+    return [r for r in rows if _match_genre_row(r, genre_column, norm_genre)]
 
 
 # ──────────────────────────────────────────────────────────

@@ -142,6 +142,50 @@ _QA_SYSTEM_PROMPT = (
     "输出严格的JSON格式。"
 )
 
+# RAG chunk_type 中文标签（用于 schema / prompt 的 types 指引动态渲染；
+# 类型全集以 rag_service.ALLOWED_QUERY_TYPES 为准，此处仅提供展示标签）
+_RAG_TYPE_LABELS = {
+    "chapter_paragraph": "段落原文",
+    "chapter_summary": "章节梗概",
+    "chapter": "机械摘要回退",
+    "csv_plot": "剧情模板",
+    "csv_pacing": "节奏技巧",
+    "csv_verdict": "裁决规则",
+    "csv_scene": "场景模式",
+    "csv_writing": "写作技巧",
+    "csv_naming": "命名规则",
+    "csv_character_knowledge": "角色知识",
+    "csv_golden_finger_knowledge": "金手指设计知识",
+    "csv_genre_tone": "题材基调",
+}
+
+_CHAPTER_RAG_TYPES = ("chapter_paragraph", "chapter_summary", "chapter")
+_CSV_RAG_TYPES = (
+    "csv_plot", "csv_pacing", "csv_verdict", "csv_scene",
+    "csv_writing", "csv_naming", "csv_character_knowledge",
+    "csv_golden_finger_knowledge", "csv_genre_tone",
+)
+
+
+def _format_rag_types_guide() -> str:
+    """渲染 RAG 可查 types 指引（与执行层 ALLOWED_QUERY_TYPES 保持一致）。
+
+    分类展示：正文细节类 + 创作知识类；保留"设定类由结构化资源提供、禁止查询"约束。
+    schema 与 prompt 均使用本函数输出，避免 LLM 可见清单与执行层白名单错位。
+    """
+    chapter_part = "、".join(
+        f"{t}（{_RAG_TYPE_LABELS.get(t, t)}）" for t in _CHAPTER_RAG_TYPES)
+    csv_part = "、".join(
+        f"{t}（{_RAG_TYPE_LABELS.get(t, t)}）" for t in _CSV_RAG_TYPES)
+    return (
+        "types 可选：\n"
+        f"  正文细节类：{chapter_part}\n"
+        f"  创作知识类：{csv_part}\n"
+        "  设定类（角色/世界观/力量体系/金手指/卷纲/反派/伏笔）已由【资源目录】"
+        "结构化资源提供，禁止生成这些类型的 rag_query\n"
+        "  limit 建议：chapter_paragraph 取 5~8，chapter_summary/chapter/csv_* 取 3~5"
+    )
+
 
 class ContextAnalyzer:
     """上下文分析器：Analyze → Gather → Generate 输入。"""
@@ -380,6 +424,7 @@ class ContextAnalyzer:
                 prev_step_selections_text=prev_step_selections_text,
                 dimension_checklist_text=dimension_checklist_text,
                 selection_constraints_text=selection_constraints_text,
+                rag_types_guide=_format_rag_types_guide(),
                 output_schema=output_schema,
             ))
         except KeyError as e:
@@ -684,7 +729,8 @@ class ContextAnalyzer:
             "目录未列出的资源（当前无数据）不可选择。`id=` 后的数字即引用键：character_card/foreshadow 的 ids 直接使用目录中 id= 后的数字；"
             "previous_chapter 的 chapter_index 使用目录中的第N章章节号；previous_chapter 建议 depth=tail(500字)或style(320字)。\n"
             f"{query_note}"
-            "- rag_queries：RAG 语义检索查询（含实体限定，禁止复制原文）；types：chapter/chapter_summary/foreshadow/character/worldview/power_system/golden_finger/villain/volume_outline。\n"
+            "- rag_queries：RAG 语义检索查询（含实体限定，禁止复制原文）；"
+            + _format_rag_types_guide().replace("\n", "\n  ") + "\n"
             "- custom_notes：一致性要点，格式「[维度名] 主体: 规则」，如「[角色状态] 苏瑶: 保持受伤未愈状态」，≤50字。\n"
         )
 

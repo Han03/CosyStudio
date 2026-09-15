@@ -1458,6 +1458,14 @@ class WebnovelService:
                     ]
                     for table_name, chunk_type, genre_col in _csv_tables:
                         rows = query_csv_knowledge(table_name, genre=_csv_genre, genre_column=genre_col)
+                        # 归一化匹配后仍无命中 → 回退全量加载（防止题材错位导致 CSV 知识静默缺失；
+                        # 检索按语义不分题材，全量仅增加体积不产生错误）
+                        if not rows:
+                            self._logger.warning(
+                                f"[WebnovelService] CSV知识 {table_name} 按题材 {_csv_genre} 无匹配，"
+                                f"回退全量 {len(query_csv_knowledge(table_name, genre_column=genre_col))} 行"
+                            )
+                            rows = query_csv_knowledge(table_name, genre="", genre_column=genre_col)
                         for row in rows:
                             text = build_csv_knowledge_chunk_text(table_name, row)
                             if text:
