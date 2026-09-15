@@ -220,7 +220,11 @@ class FactRecorderExecutor(BaseExecutor):
                 character_states, world_settings, chapter_timeline)
 
     def _build_prev_timeline_text(self, project_id: int, chapter_index: int) -> str:
-        """构建前一章时间轴文本（当前章所属卷时间轴中，本章之前的最近 3 章锚点）。"""
+        """构建前一章时间轴文本（当前章所属卷时间轴中，本章之前的最近 3 章锚点）。
+
+        始终注入本卷时间基准（time_base/time_span），起始章无前一章锚点时
+        以卷基准为起点，保证 time_anchor 能推算到具体日期而非只有时刻。
+        """
         if not project_id:
             return "（暂无前一章时间轴）"
         try:
@@ -239,9 +243,19 @@ class FactRecorderExecutor(BaseExecutor):
             )
             if not tl:
                 return "（本卷暂无时间轴数据）"
+            # 卷时间基准：始终注入，供本章 time_anchor 推算完整日期
+            base_bits = []
+            if tl.get("time_base"):
+                base_bits.append(f"时间基准:{tl['time_base']}")
+            if tl.get("time_span"):
+                base_bits.append(f"卷跨度:{tl['time_span']}")
+            base_line = f"- 本卷 | {' | '.join(base_bits)}" if base_bits else ""
             chapters = get_timeline_chapters(tl["id"]) or []
             prev = [c for c in chapters if (c.get("chapter_number") or 0) < chapter_index][-3:]
             if not prev:
+                if base_line:
+                    return ("（本章为该卷起始章，无前一章时间轴；"
+                            "本章时间应以上述本卷时间基准为起点推算）\n" + base_line)
                 return "（本章为该卷起始章，无前一章时间轴）"
             lines = []
             for c in prev:
@@ -258,6 +272,8 @@ class FactRecorderExecutor(BaseExecutor):
                 if bits:
                     line += " | " + " | ".join(bits)
                 lines.append(line)
+            if base_line:
+                lines.insert(0, base_line)
             return "\n".join(lines)
         except Exception:
             return "（暂无前一章时间轴）"
