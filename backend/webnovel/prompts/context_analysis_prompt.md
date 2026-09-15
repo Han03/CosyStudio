@@ -8,7 +8,7 @@ user_prompt: |
   重点关注：{focus}
 
   【资源目录】
-  以下列出本步骤可选的参考资源（含候选条目与可选深度）。条目编号即引用键：structured_refs 的 ids 直接使用目录条目编号，previous_chapter 使用目录中的第N章章节号。请根据任务需要选择最相关的条目：
+  以下列出本步骤可选的参考资源（含候选条目与可选深度）。条目编号即引用键：structured_refs 的 ids 直接使用目录条目编号，previous_chapter 使用目录中的第N章章节号。目录仅列代表性条目，未覆盖的全量/筛选数据请用 structured_queries 动态查询。请根据任务需要选择最相关的条目：
   {resource_catalog}
 
   【RAG候选】（预检索结果，仅含正文细节与创作知识；设定类已由【资源目录】结构化资源提供，故不在 RAG 候选内。若与需求高度相关可减少查询数量）
@@ -19,6 +19,12 @@ user_prompt: |
   {selection_constraints_text}
 
   {dimension_checklist_text}
+
+  【结构化查询要求】
+  - structured_queries 用于从业务库动态检索结构化数据（角色卡/角色状态/伏笔/时间轴/角色物品），当【资源目录】未列出所需条目、或需按条件筛选（角色类型/关键词/伏笔状态层级/章节定位/持有物品）时使用
+  - resource 只能取本节点【可查询资源】中的类型；filters 仅支持该资源的过滤条件字段，未知字段无效
+  - 能通过 structured_refs 精确选择的优先用 structured_refs；structured_queries 用于目录之外的全量/筛选检索，一般 0~3 条
+  - text 简述查询意图（供追溯），limit 控制在合理条数（默认 5）
 
   【RAG查询要求】
   - 每条 rag_query 必须是具体的语义检索语句，格式为「核心实体（角色名/地点/物品/组织）+ 关系或事件 + 状态/场景限定」，例如「李承言对张大牛敌意的应对」「林若兮追查密道线索的进展」，而不是「团队内部矛盾」这类泛化短语

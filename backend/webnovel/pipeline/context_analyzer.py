@@ -241,9 +241,31 @@ class ContextAnalyzer:
                     raise ContextAnalysisError(
                         f"步骤 {step_name} 选择了本节点不可用的资源 {ref['resource']}")
 
+            # 校验结构化查询：resource 必须在节点 queryable 白名单内，
+            # filters 字段必须在该资源 query_filters 声明范围内
+            queryable = set(assembly.get("queryable", []) if assembly else [])
+            queries = selection.get("structured_queries") or []
+            if not isinstance(queries, list):
+                raise ContextAnalysisError(f"步骤 {step_name} structured_queries 格式非法")
+            for q in queries:
+                if not isinstance(q, dict) or not q.get("resource"):
+                    raise ContextAnalysisError(
+                        f"步骤 {step_name} structured_queries 条目格式非法: {q}")
+                if q["resource"] not in queryable:
+                    raise ContextAnalysisError(
+                        f"步骤 {step_name} 查询了本节点不可查的资源 {q['resource']}")
+                res = RESOURCE_REGISTRY.get(q["resource"])
+                allowed = set(res.get("query_filters", [])) if res else set()
+                for fk in (q.get("filters") or {}):
+                    if fk not in allowed:
+                        raise ContextAnalysisError(
+                            f"步骤 {step_name} structured_queries 资源 {q['resource']} "
+                            f"不支持 filters 字段 {fk}（允许: {'/'.join(sorted(allowed))}）")
+
             self._logger.info(
                 f"[ContextAnalyzer] {step_name} 分析完成："
-                f"资源{len(refs)}个，RAG查询{len(selection.get('rag_queries') or [])}条，"
+                f"资源{len(refs)}个，结构化查询{len(queries)}条，"
+                f"RAG查询{len(selection.get('rag_queries') or [])}条，"
                 f"要点{len(selection.get('custom_notes') or [])}条"
             )
             return selection
@@ -388,6 +410,12 @@ class ContextAnalyzer:
             lines.append(line)
             for cl in candidate_text.split("\n"):
                 lines.append(cl)
+        # 目录仅列代表性条目；支持查询的节点提示用 structured_queries 获取全量
+        if lines and assembly.get("queryable"):
+            q_labels = "、".join(
+                RESOURCE_REGISTRY.get(r, {}).get("label", r)
+                for r in assembly["queryable"])
+            lines.append(f"（目录仅列代表性条目；{q_labels}等更多数据可用 structured_queries 按条件查询）")
         return "\n".join(lines) if lines else "（无可用资源）"
 
     def _format_resource_candidates(self, res_name: str, env: Dict[str, Any]) -> str:
@@ -402,7 +430,7 @@ class ContextAnalyzer:
             # 条目编号 = character id = structured_refs.ids 引用键
             return "\n".join(
                 f"    {c.get('id')}. {c.get('name')}（{c.get('type')}）— {c.get('summary', '')[:20]}"
-                for c in chars[:20]
+                for c in chars[:8]
             )
         if res_name == "foreshadow":
             loops = inventory.get("foreshadows", [])
@@ -412,7 +440,7 @@ class ContextAnalyzer:
             return "\n".join(
                 f"    {f.get('id')}. [{f.get('tier', '')}] {f.get('content', '')[:30]} "
                 f"（第{f.get('planted_chapter') or 0}章埋下）"
-                for f in loops[:15]
+                for f in loops[:8]
             )
         if res_name == "worldview":
             worlds = inventory.get("world_settings", [])
@@ -472,7 +500,7 @@ class ContextAnalyzer:
                 f"    - {st.get('character_name') or st.get('name', '?')} — "
                 f"位置 {str(st.get('location', ''))[:20]} | "
                 f"状态 {(str(st.get('state_summary') or st.get('state', '')))[:40]}"
-                for st in states[:10]
+                for st in states[:6]
             )
         if res_name == "previous_hook":
             hook = structural.get("previous_hook") or {}
@@ -488,7 +516,7 @@ class ContextAnalyzer:
             if not timelines:
                 return ""
             lines = []
-            for tl in timelines[:3]:
+            for tl in timelines[:2]:
                 chapters = get_timeline_chapters(tl["id"]) or []
                 recent = chapters[-1] if chapters else {}
                 anchor = (recent.get("time_anchor", "") or "")[:20]
@@ -515,6 +543,7 @@ class ContextAnalyzer:
         """按节点生成输出 JSON 格式与字段说明。"""
         assembly = STEP_ASSEMBLY.get(step_name)
         selectable = assembly["selectable"] if assembly else []
+        queryable = assembly.get("queryable", []) if assembly else []
         res_labels = {
             "chapter_plan": "章节规划", "volume_outline": "当前卷纲", "project": "项目信息",
             "character_state": "上章末角色状态", "previous_hook": "上一章结尾",
@@ -546,17 +575,57 @@ class ContextAnalyzer:
                 ref_lines.append(f'    {{"resource": "{r}", "depth": "{recommend}"}}')
         ref_text = "\n".join(ref_lines) if ref_lines else "    （本节点无可选资源）"
 
+        # 可查询资源清单（structured_queries 白名单）
+        if queryable:
+            query_example = (
+                '    {"resource": "' + (queryable[0] if queryable else "character_card")
+                + '", "filters": {"keyword": "关键词"}, "text": "查询意图", "limit": 5}'
+            )
+            query_section = (
+                '  "structured_queries": [\n'
+                f"{query_example}\n"
+                '  ],\n'
+            )
+            # 各可查询资源的用途与 filters 明细（防 LLM 用错资源）
+            query_res_lines = []
+            for r in queryable:
+                res = RESOURCE_REGISTRY.get(r, {})
+                label = res.get("label", r)
+                filters = res.get("query_filters", [])
+                filter_desc = {
+                    "type": "角色类型（如 配角/反派）", "keyword": "名称·身份·性格关键词",
+                    "ids": "角色id列表", "chapter": "章节号", "name": "角色名",
+                    "character_id": "角色id", "status": "active/resolved",
+                    "tier": "伏笔层级（核心/支线等）", "character": "角色名或id",
+                    "only_held": "仅持有中（默认true）", "volume": "卷号",
+                }
+                f_desc = "、".join(f"{f}={filter_desc.get(f, f)}" for f in filters)
+                query_res_lines.append(f"    - {label}（{r}）: {f_desc}")
+            query_res_text = "\n".join(query_res_lines)
+            query_note = (
+                "structured_queries 可查资源与过滤条件：\n"
+                f"{query_res_text}\n"
+                "规则：resource 只能取上述类型；filters 仅支持对应资源列出的字段，未知字段无效；"
+                "能通过 structured_refs 精确选择的优先用 structured_refs；一般 0~3 条；"
+                "text 简述查询意图供追溯。\n"
+            )
+        else:
+            query_section = '  "structured_queries": [],\n'
+            query_note = "- structured_queries：本节点不支持结构化查询，保持空数组。\n"
+
         return (
             "{\n"
             '  "structured_refs": [\n'
             f"{ref_text}\n"
             '  ],\n'
+            f"{query_section}"
             '  "rag_queries": [{"text": "针对性查询文本", "types": ["chunk_type"], "limit": 5}],\n'
             '  "custom_notes": ["[维度] 主体: 规则"]\n'
             "}\n"
             "字段说明：\n"
             "- structured_refs 从【资源目录】选，条目编号即引用键：character_card/foreshadow 的 ids 直接使用目录中的条目编号；"
             "previous_chapter 的 chapter_index 使用目录中的第N章章节号；previous_chapter 建议 depth=tail(500字)或style(320字)。\n"
+            f"{query_note}"
             "- rag_queries：RAG 语义检索查询（含实体限定，禁止复制原文）；types：chapter/chapter_summary/foreshadow/character/worldview/power_system/golden_finger/villain/volume_outline。\n"
             "- custom_notes：一致性要点，格式「[维度名] 主体: 规则」，如「[角色状态] 苏瑶: 保持受伤未愈状态」，≤50字。\n"
         )
@@ -663,6 +732,43 @@ class ContextAnalyzer:
                     data_list if len(data_list) > 1 else data_list
                 )
 
+        # 1.5 结构化主动查询（structured_queries：动态检索业务库全量数据）
+        # 结果渲染为独立区块【资源名·查询】，追加在 selectable 区块之后、auto 之前；
+        # 查询失败抛错；空结果跳过区块（合法查询无命中不报错）。
+        query_blocks: List[str] = []
+        query_results: Dict[str, List[Dict[str, Any]]] = {}
+        queries = selection.get("structured_queries") or []
+        if not isinstance(queries, list):
+            queries = []
+        for q in queries:
+            if not isinstance(q, dict):
+                raise ContextAnalysisError(f"structured_queries 条目格式非法: {q}")
+            res_name = q.get("resource")
+            res = RESOURCE_REGISTRY.get(res_name)
+            if not res or not res.get("query_loader"):
+                raise ContextAnalysisError(f"不可查询的资源 {res_name}")
+            try:
+                data = res["query_loader"](q, env)
+            except ContextAnalysisError:
+                raise
+            except Exception as e:
+                raise ContextAnalysisError(
+                    f"结构化查询 {res_name} 失败: {e}")
+            query_results[res_name] = data or []
+            if not data:
+                continue
+            formatters = res["formatters"]
+            depth = q.get("depth") or res["default_depth"]
+            if depth not in formatters:
+                depth = res["default_depth"]
+            body = formatters[depth](data, depth)
+            if not body or not body.strip():
+                continue
+            query_blocks.append(f"{res['header']}·查询\n{body}")
+        ctx["structured_query_results"] = query_results
+        if query_blocks:
+            sections["__query_blocks__"] = "\n\n".join(query_blocks)
+
         # 2. auto_sections 固定挂载（任务输入/约束/RAG，按配置顺序）
         for sec_name, sec_depth in auto_items:
             res = RESOURCE_REGISTRY.get(sec_name)
@@ -707,18 +813,24 @@ class ContextAnalyzer:
                 raise ContextAnalysisError(
                     f"未知 auto_sections 区块类型: {sec_name}")
 
-        # 3. 组装 assembled_context：selectable 命中项（按 selectable 顺序）+ auto 项（按配置顺序）
+        # 3. 组装 assembled_context：selectable 命中项（按 selectable 顺序）
+        #    + structured_queries 查询结果 + auto 项（按配置顺序）
         from utils.prompt_normalizer import normalize_text_block
         _JSON_SECTIONS = {"plot_list", "review_result"}
         ordered = []
         for sec_name, _ in selectable_items:
             if sec_name in sections:
                 ordered.append(sec_name)
+        if "__query_blocks__" in sections:
+            ordered.append("__query_blocks__")
         for sec_name, _ in auto_items:
             if sec_name in sections:
                 ordered.append(sec_name)
         ordered_parts = []
         for sec_name in ordered:
+            if sec_name == "__query_blocks__":
+                ordered_parts.append(sections[sec_name])
+                continue
             header = RESOURCE_REGISTRY[sec_name]["header"]
             body = sections[sec_name]
             if sec_name not in _JSON_SECTIONS:

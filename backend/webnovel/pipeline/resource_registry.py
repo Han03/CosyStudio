@@ -20,13 +20,20 @@ from utils.logger import log_manager
 
 from webnovel.repositories import (
     get_character_card,
+    get_character_cards_by_project,
     get_character_items_by_project,
     get_character_relationships,
+    get_open_loops_by_project,
     get_worldview_by_project, get_worldview_factions,
     get_power_system_by_project,
     get_golden_finger_by_project,
     get_character_group_by_project, get_character_group_members,
     get_timelines_by_project, get_timeline_chapters,
+)
+from repositories.base_repository import safe_int
+from webnovel.repositories.character_state_repository import (
+    get_character_states_before_chapter,
+    get_character_states_by_chapter,
 )
 
 _logger = log_manager.get_logger("resource_registry")
@@ -123,37 +130,7 @@ def _load_character_cards(ref, env):
         card = get_character_card(project_id, cid)
         if not card:
             continue
-        raw_type = card.get("character_type", "")
-        # 角色事实关系（webnovel_character_relationship）
-        rels = []
-        try:
-            rels = [
-                {"target": r.get("target_name", ""), "type": r.get("relation_type", ""),
-                 "desc": (r.get("description") or "")[:40]}
-                for r in get_character_relationships(cid)
-                if r.get("target_name") and r.get("relation_type")
-            ]
-        except Exception:
-            rels = []
-        characters.append({
-            "role": _CHAR_TYPE_LABELS.get(raw_type, raw_type),
-            "character_name": card.get("name", ""),
-            "alias": card.get("alias", ""),
-            "identity": card.get("identity", ""),
-            "protagonist_relation": card.get("protagonist_relation", ""),
-            "personality": card.get("core_personality", ""),
-            "flaw": card.get("personality_flaw", ""),
-            "goals": card.get("true_desire", "") or card.get("long_term_goal", ""),
-            "abilities": card.get("ability_limit", ""),
-            "relationships": rels,
-            "items": [
-                {"name": it.get("item_name", ""),
-                 "quantity": it.get("quantity", 1) or 1,
-                 "desc": it.get("source", "") or it.get("change_note", "")}
-                for it in items_by_char.get(cid, [])
-                if it.get("item_name")
-            ],
-        })
+        characters.append(_build_card_enriched(card, project_id, items_by_char))
     if not characters:
         raise ContextAnalysisError(f"角色卡资源加载失败：ids={ids} 均无有效数据")
     # 主角排最前
@@ -167,7 +144,6 @@ def _load_character_group(ref, env):
     if not char_group:
         raise ContextAnalysisError("主角团资源加载失败：未设定角色组")
     group_members = get_character_group_members(char_group["id"])
-    from webnovel.repositories import get_character_cards_by_project
     all_chars = {c.get("id"): c for c in get_character_cards_by_project(project_id)}
     enriched = []
     for m in group_members:
@@ -295,6 +271,174 @@ def _load_review_result(ref, env):
     if review_result is None:
         raise ContextAnalysisError("审查结果任务输入缺失")
     return review_result
+
+
+# ── 结构化查询处理器：统一签名 query_loader(ref, env) -> list ──
+# ref = {"resource", "filters": {...}, "text", "limit"}
+# 全量拉取 + 内存过滤（数据量小，毫秒级），结果复用现有 formatter 渲染。
+
+def _build_card_enriched(card: dict, project_id: int, items_by_char: dict) -> dict:
+    """单张角色卡 → 富化结构（含物品/关系），与 _load_character_cards 一致。"""
+    raw_type = card.get("character_type", "")
+    rels = []
+    try:
+        rels = [
+            {"target": r.get("target_name", ""), "type": r.get("relation_type", ""),
+             "desc": (r.get("description") or "")[:40]}
+            for r in get_character_relationships(card.get("id"))
+            if r.get("target_name") and r.get("relation_type")
+        ]
+    except Exception:
+        rels = []
+    return {
+        "role": _CHAR_TYPE_LABELS.get(raw_type, raw_type),
+        "character_name": card.get("name", ""),
+        "alias": card.get("alias", ""),
+        "identity": card.get("identity", ""),
+        "protagonist_relation": card.get("protagonist_relation", ""),
+        "personality": card.get("core_personality", ""),
+        "flaw": card.get("personality_flaw", ""),
+        "goals": card.get("true_desire", "") or card.get("long_term_goal", ""),
+        "abilities": card.get("ability_limit", ""),
+        "relationships": rels,
+        "items": [
+            {"name": it.get("item_name", ""),
+             "quantity": it.get("quantity", 1) or 1,
+             "desc": it.get("source", "") or it.get("change_note", "")}
+            for it in items_by_char.get(card.get("id"), [])
+            if it.get("item_name")
+        ],
+    }
+
+
+def _query_character_cards(ref, env):
+    """按 filters 检索角色卡：type（中文/英文）/keyword（name/identity/personality）/ids。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    cards = get_character_cards_by_project(project_id) or []
+    type_f = filters.get("type")
+    if type_f:
+        label_to_raw = {v: k for k, v in _CHAR_TYPE_LABELS.items()}
+        raw = label_to_raw.get(type_f, type_f)
+        cards = [c for c in cards if c.get("character_type") == raw]
+    ids = filters.get("ids")
+    if ids:
+        id_set = {str(i) for i in ids}
+        cards = [c for c in cards if str(c.get("id")) in id_set]
+    keyword = filters.get("keyword")
+    if keyword:
+        kw = str(keyword)
+        cards = [c for c in cards if kw in str(c.get("name", ""))
+                 or kw in str(c.get("identity", ""))
+                 or kw in str(c.get("core_personality", ""))]
+    if not cards:
+        return []
+    try:
+        items_by_char = get_character_items_by_project(project_id)
+    except Exception:
+        items_by_char = {}
+    enriched = [_build_card_enriched(c, project_id, items_by_char) for c in cards]
+    # 主角排最前
+    enriched.sort(key=lambda c: (c.get("role") != "主角", c.get("role") != "主角团核心"))
+    return enriched[:limit]
+
+
+def _query_character_states(ref, env):
+    """按 filters 检索角色状态：chapter（指定章）/name/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 5)
+    project_id = env["project_id"]
+    chapter = filters.get("chapter")
+    if chapter is not None:
+        states = get_character_states_by_chapter(project_id, safe_int(chapter)) or []
+    else:
+        # 未指定章 → 最近一章状态（与写作侧"上章末状态"一致）
+        states = get_character_states_before_chapter(project_id, 10 ** 9) or []
+    name = filters.get("name")
+    if name:
+        states = [s for s in states if str(name) in str(s.get("character_name", ""))]
+    cid = filters.get("character_id")
+    if cid is not None:
+        states = [s for s in states if str(s.get("character_id")) == str(cid)]
+    keyword = filters.get("keyword")
+    if keyword:
+        states = [s for s in states if str(keyword) in str(s.get("state_summary", ""))]
+    return states[:limit]
+
+
+def _query_foreshadows(ref, env):
+    """按 filters 检索伏笔：status（active/resolved）/tier/chapter（planted<=）/keyword。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 8)
+    project_id = env["project_id"]
+    loops = get_open_loops_by_project(project_id) or []
+    status = filters.get("status")
+    if status in ("active", "open"):
+        loops = [l for l in loops if l.get("status") == "active"]
+    elif status == "resolved":
+        loops = [l for l in loops if l.get("status") == "resolved"]
+    tier = filters.get("tier")
+    if tier:
+        loops = [l for l in loops if str(tier) in str(l.get("tier", ""))]
+    chapter = filters.get("chapter")
+    if chapter is not None:
+        loops = [l for l in loops if (l.get("planted_chapter") or 0) <= safe_int(chapter)]
+    keyword = filters.get("keyword")
+    if keyword:
+        loops = [l for l in loops if str(keyword) in str(l.get("content", ""))]
+    return loops[:limit]
+
+
+def _query_timeline(ref, env):
+    """按 filters 检索时间轴：volume（卷号）/chapter（章号）。"""
+    filters = ref.get("filters") or {}
+    project_id = env["project_id"]
+    timelines = get_timelines_by_project(project_id) or []
+    if not timelines:
+        return []
+    volume = filters.get("volume")
+    tl = None
+    if volume is not None:
+        for t in timelines:
+            if t.get("volume_number") == safe_int(volume):
+                tl = t
+                break
+    if tl is None:
+        tl = timelines[0]
+    chapters = get_timeline_chapters(tl["id"]) or []
+    ch = filters.get("chapter")
+    if ch is not None:
+        chapters = [c for c in chapters if c.get("chapter_number") == safe_int(ch)]
+    return [{"timeline": tl, "chapters": chapters}]
+
+
+def _query_items(ref, env):
+    """按 filters 检索角色物品：character（角色名/id）/keyword（物品名/变更说明）。"""
+    filters = ref.get("filters") or {}
+    limit = ref.get("limit", 10)
+    project_id = env["project_id"]
+    items_by_char = get_character_items_by_project(project_id) or {}
+    name_by_id = {c.get("id"): c.get("name", "?") for c in (get_character_cards_by_project(project_id) or [])}
+    rows = []
+    for cid, items in items_by_char.items():
+        for it in items:
+            row = dict(it)
+            row["character_id"] = cid
+            row["character_name"] = name_by_id.get(cid, f"角色#{cid}")
+            rows.append(row)
+    char = filters.get("character")
+    if char:
+        rows = [r for r in rows if str(char) == str(r.get("character_id"))
+                or str(char) in str(r.get("character_name", ""))]
+    keyword = filters.get("keyword")
+    if keyword:
+        rows = [r for r in rows if str(keyword) in str(r.get("item_name", ""))
+                or str(keyword) in str(r.get("change_note", ""))]
+    only_held = filters.get("only_held", True)
+    if only_held:
+        rows = [r for r in rows if r.get("status") != "lost"]
+    return rows[:limit]
 
 
 # ── 格式化器：统一签名 formatter(data, depth) -> str（不含区块标题）──
@@ -446,6 +590,26 @@ def _fmt_character_summary(characters, depth="summary"):
         "物品一致性约束：角色使用、掏出、挥动任何物品前，必须已在其持有物品清单中；"
         "禁止凭空出现清单外的物品；若剧情需要新物品，必须先写获得它的过程。"
     )
+    return "\n".join(lines)
+
+
+def _fmt_character_items(items, depth="full"):
+    """角色物品（结构化查询结果渲染）。"""
+    if not items:
+        return ""
+    lines = []
+    for it in items[:10]:
+        name = it.get("character_name", "") or f"角色#{it.get('character_id', '')}"
+        item = it.get("item_name", "")
+        if not item:
+            continue
+        qty = it.get("quantity", 1) or 1
+        item_str = f"{item}x{qty}" if qty > 1 else item
+        line = f"- {name}持有 {item_str}"
+        note = (it.get("change_note", "") or it.get("source", "") or "")[:30]
+        if note:
+            line += f"（{note}）"
+        lines.append(line)
     return "\n".join(lines)
 
 
@@ -733,6 +897,8 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "上章末角色状态", "header": "【上章末角色状态】", "category": "structured",
         "loader": _load_character_states, "formatters": {"full": _fmt_character_states},
         "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_character_states,
+        "query_filters": ["chapter", "name", "character_id", "keyword"],
     },
     "previous_hook": {
         "label": "上一章结尾状态", "header": "【上一章结尾】", "category": "structured",
@@ -744,6 +910,15 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "loader": _load_character_cards,
         "formatters": {"full": _fmt_character_full, "summary": _fmt_character_summary},
         "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_character_cards,
+        "query_filters": ["type", "keyword", "ids"],
+    },
+    "character_item": {
+        "label": "角色物品", "header": "【角色物品】", "category": "structured",
+        "loader": None, "formatters": {"full": _fmt_character_items},
+        "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_items,
+        "query_filters": ["character", "keyword", "only_held"],
     },
     "character_group": {
         "label": "主角团", "header": "【主角团】", "category": "structured",
@@ -769,11 +944,15 @@ RESOURCE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "活跃伏笔", "header": "【活跃伏笔】", "category": "structured",
         "loader": _load_foreshadows, "formatters": {"full": _fmt_foreshadows},
         "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_foreshadows,
+        "query_filters": ["status", "tier", "chapter", "keyword"],
     },
     "timeline": {
         "label": "章节时间轴", "header": "【章节时间轴】", "category": "structured",
         "loader": _load_timeline, "formatters": {"full": _fmt_timeline},
         "default_depth": "full", "task_input": False,
+        "queryable": True, "query_loader": _query_timeline,
+        "query_filters": ["volume", "chapter"],
     },
     "previous_chapter": {
         "label": "前文章节", "header": "【前文回顾】", "category": "structured",
@@ -834,6 +1013,10 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "character_group", "golden_finger", "power_system",
             "worldview", "foreshadow", "timeline",
         ],
+        "queryable": [
+            "character_card", "character_state", "foreshadow",
+            "timeline", "character_item",
+        ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
             ("rag_results", "full"),
@@ -845,6 +1028,9 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "chapter_plan", "volume_outline", "character_card",
             "golden_finger", "worldview", "foreshadow", "timeline",
         ],
+        "queryable": [
+            "character_card", "foreshadow", "timeline",
+        ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
             ("dimensions", None),
@@ -855,6 +1041,10 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             ("character_card", "summary"), "previous_chapter", "character_state",
             "character_group", "worldview", "power_system", "golden_finger",
             "foreshadow", "timeline",
+        ],
+        "queryable": [
+            "character_card", "character_state", "foreshadow",
+            "timeline", "character_item",
         ],
         "auto_sections": [
             ("undisclosed_foreshadows", None),
@@ -868,6 +1058,9 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "chapter_plan", ("previous_chapter", "tail"), "character_state",
             "worldview", "character_card", "timeline",
         ],
+        "queryable": [
+            "character_card", "character_state", "timeline",
+        ],
         "auto_sections": [
             ("dimensions", None),
             ("consistency_notes", None),
@@ -877,6 +1070,7 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
         "selectable": [
             "worldview", "power_system", ("previous_chapter", "style"),
         ],
+        "queryable": [],
         "auto_sections": [
             ("review_result", "full"),
             ("consistency_notes", None),
@@ -892,6 +1086,10 @@ STEP_ASSEMBLY: Dict[str, Dict[str, Any]] = {
             "worldview", "power_system", "golden_finger", "foreshadow",
             "timeline", "previous_chapter", "previous_hook",
             "volume_outline", "project",
+        ],
+        "queryable": [
+            "character_card", "character_state", "foreshadow",
+            "timeline", "character_item",
         ],
         "auto_sections": [
             ("rag_results", "qa"),
