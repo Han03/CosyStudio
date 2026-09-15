@@ -10,7 +10,6 @@ user_prompt: |
   2. 按时间顺序拆解为 {plot_count} 个剧情点，每点聚焦一个场景与冲突转折
   3. 为每点写 description：只写"谁做了什么→导致什么结果"，不含环境铺陈与心理描写
 
-  【装配上下文】
   {assembled_context}
 
   【输出格式】

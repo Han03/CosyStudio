@@ -10,7 +10,6 @@ user_prompt: |
   2. 按【审查维度】逐项评分并列出问题
   3. 最后汇总 overall_passed
 
-  【装配上下文】
   {assembled_context}
 
   【待审查剧情列表】
