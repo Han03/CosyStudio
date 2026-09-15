@@ -353,7 +353,7 @@ class ContextAnalyzer:
             env["inventory"].get("rag_candidates", []))
         prev_step_selections_text = self._format_prev_selections(prev_selections)
         dimension_checklist_text = self._build_dimension_checklist(step_name)
-        output_schema = self._build_output_schema(step_name)
+        output_schema = self._build_output_schema(step_name, env)
         selection_constraints_text = (
             _QA_SELECTION_CONSTRAINTS if is_qa else _WRITING_SELECTION_CONSTRAINTS
         )
@@ -573,8 +573,13 @@ class ContextAnalyzer:
         lines.append(f"  （本节点一致性要点请控制在 {limit} 条内）")
         return "\n".join(lines)
 
-    def _build_output_schema(self, step_name: str) -> str:
-        """按节点生成输出 JSON 格式与字段说明。"""
+    def _build_output_schema(self, step_name: str, env: Dict[str, Any]) -> str:
+        """按节点生成输出 JSON 格式与字段说明。
+
+        structured_refs 示例行只列出【资源目录】中实际有内容的资源：
+        空资源（如第 1 章尚无活跃伏笔）不出现示例行，杜绝 LLM 按示例
+        幻觉选择不存在的资源（此前出现过 LLM 编造伏笔 id 导致装配报错）。
+        """
         assembly = STEP_ASSEMBLY.get(step_name)
         selectable = assembly["selectable"] if assembly else []
         queryable = assembly.get("queryable", []) if assembly else []
@@ -596,6 +601,9 @@ class ContextAnalyzer:
         _PREV_CH_DEPTH_RECOMMEND = {"previous_chapter": "tail"}
         for item in selectable:
             r = item[0] if isinstance(item, (list, tuple)) else item
+            # 与资源目录同源判空：目录中未列出的空资源不在 schema 示例中出现
+            if not self._format_resource_candidates(r, env).strip():
+                continue
             label = res_labels.get(r, r)
             res = RESOURCE_REGISTRY.get(r, {})
             depths = list(res.get("formatters", {}).keys())
@@ -666,7 +674,8 @@ class ContextAnalyzer:
             '  "custom_notes": ["[维度] 主体: 规则"]\n'
             "}\n"
             "字段说明：\n"
-            "- structured_refs 从【资源目录】选，`id=` 后的数字即引用键：character_card/foreshadow 的 ids 直接使用目录中 id= 后的数字；"
+            "- structured_refs 只能从【资源目录】实际列出的资源中选择（示例行即当前有数据的全部可选项）；"
+            "目录未列出的资源（当前无数据）不可选择。`id=` 后的数字即引用键：character_card/foreshadow 的 ids 直接使用目录中 id= 后的数字；"
             "previous_chapter 的 chapter_index 使用目录中的第N章章节号；previous_chapter 建议 depth=tail(500字)或style(320字)。\n"
             f"{query_note}"
             "- rag_queries：RAG 语义检索查询（含实体限定，禁止复制原文）；types：chapter/chapter_summary/foreshadow/character/worldview/power_system/golden_finger/villain/volume_outline。\n"
