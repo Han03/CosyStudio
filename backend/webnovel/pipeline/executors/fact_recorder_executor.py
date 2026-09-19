@@ -39,6 +39,131 @@ COOL_POINT_TYPES = [
 FORESHA_DOW_TIERS = ["核心", "支线", "装饰"]
 
 
+_CN_NUM = {"零": 0, "一": 1, "元": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+            "六": 6, "七": 7, "八": 8, "九": 9, "十": 10, "廿": 20, "卅": 30}
+_CN_DAYS = {"初一": 1, "初二": 2, "初三": 3, "初四": 4, "初五": 5, "初六": 6, "初七": 7,
+            "初八": 8, "初九": 9, "初十": 10}
+
+
+def _cn_num_to_int(text: str):
+    """中文数字转 int（支持 一~三十/初X/廿X/卅X），失败返回 None。"""
+    if not text:
+        return None
+    if text in _CN_DAYS:
+        return _CN_DAYS[text]
+    if text.startswith("初") and len(text) == 2 and text[1] in _CN_NUM:
+        return _CN_NUM[text[1]]
+    if text in _CN_NUM:
+        return _CN_NUM[text]
+    if text.startswith("十"):
+        return 10 + _CN_NUM.get(text[1:], 0)
+    if text.startswith("廿"):
+        return 20 + _CN_NUM.get(text[1:], 0)
+    if text.startswith("卅"):
+        return 30 + _CN_NUM.get(text[1:], 0)
+    if text.isdigit():
+        return int(text)
+    return None
+
+
+def _int_to_cn_day(num: int) -> str:
+    """int 转中文日（1→初一, 11→十一, 21→廿一, 30→三十）。"""
+    if num <= 0:
+        return ""
+    if num <= 10:
+        return "初" + ("十" if num == 10 else "一二三四五六七八九"[num - 1])
+    if num < 20:
+        return "十" + ("一二三四五六七八九"[num - 11] if num > 10 else "")
+    if num % 10 == 0:
+        return ("二十" if num == 20 else "三十")
+    return ("廿" if num < 30 else "卅") + "一二三四五六七八九"[num % 10 - 1]
+
+
+def _interval_to_days(interval: str):
+    """解析时间间隔为天数（'一日'/'1日'/'一天'→1；'半日'/'连续'/'跨夜'→None）。"""
+    if not interval:
+        return None
+    text = str(interval).strip()
+    # 阿拉伯数字：N日/N天/N个月
+    m = re.match(r"^([0-9]+)\s*(日|天)$", text)
+    if m:
+        return int(m.group(1))
+    # 中文数字：X日/X天
+    m = re.match(r"^([一二两三四五六七八九十廿卅]+)\s*(日|天)$", text)
+    if m:
+        n = _cn_num_to_int(m.group(1))
+        return n if n and n > 0 else None
+    # 连续/半日/跨夜/当夜/一夜等不跨日表述
+    if any(k in text for k in ("半日", "连续", "跨夜", "当夜", "一夜", "当日", "同一天")):
+        return None
+    m = re.match(r"^([0-9一二两三四五六七八九十廿卅]+)\s*个月?$", text)
+    if m:
+        n = _cn_num_to_int(m.group(1))
+        return n * 30 if n else None
+    return None
+
+
+def _advance_date(anchor: str, days: int) -> str:
+    """按天数推进日期（小说虚构历法简化：月内推进，跨月按 30 天/月进位）。"""
+    if not anchor or not days or days <= 0:
+        return anchor
+    m = re.match(r"^(.*?)([一二三四五六七八九十]+|[0-9]+)月([初一二三四五六七八九十廿卅]+|[0-9]+)(?:日)?$", anchor)
+    if not m:
+        return anchor
+    year = m.group(1)
+    month = _cn_num_to_int(m.group(2))
+    day = _cn_num_to_int(m.group(3))
+    if not month or not day:
+        return anchor
+    day += days
+    while day > 30:
+        day -= 30
+        month += 1
+    if month > 12:
+        month = 1
+        # 纪年推进：天启元年 +1 → 天启二年（仅当 year 可解析；否则保持）
+        y = re.search(r"([一二三四五六七八九十百千零元]+|[0-9]+)年", year)
+        if y:
+            yv = _cn_num_to_int(y.group(1))
+            if yv:
+                year = year[:y.start()] + _int_to_cn_year(yv + 1) + "年"
+    month_cn = _int_to_cn_month(month)
+    day_cn = _int_to_cn_day(day)
+    return f"{year}{month_cn}月{day_cn}"
+
+
+def _int_to_cn_month(num: int) -> str:
+    if num <= 0 or num > 12:
+        return str(num)
+    return "一二三四五六七八九十"[num - 1] if num <= 10 else ("十一" if num == 11 else "十二")
+
+
+def _int_to_cn_year(num: int) -> str:
+    if num <= 0:
+        return str(num)
+    digits = "零一二三四五六七八九"
+    if num < 10:
+        return digits[num]
+    if num < 20:
+        return "十" + (digits[num - 10] if num > 10 else "")
+    parts = []
+    s = str(num)
+    for i, ch in enumerate(s):
+        d = int(ch)
+        place = len(s) - i
+        if d == 0:
+            parts.append("零")
+        elif place == 4:
+            parts.append(digits[d] + "千")
+        elif place == 3:
+            parts.append(digits[d] + "百")
+        elif place == 2:
+            parts.append(digits[d] + "十")
+        else:
+            parts.append(digits[d])
+    return "".join(parts).replace("零", "零") if num < 1000 else "".join(parts)
+
+
 class FactRecorderExecutor(BaseExecutor):
     """事实记录器执行器。"""
 
@@ -72,15 +197,16 @@ class FactRecorderExecutor(BaseExecutor):
                     else:
                         world_settings_text.append("世界观设定")
 
-            characters_text = []
-            for c in inventory.get('characters', []):
-                if isinstance(c, dict):
-                    if c.get('name'):
-                        characters_text.append(c['name'])
-                    elif c.get('type'):
-                        characters_text.append(c['type'])
-                    else:
-                        characters_text.append("角色")
+            # 0. 先检测并创建新角色（建卡入库后，事实提取的角色清单才包含本章新角色，
+            #    character_updates 关系 / character_states 能匹配新卡真实 id）
+            await self._create_new_characters(script_id, polished_content, inventory)
+
+            project = get_webnovel_project_by_script(script_id)
+            project_id = project["id"] if project else 0
+
+            # 角色清单（带真实 id 文本）与物品清单（item 名称对齐依据）
+            characters_text = self._build_characters_text(project_id)
+            character_items_text = self._build_character_items_text(project_id)
 
             # 从 .md 文件加载 prompt 模板
             prompt_data = self._load_prompt("fact_record")
@@ -91,16 +217,14 @@ class FactRecorderExecutor(BaseExecutor):
             from core.model_executor import get_model_executor
             executor = get_model_executor()
 
-            project = get_webnovel_project_by_script(script_id)
-            project_id = project["id"] if project else 0
-
             # 前一章时间轴（基于原文的章节时间轴证据，供 chapter_timeline 块衔接）
             prev_timeline = self._build_prev_timeline_text(project_id, self.chapter_index)
 
             prompt = prompt_data["user_prompt"].format(
                 chapter_content=chapter_content,
                 world_settings=json.dumps(world_settings_text, ensure_ascii=False),
-                characters=json.dumps(characters_text, ensure_ascii=False),
+                characters=characters_text,
+                character_items=character_items_text,
                 prev_timeline=prev_timeline,
             )
             system_prompt = prompt_data["system_prompt"] or "你是一位专业的内容分析助手，擅长提取文本中的关键信息，输出严格的JSON格式"
@@ -139,9 +263,6 @@ class FactRecorderExecutor(BaseExecutor):
                 # 5.5 章节时间轴（基于原文补写 webnovel_timeline_chapter）
                 await self._save_chapter_timeline(project_id, self.chapter_index, chapter_timeline)
             # 跨章节事件（开放悬念/倒计时 提取+回收）由 apply 后处理中独立执行器处理
-
-            # 6. 检测并创建新角色
-            await self._create_new_characters(script_id, polished_content, inventory)
 
             item_change_count = len(item_changes)
             char_update_count = len(character_updates)
@@ -311,14 +432,42 @@ class FactRecorderExecutor(BaseExecutor):
                     f"[FactRecorder] 第{chapter_index}章时间轴落库跳过：第{cur_vol.get('volume_number')}卷无主记录"
                 )
                 return
+            time_anchor = str(chapter_timeline.get("time_anchor", "") or "").strip()
+            interval = str(chapter_timeline.get("interval_from_prev", "") or "").strip()
+            notes = str(chapter_timeline.get("notes", "") or "").strip()
+
+            # 锚点校验：与前一章相同且间隔为明确天数时，按间隔自动推进。
+            # LLM 在正文无明确时间时常直接复制前一章锚点，导致时间轴停滞且与
+            # interval_from_prev（如"一日"）自相矛盾。
+            prev_row = None
+            prev_chapters = get_timeline_chapters(tl["id"]) or []
+            for pc in prev_chapters:
+                if (pc.get("chapter_number") or 0) == chapter_index - 1:
+                    prev_row = pc
+                    break
+            if (prev_row and prev_row.get("time_anchor")
+                    and time_anchor == prev_row["time_anchor"]):
+                days = _interval_to_days(interval)
+                if days and days > 0:
+                    new_anchor = _advance_date(prev_row["time_anchor"], days)
+                    if new_anchor and new_anchor != prev_row["time_anchor"]:
+                        logger.info(
+                            f"[FactRecorder] 第{chapter_index}章锚点与上章相同且间隔'{interval}'，"
+                            f"自动推进 {prev_row['time_anchor']} → {new_anchor}"
+                        )
+                        time_anchor = new_anchor
+                        if notes and "自动推进" not in notes:
+                            notes += f"；锚点与上章相同，按间隔{interval}自动推进"
+                        elif not notes:
+                            notes = f"锚点与上章相同，按间隔{interval}自动推进"
             upsert_timeline_chapter(
                 timeline_id=tl["id"],
                 chapter_number=chapter_index,
-                time_anchor=chapter_timeline.get("time_anchor", ""),
+                time_anchor=time_anchor,
                 chapter_duration=chapter_timeline.get("chapter_duration", ""),
-                interval_from_prev=chapter_timeline.get("interval_from_prev", ""),
+                interval_from_prev=interval,
                 countdown_status=chapter_timeline.get("countdown_status", ""),
-                notes=chapter_timeline.get("notes", ""),
+                notes=notes,
             )
         except Exception as e:
             logger.warning(f"[FactRecorder] 章节时间轴落库失败（不阻断）: {e}")
@@ -380,14 +529,26 @@ class FactRecorderExecutor(BaseExecutor):
         """落库章末角色状态到 character_state（每章覆盖 upsert）。"""
         count = 0
         try:
+            # 角色名 → 真实 id 映射（LLM 可能自造序号，落库前按名字兜底修正）
+            card_id_map = {}
+            try:
+                for c in get_character_cards_by_project(project_id) or []:
+                    nm = c.get("name", "") or c.get("character_name", "")
+                    if nm:
+                        card_id_map[nm] = c.get("id")
+            except Exception:
+                pass
             for s in states:
+                cname = str(s.get("character_name", "") or "").strip()
                 cid = s.get("character_id")
+                if not cid or cid not in set(card_id_map.values()):
+                    cid = card_id_map.get(cname)
                 if not cid:
                     continue
                 upsert_character_state(
                     project_id=project_id,
                     character_id=cid,
-                    character_name=s.get("character_name", ""),
+                    character_name=cname,
                     chapter_number=chapter_index,
                     location=s.get("location", ""),
                     state_summary=s.get("state_summary", ""),
@@ -493,6 +654,60 @@ class FactRecorderExecutor(BaseExecutor):
                 result.append(cp)
         return result
 
+    def _build_characters_text(self, project_id: int) -> str:
+        """构建角色清单文本（带真实 id），供事实提取识别角色与 character_id 使用。
+
+        直接从角色卡表读取（含本章刚建的新卡），id 为数据库真实主键，
+        避免 LLM 自造序号导致 character_states.character_id 断链。
+        """
+        try:
+            cards = get_character_cards_by_project(project_id) or []
+        except Exception:
+            cards = []
+        if not cards:
+            return "（暂无角色）"
+        lines = []
+        for c in cards:
+            name = c.get("name", "") or c.get("character_name", "")
+            if not name:
+                continue
+            identity = (c.get("identity") or "").strip()
+            parts = [f"id={c.get('id', 0)}", f"姓名：{name}"]
+            if identity:
+                parts.append(f"身份：{identity[:30]}")
+            lines.append("- " + " ｜ ".join(parts))
+        return "\n".join(lines) if lines else "（暂无角色）"
+
+    def _build_character_items_text(self, project_id: int) -> str:
+        """构建角色物品清单文本（各角色当前持有物品及数量），供 item_changes 名称对齐。
+
+        同一物品跨章提取时名称不稳定（玉简/青元剑诀玉简/残篇玉简），
+        注入已持有清单并要求 LLM 沿用清单名称，从源头防分裂。
+        """
+        try:
+            from repositories.base_repository import _get_conn
+            conn = _get_conn()
+            card_rows = conn.execute(
+                "SELECT id, name FROM webnovel_character_card WHERE project_id=?",
+                (project_id,),
+            ).fetchall()
+            item_rows = conn.execute(
+                "SELECT character_id, item_name, quantity FROM webnovel_character_item "
+                "WHERE character_id IN (SELECT id FROM webnovel_character_card WHERE project_id=?)",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            return "（暂无物品持有记录）"
+        if not item_rows:
+            return "（暂无物品持有记录）"
+        name_map = {r["id"]: (r["name"] or str(r["id"])) for r in card_rows}
+        by_char: Dict[str, List[str]] = {}
+        for r in item_rows:
+            cname = name_map.get(r["character_id"], f"id={r['character_id']}")
+            by_char.setdefault(cname, []).append(f"{r['item_name']}x{r['quantity']}")
+        lines = [f"- {name} 持有：" + "、".join(by_char[name]) for name in sorted(by_char)]
+        return "\n".join(lines)
+
     def _format_existing_chars_text(self, existing_chars: list) -> str:
         """将已有角色列表渲染为易读文本（替代 JSON 注入）。
 
@@ -521,12 +736,12 @@ class FactRecorderExecutor(BaseExecutor):
 
     async def _create_new_characters(
         self, script_id: int, draft_content: str, inventory: Dict[str, Any]
-    ):
-        """检测正文中的新角色并自动创建角色卡。"""
+    ) -> List[Tuple[str, int]]:
+        """检测正文中的新角色并自动创建角色卡。返回新卡 [(name, id), ...]。"""
         try:
             project = get_webnovel_project_by_script(script_id)
             if not project:
-                return
+                return []
             project_id = project["id"]
 
             # 获取已有角色名与曾用名（曾用名命中同样视为已有角色）
@@ -563,7 +778,7 @@ class FactRecorderExecutor(BaseExecutor):
                 log_manager.get_logger("fact_recorder").warning(
                     "[fact_recorder] create_new_characters prompt 模板加载为空，跳过新角色检测"
                 )
-                return
+                return []
 
             from core.model_executor import get_model_executor
             executor = get_model_executor()
@@ -579,7 +794,7 @@ class FactRecorderExecutor(BaseExecutor):
 
             content = result.get("content", "") if result else ""
             if not content:
-                return
+                return []
 
             char_data = parse_llm_json(
                 content,
@@ -590,11 +805,10 @@ class FactRecorderExecutor(BaseExecutor):
             )
 
             if not char_data or "new_characters" not in char_data:
-                return
+                return []
 
-            # 创建新角色卡（收集新卡 id 用于增量索引）
-            created = []
-            created_ids = []
+            # 创建新角色卡（收集新卡 name/id 供后续事实提取引用）
+            created_pairs: List[Tuple[str, int]] = []
             for char in char_data["new_characters"]:
                 if not isinstance(char, dict):
                     continue
@@ -637,9 +851,8 @@ class FactRecorderExecutor(BaseExecutor):
                     **card_kwargs,
                 )
                 existing_names.add(name)
-                created.append(name)
                 if new_card and new_card.get("id"):
-                    created_ids.append(new_card["id"])
+                    created_pairs.append((name, new_card["id"]))
                     # 记录基础设定变更（回退用）：新建角色卡
                     try:
                         add_setting_change(
@@ -653,13 +866,14 @@ class FactRecorderExecutor(BaseExecutor):
                     except Exception:
                         pass
 
-            if created:
+            if created_pairs:
                 from utils.logger import log_manager
                 logger = log_manager.get_logger("fact_recorder")
-                logger.info(f"[fact_recorder] 自动创建新角色卡: {created}")
+                logger.info(f"[fact_recorder] 自动创建新角色卡: {[n for n, _ in created_pairs]}")
 
+            return created_pairs
         except Exception:
-            pass
+            return []
 
     async def _save_character_updates(
         self, script_id: int, chapter_index: int,
@@ -769,6 +983,61 @@ class FactRecorderExecutor(BaseExecutor):
         text = re.split(r"[（(，,。]", text, 1)[0]
         return text.strip()
 
+    @staticmethod
+    def _net_item_changes(item_changes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """同章净合并物品变化：按 (角色, 物品) 汇总获得/失去数量，抵消后输出净变化。
+
+        - 获得 > 失去 → 一条"获得"（净数量）
+        - 失去 > 获得 → 一条"失去"（净数量）
+        - 相等或含"全部失去"（quantity=0）且获得存在 → 净 0，不改变账目（获得又全部失去）
+        - 仅单方向 → 原样透传
+        """
+        net: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        order: List[Tuple[str, str]] = []
+        for ic in item_changes:
+            key = (str(ic.get("character", "") or "").strip(), str(ic.get("item", "") or "").strip())
+            if not key[0] or not key[1]:
+                continue
+            action = str(ic.get("action", "") or "").strip()
+            if action not in ("获得", "失去"):
+                continue
+            try:
+                qty = int(float(ic.get("quantity") or 1))
+            except (TypeError, ValueError):
+                qty = 1
+            if key not in net:
+                net[key] = {"获得": 0, "失去": 0, "all_lost": False, "notes": []}
+                order.append(key)
+            if action == "失去" and qty <= 0:
+                net[key]["all_lost"] = True
+                net[key]["失去"] = max(net[key]["失去"], 0)
+            else:
+                net[key][action] += max(qty, 1)
+            note = str(ic.get("note", "") or "").strip()
+            if note:
+                net[key]["notes"].append(note)
+
+        out: List[Dict[str, Any]] = []
+        for key in order:
+            entry = net[key]
+            gain, lose = entry["获得"], entry["失去"]
+            note = "；".join(entry["notes"])
+            if gain > 0 and (lose > 0 or entry["all_lost"]):
+                # 获得又（部分/全部）失去：净抵消；全部失去 → 不改账
+                net_qty = gain - lose
+                if net_qty > 0 and not entry["all_lost"]:
+                    out.append({"character": key[0], "item": key[1], "action": "获得",
+                                "quantity": net_qty, "note": note})
+                # 净 0 或全部失去：不产出
+            elif gain > lose:
+                out.append({"character": key[0], "item": key[1], "action": "获得",
+                            "quantity": gain - lose, "note": note})
+            elif lose > gain:
+                out.append({"character": key[0], "item": key[1], "action": "失去",
+                            "quantity": lose - gain, "note": note})
+            # gain==lose==0 或仅失去0：不产出
+        return out
+
     def _save_item_changes(
         self, script_id: int, chapter_index: int,
         item_changes: List[Dict[str, Any]]
@@ -783,6 +1052,10 @@ class FactRecorderExecutor(BaseExecutor):
         try:
             from utils.logger import log_manager
             logger = log_manager.get_logger("fact_recorder")
+
+            # 同章净合并：同一角色+同一物品 获得/失去 抵消，避免"获得又失去"造成
+            # 账目虚增；净 0（含全部失去）不改账，仅保留流水日志。
+            item_changes = self._net_item_changes(item_changes)
 
             project = get_webnovel_project_by_script(script_id)
             if not project:
