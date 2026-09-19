@@ -87,7 +87,10 @@ def check_character_item(conn, project_id, chapter, out):
         d = dict(r)
         key = (d["character_id"], d["item_name"])
         latest[key] = d
-    zero = [f"{k[1]}" for k, v in latest.items() if (v.get("quantity") or 0) <= 0]
+    # quantity=0 且已记录 lost_chapter 视为"已失去"（正常记账），不列为问题；
+    # 仅 quantity=0 且无 lost_chapter 才是异常残留
+    zero = [f"{k[1]}" for k, v in latest.items()
+            if (v.get("quantity") or 0) <= 0 and not (v.get("lost_chapter") or 0)]
     dup = {}
     for r in rows:
         k = (dict(r)["character_id"], dict(r)["item_name"])
@@ -96,7 +99,7 @@ def check_character_item(conn, project_id, chapter, out):
     multi = [f"{k[1]}({c}条)" for k, c in dup.items() if c > 1]
     issues = []
     if zero:
-        issues.append("持有量为0的残留: " + ", ".join(zero))
+        issues.append("已失去（quantity=0，记录lost_chapter）: " + ", ".join(zero))
     if multi:
         issues.append("多条记录: " + ", ".join(multi))
     out.append({"维度": "角色物品", "结论": "有检查项" if issues else "正常",

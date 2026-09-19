@@ -11,6 +11,11 @@ user_prompt: |
   【已知设定】
   世界观: {world_settings}
   角色: {characters}
+  （角色行内 id 为数据库真实ID，character_id 字段必须使用清单中的 id，禁止自造序号）
+
+  【角色物品清单】
+  {character_items}
+  （各角色当前持有物品及数量。提取 item_changes 时：若该物品已存在于清单，item 必须使用与清单完全一致的名称；新物品用最简洁的标准名，不得带来源、状态等修饰词，如"玉简"而非"发光的玉简"）
 
   【前一章时间轴】
   {prev_timeline}
@@ -50,7 +55,7 @@ user_prompt: |
   - ending_location: 场景地点
 
   【角色状态 character_states】提取各主要角色在本章【结束时】的状态快照（仅限正文中实际出场的角色，每角色一条）：
-  - character_id: 角色ID（对应【角色】清单中的 id）
+  - character_id: 角色ID（必须使用【角色】清单中该角色行的真实 id）
   - character_name: 角色名
   - location: 章末所在位置
   - state_summary: 章末身体/处境状态（受伤/体力/得失/异常），用一句话概括
@@ -65,7 +70,7 @@ user_prompt: |
   注意：与【已知设定】中已存在的内容重复的不提取；正文中没有明确交代的不要臆造。
 
   【章节时间轴 chapter_timeline】基于本章原文与【前一章时间轴】，推断本章的时间信息，只输出一条：
-  - time_anchor: 本章故事发生的具体时间，依据原文时间描述与【前一章时间轴】推断，与前一章时间锚点保持同一纪年体系
+  - time_anchor: 本章故事发生的具体时间，必须与【前一章时间轴】锚点按 interval_from_prev 推进后的结果一致（如前一章"三月初五"、间隔"一日" → "三月初六"），不得与前一章锚点相同；仅当间隔为"连续""半日""当夜""跨夜"等不跨日表述时保持同一日期。正文有明确时间以正文为准
   - chapter_duration: 章内时间跨度（如"一夜""半日"，无法判断填"（未知）"）
   - interval_from_prev: 与上一章的时间间隔（"三日后"→三日；跨夜/连续等按原文描述），本章为首章且无前一章时填"（起始章）"
   - countdown_status: 原文出现倒计时（"还剩X天"等）时记录，否则填"无"
@@ -73,6 +78,6 @@ user_prompt: |
 
   【输出格式】
   请严格按照JSON格式输出，只输出JSON，不要包含任何其他内容：
-  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 1, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}], "world_settings": [{{"name": "名词", "content": "解释", "category": "分类"}}], "chapter_timeline": {{"time_anchor": "本章时间", "chapter_duration": "章内跨度", "interval_from_prev": "距上章间隔", "countdown_status": "无", "notes": "推理说明"}}}}
+  {{"item_changes": [{{"character": "角色名", "action": "获得|失去", "item": "物品名", "quantity": 1, "note": "说明"}}], "character_updates": [{{"type": "关系|身份揭露|成长|能力", "character": "角色名", "target": "关联角色", "alias": "曾用名", "real_name": "真名", "ability": "能力名", "description": "说明"}}], "cool_points": [{{"content": "爽点内容", "cool_point_type": "类型", "execution_mode": "模式", "structure_stage": "铺垫/爆发/释放", "pressure_level": 1, "release_level": 1, "reader_emotion": "情感", "impact_score": 1, "evidence": "证据"}}], "hook": {{"hook_content": "结尾状态", "hook_type": "类型", "hook_strength": "强/中/弱", "hook_pattern": "手法", "ending_emotion": "情感", "ending_time": "时间", "ending_location": "地点"}}, "character_states": [{{"character_id": 275, "character_name": "角色名", "location": "位置", "state_summary": "状态", "emotion": "情绪", "knowledge": "认知", "notes": "备注"}}], "world_settings": [{{"name": "名词", "content": "解释", "category": "分类"}}], "chapter_timeline": {{"time_anchor": "本章时间", "chapter_duration": "章内跨度", "interval_from_prev": "距上章间隔", "countdown_status": "无", "notes": "推理说明"}}}}
   cool_points/character_states/item_changes/character_updates/world_settings 无内容时输出空数组，hook 无内容时输出空对象，chapter_timeline 无法推断时输出空对象。
 ---

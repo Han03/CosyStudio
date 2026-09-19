@@ -19,6 +19,7 @@ except ImportError:
 _PARSE_STRATEGIES = [
     ("direct", "直接解析/ json_repair 容错解析"),
     ("normalize_quotes", "统一中文引号到英文引号"),
+    ("fix_over_closed_braces", "修复对象过度闭合（}}, \"key\" → }, \"key\"）"),
     ("fix_missing_quotes", "修复缺失的引号(值缺前引号/键缺前引号/缺冒号)"),
     ("fix_string_end_key", "修复字符串结束后直接跟'key':"),
     ("fix_merged_keys", "修复被合并的键值对"),
@@ -177,13 +178,21 @@ def parse_llm_json(
                     break
             except json.JSONDecodeError:
                 continue
-        content = picked or blocks[-1]
+        if picked:
+            content = picked
+        # 无完整 dict 块（如单个完整 JSON 因内部语法错误被拆成残段）：
+        # 保持原文交给下方括号提取与修复策略链，避免取数组残块丢失修复机会
 
     # 提取最外层的 JSON 对象
+    # 仅当内容不以完整对象开头结尾时执行；完整 JSON 原文（去围栏后首{尾}）直接交给策略链，
+    # 避免括号深度在"对象提前闭合"等错误结构下截断出残段，导致修复策略失效。
     # 使用括号深度计数找到首个 { 的匹配 }，而非 rfind("}")，
     # 避免 LLM 在 JSON 后附加解释文本（含 } 字符）时截取范围过大导致解析失败。
+    stripped = content.strip()
+    # 完整对象包裹（首{尾}）直接跳过括号提取；否则尝试提取（LLM 附加解释文本场景）
+    _looks_complete = stripped.startswith("{") and stripped.endswith("}")
     first_brace = content.find("{")
-    if first_brace != -1:
+    if first_brace != -1 and not _looks_complete:
         depth = 0
         in_string = False
         escape_next = False
@@ -238,6 +247,7 @@ def parse_llm_json(
     strategies = [
         ("direct", lambda x: x),
         ("normalize_quotes", _normalize_quotes),
+        ("fix_over_closed_braces", _fix_over_closed_braces),
         ("fix_missing_quotes", _fix_missing_quotes),
         ("fix_string_end_key", _fix_string_end_key),
         ("fix_merged_keys", _fix_merged_keys),
@@ -885,6 +895,57 @@ def _fix_missing_commas_in_objects(text: str) -> str:
         result.append(ch)
         i += 1
     
+    return ''.join(result)
+
+
+def _fix_over_closed_braces(text: str) -> str:
+    """修复对象过度闭合：字符串外 `}}, "` → `}, "`。
+
+    LLM 偶发在嵌套对象后多加一个闭合括号再续写下一个 key
+    （如 `"filters": {...}}, "text": ...`），导致外层对象被提前闭合、
+    后续 key 悬空。合法 JSON 中字符串外 `}}` 后不可能直接跟 `, "key"`，
+    因此该替换安全；字符串内的 `}}, "` 由 in_string 状态跳过。
+    """
+    result = []
+    in_string = False
+    escape = False
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if escape:
+            result.append(ch)
+            escape = False
+            i += 1
+            continue
+        if in_string:
+            if ch == '\\':
+                escape = True
+                result.append(ch)
+                i += 1
+                continue
+            if ch == '"':
+                in_string = False
+            result.append(ch)
+            i += 1
+            continue
+        # 对象过度闭合：}} 后跟逗号 + key（删除多余的第二个 }，保留第一个）
+        if ch == '}' and i + 1 < n and text[i + 1] == '}':
+            j = i + 2
+            while j < n and text[j] in ' \t\n\r':
+                j += 1
+            if j < n and text[j] == ',':
+                k = j + 1
+                while k < n and text[k] in ' \t\n\r':
+                    k += 1
+                if k < n and text[k] == '"':
+                    result.append(ch)
+                    i += 2
+                    continue
+        if ch == '"':
+            in_string = True
+        result.append(ch)
+        i += 1
     return ''.join(result)
 
 
