@@ -63,6 +63,13 @@ app.include_router(webnovel_init_router)
 app.include_router(agent_bridge_router)
 
 # ============================================================
+# 探活端点（能力注册中心 CP probe 固定探测 {baseUrl}/healthz）
+# ============================================================
+@app.get("/healthz")
+async def healthz():
+    return {"status": "UP"}
+
+# ============================================================
 # 生命周期钩子
 # ============================================================
 register_startup_hooks(app)
