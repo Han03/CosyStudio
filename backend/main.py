@@ -31,6 +31,7 @@ from api.audio_synthesize import router as audio_synthesize_router
 from api.books import router as books_router
 from api.asr import router as asr_router
 from api.model_capability import router as model_capability_router
+from api.agent_bridge import router as agent_bridge_router
 from webnovel.api.routes import router as webnovel_router
 from webnovel.api.integration_routes import router as webnovel_integration_router
 from webnovel.api.init_routes import router as webnovel_init_router
@@ -59,6 +60,7 @@ app.include_router(model_capability_router)
 app.include_router(webnovel_router)
 app.include_router(webnovel_integration_router)
 app.include_router(webnovel_init_router)
+app.include_router(agent_bridge_router)
 
 # ============================================================
 # 生命周期钩子
