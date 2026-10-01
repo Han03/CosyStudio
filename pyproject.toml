@@ -27,7 +27,6 @@ dependencies = [
     "librosa==0.10.2",
     "scipy==1.15.3",
     "numpy==1.26.4",
-    "openai-whisper==20231117",
     # CosyVoice TTS 依赖
     "hyperpyyaml==1.2.3",
     "conformer==0.3.2",
@@ -50,3 +49,7 @@ dependencies = [
     "kivy==2.3.1",
     "watchdog==6.0.0",
 ]
+
+[project.optional-dependencies]
+# ASR 语音转写：whisper 惰性加载，仅调用 /api/asr 时才需要
+asr = ["openai-whisper==20231117"]
